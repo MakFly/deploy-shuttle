@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.shuttle/key
+.shuttle/secrets/
+.shuttle-dev/
+*.enc
+.env
+.env.*
+!.env.example
+data/
+.astro/
+.claude/agent-memory/
