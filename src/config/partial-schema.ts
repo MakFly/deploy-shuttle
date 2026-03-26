@@ -3,6 +3,7 @@ import {
 	accessorySchema,
 	buildSchema,
 	deploySchema,
+	devSchema,
 	envSchema,
 	notificationsSchema,
 	proxySchema,
@@ -11,6 +12,7 @@ import {
 	serverGroupSchema,
 	serverShorthandSchema,
 	serviceSchema,
+	swarmSchema,
 	tunnelSchema,
 } from './schema.ts'
 
@@ -34,6 +36,7 @@ export const partialConfigSchema = z.object({
 	image: z.string().min(1).optional(),
 	registry: registrySchema.optional(),
 	deploy: deploySchema.optional(),
+	swarm: swarmSchema.optional(),
 	services: z.record(serviceSchema).optional(),
 	accessories: z.record(accessorySchema).optional(),
 	secrets: secretsSchema.optional(),
@@ -41,6 +44,7 @@ export const partialConfigSchema = z.object({
 	proxy: proxySchema.optional(),
 	tunnel: tunnelSchema.optional(),
 	notifications: notificationsSchema.optional(),
+	dev: devSchema.optional(),
 })
 
 export type PartialConfig = z.infer<typeof partialConfigSchema>

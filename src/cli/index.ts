@@ -20,6 +20,9 @@ const mainCommand = defineCommand({
 		exec: () => import('./exec.ts').then((m) => m.default),
 		lock: () => import('./lock.ts').then((m) => m.default),
 		license: () => import('./license.ts').then((m) => m.default),
+		ci: () => import('./ci.ts').then((m) => m.default),
+		new: () => import('./new.ts').then((m) => m.default),
+		dev: () => import('./dev.ts').then((m) => m.default),
 	},
 })
 

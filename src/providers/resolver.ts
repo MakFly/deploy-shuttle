@@ -2,11 +2,13 @@ import type { ShuttleConfig } from '../config/schema.ts'
 import type { DockerManager } from '../core/docker-manager.ts'
 import type { SSHManager } from '../core/ssh-manager.ts'
 import { requirePremium } from '../license/gate.ts'
-import type { RegistryProvider } from './types.ts'
 import { DockerHubRegistry } from './registry/docker-hub.ts'
 import { GHCRRegistry } from './registry/ghcr.ts'
 import { ImageRefRegistry } from './registry/image-ref.ts'
+import { LocalRegistryProvider } from './registry/local-registry.ts'
 import { LocalTransferRegistry } from './registry/local-transfer.ts'
+import { AESSecretsProvider } from './secrets/aes.ts'
+import type { RegistryProvider, SecretsProvider } from './types.ts'
 
 // ---------------------------------------------------------------------------
 // Registry resolver
@@ -43,6 +45,8 @@ export function resolveRegistry(
 			return new DockerHubRegistry(docker, ssh)
 		case 'local-transfer':
 			return new LocalTransferRegistry(docker)
+		case 'local-registry':
+			return new LocalRegistryProvider(docker, ssh)
 		case 'custom':
 			// Custom registries follow the same login-then-pull flow as GHCR.
 			return new GHCRRegistry(docker, ssh)
@@ -53,4 +57,12 @@ export function resolveRegistry(
 			throw new Error(`Unknown registry driver: ${String(_exhaustive)}`)
 		}
 	}
+}
+
+// ---------------------------------------------------------------------------
+// Secrets resolver
+// ---------------------------------------------------------------------------
+
+export function resolveSecrets(_config: ShuttleConfig): SecretsProvider {
+	return new AESSecretsProvider()
 }

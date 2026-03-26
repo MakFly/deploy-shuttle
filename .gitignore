@@ -10,3 +10,6 @@ dist/
 data/
 .astro/
 .claude/agent-memory/
+
+# instant-grep index
+.ig/

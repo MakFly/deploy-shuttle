@@ -21,6 +21,21 @@ export const buildSchema = z.object({
 export type BuildConfig = z.infer<typeof buildSchema>
 
 // ---------------------------------------------------------------------------
+// Swarm
+// ---------------------------------------------------------------------------
+
+export const swarmSchema = z.object({
+	replicas: z.number().int().positive().default(2),
+	update_parallelism: z.number().int().positive().default(1),
+	update_delay: z.string().default('10s'),
+	update_order: z.enum(['start-first', 'stop-first']).default('start-first'),
+	monitor: z.string().default('15s'),
+	convergence_timeout: z.number().int().positive().default(300),
+})
+
+export type SwarmConfig = z.infer<typeof swarmSchema>
+
+// ---------------------------------------------------------------------------
 // Deploy
 // ---------------------------------------------------------------------------
 
@@ -39,7 +54,7 @@ export const blueGreenSchema = z.object({
 export type BlueGreenConfig = z.infer<typeof blueGreenSchema>
 
 export const deploySchema = z.object({
-	strategy: z.enum(['blue-green', 'rolling']).optional(),
+	strategy: z.enum(['blue-green', 'rolling', 'swarm']).optional(),
 	blue_green: blueGreenSchema.optional(),
 	timeout: z.number().int().positive().optional(),
 	retain: z.number().int().positive().optional(),
@@ -116,12 +131,17 @@ export type ServiceConfig = z.infer<typeof serviceSchema>
 // Accessories
 // ---------------------------------------------------------------------------
 
-export const accessorySchema = z.object({
-	image: z.string().min(1),
-	port: z.union([z.string(), z.number().int().positive()]).optional(),
-	volumes: z.array(z.string()).optional(),
-	env: z.record(z.string()).optional(),
-})
+export const accessorySchema = z
+	.object({
+		preset: z.enum(['postgres', 'mysql', 'mariadb', 'redis', 'mailpit', 'meilisearch']).optional(),
+		image: z.string().min(1).optional(),
+		port: z.union([z.string(), z.number().int().positive()]).optional(),
+		volumes: z.array(z.string()).optional(),
+		env: z.record(z.string()).optional(),
+	})
+	.refine((data) => data.preset !== undefined || data.image !== undefined, {
+		message: 'Either "preset" or "image" must be provided for each accessory.',
+	})
 
 export type AccessoryConfig = z.infer<typeof accessorySchema>
 
@@ -130,7 +150,7 @@ export type AccessoryConfig = z.infer<typeof accessorySchema>
 // ---------------------------------------------------------------------------
 
 export const registrySchema = z.object({
-	driver: z.enum(['local-transfer', 'docker-hub', 'ghcr', 'custom']).optional(),
+	driver: z.enum(['local-transfer', 'local-registry', 'docker-hub', 'ghcr', 'custom']).optional(),
 	url: z.string().optional(),
 	username: z.string().optional(),
 	password_env: z.string().optional(),
@@ -201,6 +221,23 @@ export const notificationsSchema = z.object({
 export type NotificationsConfig = z.infer<typeof notificationsSchema>
 
 // ---------------------------------------------------------------------------
+// Dev (local development)
+// ---------------------------------------------------------------------------
+
+export const devSchema = z.object({
+	ssl: z.boolean().default(true),
+	domain: z.string().optional(),
+	ports: z
+		.object({
+			http: z.number().int().positive().default(80),
+			https: z.number().int().positive().default(443),
+		})
+		.default({}),
+})
+
+export type DevConfig = z.infer<typeof devSchema>
+
+// ---------------------------------------------------------------------------
 // Raw input shape (before normalisation)
 // ---------------------------------------------------------------------------
 
@@ -221,6 +258,7 @@ const rawConfigSchema = z
 		// registry for image distribution
 		registry: registrySchema.optional(),
 		deploy: deploySchema.optional(),
+		swarm: swarmSchema.optional(),
 		services: z.record(serviceSchema).optional(),
 		accessories: z.record(accessorySchema).optional(),
 		secrets: secretsSchema.optional(),
@@ -228,6 +266,7 @@ const rawConfigSchema = z
 		proxy: proxySchema.optional(),
 		tunnel: tunnelSchema.optional(),
 		notifications: notificationsSchema.optional(),
+		dev: devSchema.optional(),
 	})
 	.refine((data) => data.server !== undefined || data.servers !== undefined, {
 		message: 'Either "server" (shorthand) or "servers" must be provided.',

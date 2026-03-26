@@ -9,7 +9,7 @@ import type { ProxyProvider } from '../types.ts'
 // CaddyProxyProvider
 // ---------------------------------------------------------------------------
 
-const CADDYFILE_REMOTE_PATH = '/etc/caddy/Caddyfile'
+const CADDYFILE_REMOTE_PATH = '/opt/caddy/Caddyfile'
 const CADDY_CONTAINER_NAME = 'caddy'
 const CADDY_CONFIG_IN_CONTAINER = '/etc/caddy/Caddyfile'
 

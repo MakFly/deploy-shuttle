@@ -1,6 +1,8 @@
 import path from 'node:path'
 import { parse } from 'yaml'
 import type { z } from 'zod'
+import { resolveAccessoryPreset } from '../presets/accessories.ts'
+import type { AccessoryPresetName } from '../presets/accessories.ts'
 import { ConfigError } from '../utils/errors.ts'
 import { assertSafeName } from '../utils/shell.ts'
 import { defaults } from './defaults.ts'
@@ -48,6 +50,25 @@ function applyHealthcheckDefaults(hc: HealthcheckConfig): HealthcheckConfig {
 		...(hc.type === 'http' ? { path: defaults.healthcheck.path } : {}),
 		...hc,
 	} as HealthcheckConfig
+}
+
+/**
+ * Resolve accessory presets into full config with image, port, volumes, env.
+ */
+function resolvePresets(config: ShuttleConfig): ShuttleConfig {
+	if (!config.accessories) return config
+
+	const resolved = Object.fromEntries(
+		Object.entries(config.accessories).map(([name, acc]) => {
+			if (acc.preset) {
+				const { preset, ...overrides } = acc
+				return [name, resolveAccessoryPreset(preset as AccessoryPresetName, overrides)]
+			}
+			return [name, acc]
+		}),
+	)
+
+	return { ...config, accessories: resolved }
 }
 
 /**
@@ -205,9 +226,7 @@ export async function loadConfig(filePath?: string, env?: string): Promise<Shutt
 			// Validate overlay with partial schema
 			const envResult = partialConfigSchema.safeParse(envParsed)
 			if (!envResult.success) {
-				throw new ConfigError(
-					`Invalid ${envFilename}:\n${formatZodError(envResult.error)}`,
-				)
+				throw new ConfigError(`Invalid ${envFilename}:\n${formatZodError(envResult.error)}`)
 			}
 
 			// Deep merge: overlay wins
@@ -224,6 +243,9 @@ export async function loadConfig(filePath?: string, env?: string): Promise<Shutt
 	// 5. Validate names
 	validateNames(result.data)
 
-	// 6. Apply defaults
-	return applyDefaults(result.data)
+	// 6. Resolve accessory presets
+	const resolved = resolvePresets(result.data)
+
+	// 7. Apply defaults
+	return applyDefaults(resolved)
 }

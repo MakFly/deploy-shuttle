@@ -1,6 +1,11 @@
 import type { ShuttleConfig } from '../config/schema.ts'
+import { createCaddyProxyProvider } from '../providers/proxy/caddy.ts'
+import { resolveRegistry, resolveSecrets } from '../providers/resolver.ts'
+import { BlueGreenStrategy } from '../providers/strategy/blue-green.ts'
+import { RollingStrategy } from '../providers/strategy/rolling.ts'
+import { SwarmStrategy } from '../providers/strategy/swarm.ts'
+import type { DeployStrategy } from '../providers/types.ts'
 import { DeployError } from '../utils/errors.ts'
-import { checkHttp, checkTcp, waitForHealth } from '../utils/health.ts'
 import { logger } from '../utils/logger.ts'
 import type { AccessoryManager } from './accessory-manager.ts'
 import { accessories as defaultAccessories } from './accessory-manager.ts'
@@ -41,19 +46,6 @@ export class DeployManager {
 	getServicePort(serviceIndex: number, slot: 'blue' | 'green'): number {
 		const offset = slot === 'blue' ? BLUE_OFFSET : GREEN_OFFSET
 		return BASE_PORT + serviceIndex * 2 + offset
-	}
-
-	private async getShortSha(): Promise<string> {
-		try {
-			const proc = Bun.spawn(['git', 'rev-parse', '--short', 'HEAD'], { stdout: 'pipe' })
-			return (await new Response(proc.stdout).text()).trim()
-		} catch {
-			return Date.now().toString(36)
-		}
-	}
-
-	private async sleep(ms: number): Promise<void> {
-		await new Promise((resolve) => setTimeout(resolve, ms))
 	}
 
 	private async createInFlightState(
@@ -109,59 +101,6 @@ export class DeployManager {
 		)
 	}
 
-	private buildHealthCheck(
-		healthcheck: NonNullable<NonNullable<ShuttleConfig['services']>[string]['healthcheck']>,
-		host: string,
-		container: string,
-		port: number,
-		timeoutMs: number,
-	): () => Promise<boolean> {
-		if (healthcheck.type === 'http') {
-			const hcPath = healthcheck.path ?? '/'
-			return () => checkHttp(`http://127.0.0.1:${port}${hcPath}`, timeoutMs)
-		}
-		if (healthcheck.type === 'exec') {
-			return async () => {
-				const { code } = await this.docker.exec(host, container, healthcheck.command)
-				return code === 0
-			}
-		}
-		return () => checkTcp('127.0.0.1', port, timeoutMs)
-	}
-
-	private async runHealthCheck(
-		config: ShuttleConfig,
-		host: string,
-		service: string,
-		containerName: string,
-		port: number,
-	): Promise<void> {
-		const healthcheck = config.services?.[service]?.healthcheck
-		const healthTimeout = config.deploy?.timeout ?? 60
-
-		if (healthcheck === undefined) {
-			return
-		}
-
-		const readinessDelayMs = (config.deploy?.blue_green?.readiness_delay ?? 0) * 1000
-		if (readinessDelayMs > 0) {
-			await this.sleep(readinessDelayMs)
-		}
-
-		const hcTimeoutMs = (healthcheck.timeout ?? healthTimeout) * 1000
-		const check = this.buildHealthCheck(healthcheck, host, containerName, port, hcTimeoutMs)
-
-		const healthy = await waitForHealth(check, {
-			timeout: hcTimeoutMs,
-			retries: healthcheck.retries ?? 5,
-			interval: healthcheck.interval ?? 2000,
-		})
-
-		if (!healthy) {
-			throw new DeployError(`Health check did not pass for "${service}" on ${host}`, 'healthcheck')
-		}
-	}
-
 	private async runPostDeployHooks(config: ShuttleConfig, host: string): Promise<void> {
 		for (const hook of config.deploy?.hooks?.post_deploy ?? []) {
 			try {
@@ -172,7 +111,34 @@ export class DeployManager {
 		}
 	}
 
-	private logDryRun(config: ShuttleConfig, host: string, strategy: 'blue-green' | 'rolling'): void {
+	private createStrategy(name: string, config: ShuttleConfig): DeployStrategy {
+		const registry = resolveRegistry(config, this.docker, this.ssh)
+		const proxy = createCaddyProxyProvider(this.ssh)
+		const secrets = resolveSecrets(config)
+		const deps = {
+			docker: this.docker,
+			ssh: this.ssh,
+			runtime: this.runtime,
+			secrets,
+			registry,
+			proxy,
+		}
+
+		switch (name) {
+			case 'rolling':
+				return new RollingStrategy(deps)
+			case 'swarm':
+				return new SwarmStrategy(deps)
+			default:
+				return new BlueGreenStrategy(deps)
+		}
+	}
+
+	private logDryRun(
+		config: ShuttleConfig,
+		host: string,
+		strategy: 'blue-green' | 'rolling' | 'swarm',
+	): void {
 		logger.info(`[dry-run] Host ${host}`)
 		logger.info(`[dry-run] Strategy: ${strategy}`)
 		logger.info(`[dry-run] Services: ${Object.keys(config.services ?? {}).join(', ')}`)
@@ -218,19 +184,17 @@ export class DeployManager {
 			for (let i = 0; i < serviceEntries.length; i++) {
 				const [serviceName] = serviceEntries[i]
 				logger.info(`Deploying service "${serviceName}" to ${host} (${strategy})`)
-				await this.updateInFlight(
+				await this.updateInFlight(config, host, `deploying ${serviceName}`, 'running', serviceName)
+
+				const strategyImpl = this.createStrategy(strategy, config)
+				await strategyImpl.execute({
 					config,
 					host,
-					`deploying ${serviceName}`,
-					'running',
-					serviceName,
-				)
-
-				if (strategy === 'rolling') {
-					await this.rollingDeploy(config, host, serviceName, i, options)
-				} else {
-					await this.blueGreenDeploy(config, host, serviceName, i, options)
-				}
+					service: serviceName,
+					serviceIndex: i,
+					tag: '',
+					options,
+				})
 			}
 
 			await this.updateInFlight(config, host, 'running post-deploy hooks', 'running')
@@ -295,254 +259,8 @@ export class DeployManager {
 			const details = failed
 				.map((r) => `  - ${r.host} (${r.group}): ${r.error?.message ?? 'unknown error'}`)
 				.join('\n')
-			throw new DeployError(
-				`Deploy failed on ${failed.length} host(s):\n${details}`,
-				'deploy',
-			)
+			throw new DeployError(`Deploy failed on ${failed.length} host(s):\n${details}`, 'deploy')
 		}
-	}
-
-	async blueGreenDeploy(
-		config: ShuttleConfig,
-		host: string,
-		service: string,
-		serviceIndex: number,
-		options: DeployOptions = {},
-	): Promise<void> {
-		const TOTAL_STEPS = 12
-
-		logger.step(1, TOTAL_STEPS, 'Reading deployment state')
-
-		let state: DeployState | null = null
-		try {
-			state = await this.runtime.readState(host, config.app)
-		} catch {
-			// First deploy.
-		}
-
-		const activeSlot = state?.active_slot ?? 'blue'
-		const newSlot: 'blue' | 'green' = activeSlot === 'blue' ? 'green' : 'blue'
-		const newPort = this.getServicePort(serviceIndex, newSlot)
-
-		const newContainerName = `${config.app}_${service}_${newSlot}`
-		const oldContainerName = state !== null ? `${config.app}_${service}_${activeSlot}` : null
-
-		logger.step(2, TOTAL_STEPS, 'Generating image tag')
-
-		const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-		const shortSha = await this.getShortSha()
-		const tag = `shuttle/${config.app}:deploy-${date}-${shortSha}`
-
-		if (!options.skipBuild) {
-			logger.step(3, TOTAL_STEPS, `Building image ${tag}`)
-			await this.docker.build({
-				dockerfile: config.build?.dockerfile,
-				context: config.build?.context,
-				target: config.build?.target,
-				platform: config.build?.platform,
-				tag,
-				args: config.build?.args,
-			})
-
-			logger.step(4, TOTAL_STEPS, `Transferring image to ${host}`)
-			await this.docker.transfer(tag, host)
-		} else {
-			logger.step(3, TOTAL_STEPS, 'Skipping build (--skip-build)')
-			logger.step(4, TOTAL_STEPS, 'Skipping transfer (--skip-build)')
-		}
-
-		logger.step(5, TOTAL_STEPS, 'Uploading environment')
-
-		try {
-			await this.secrets.push(host, config.app)
-		} catch (err) {
-			logger.warn(
-				`No secrets to push or push failed — continuing: ${err instanceof Error ? err.message : String(err)}`,
-			)
-		}
-
-		const envFilePath = `${this.runtime.getWorkDir(config.app)}/.env`
-
-		logger.step(6, TOTAL_STEPS, `Starting container on ${newSlot} slot (port ${newPort})`)
-
-		await this.docker.stop(host, newContainerName)
-		await this.docker.run(host, {
-			name: newContainerName,
-			image: tag,
-			port: `127.0.0.1:${newPort}:${config.services?.[service]?.port ?? 3000}`,
-			envFile: envFilePath,
-			command: config.services?.[service]?.command,
-			labels: {
-				'shuttle.kind': 'service',
-				'shuttle.service': service,
-			},
-		})
-
-		logger.step(7, TOTAL_STEPS, 'Waiting for health check')
-
-		try {
-			await this.runHealthCheck(config, host, service, newContainerName, newPort)
-		} catch (err) {
-			if (config.deploy?.auto_rollback ?? true) {
-				await this.docker.stop(host, newContainerName)
-			}
-			throw DeployError.wrap(err, `Health check failed for "${service}" on ${host}`, 'healthcheck')
-		}
-
-		logger.step(8, TOTAL_STEPS, 'Switching proxy upstream')
-
-		const domains = Array.isArray(config.domain) ? config.domain[0] : config.domain
-		await this.proxy.switchUpstream(host, domains, newPort)
-
-		logger.step(9, TOTAL_STEPS, 'Updating deployment state')
-
-		const newState: DeployState = {
-			active_slot: newSlot,
-			active_tag: tag,
-			previous_tag: state?.active_tag,
-			port: newPort,
-			deployed_at: new Date().toISOString(),
-			version: (state?.version ?? 0) + 1,
-		}
-
-		await this.runtime.writeState(host, config.app, newState)
-
-		logger.step(10, TOTAL_STEPS, 'Draining old container')
-
-		if (oldContainerName !== null) {
-			const drainTimeout = config.deploy?.blue_green?.drain_timeout ?? 30
-			await this.docker.stop(host, oldContainerName, drainTimeout)
-		}
-
-		logger.step(11, TOTAL_STEPS, 'Tagging images')
-
-		await this.docker.tag(host, tag, `shuttle/${config.app}:current`)
-		if (state?.active_tag !== undefined) {
-			await this.docker.tag(host, state.active_tag, `shuttle/${config.app}:previous`)
-		}
-
-		logger.step(12, TOTAL_STEPS, 'Cleaning up old images')
-
-		const retain = config.deploy?.retain ?? 3
-		await this.docker.prune(host, retain, `shuttle/${config.app}:deploy-`)
-
-		logger.success(`Service "${service}" deployed to ${host} — slot ${newSlot} on port ${newPort}`)
-	}
-
-	async rollingDeploy(
-		config: ShuttleConfig,
-		host: string,
-		service: string,
-		serviceIndex: number,
-		options: DeployOptions = {},
-	): Promise<void> {
-		const TOTAL_STEPS = 8
-		const replicas = config.services?.[service]?.replicas ?? 1
-
-		logger.step(1, TOTAL_STEPS, 'Generating image tag')
-
-		let state: DeployState | null = null
-		try {
-			state = await this.runtime.readState(host, config.app)
-		} catch {
-			// First deploy.
-		}
-
-		const previousTag = state?.active_tag
-		const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-		const shortSha = await this.getShortSha()
-		const tag = `shuttle/${config.app}:deploy-${date}-${shortSha}`
-
-		if (!options.skipBuild) {
-			logger.step(2, TOTAL_STEPS, `Building image ${tag}`)
-			await this.docker.build({
-				dockerfile: config.build?.dockerfile,
-				context: config.build?.context,
-				target: config.build?.target,
-				platform: config.build?.platform,
-				tag,
-				args: config.build?.args,
-			})
-
-			logger.step(3, TOTAL_STEPS, 'Transferring image')
-			await this.docker.transfer(tag, host)
-		} else {
-			logger.step(2, TOTAL_STEPS, 'Skipping build (--skip-build)')
-			logger.step(3, TOTAL_STEPS, 'Skipping transfer (--skip-build)')
-		}
-
-		logger.step(4, TOTAL_STEPS, 'Uploading environment')
-		try {
-			await this.secrets.push(host, config.app)
-		} catch (err) {
-			logger.warn(
-				`No secrets to push — continuing: ${err instanceof Error ? err.message : String(err)}`,
-			)
-		}
-
-		const envFilePath = `${this.runtime.getWorkDir(config.app)}/.env`
-		const basePort = this.getServicePort(serviceIndex, 'blue')
-
-		for (let i = 0; i < replicas; i++) {
-			const containerName = `${config.app}_${service}_${i}`
-			const servicePort = config.services?.[service]?.port ?? 3000
-			const hostPort = basePort + i * 2
-
-			logger.step(5, TOTAL_STEPS, `Replacing replica ${i + 1}/${replicas} (${containerName})`)
-
-			await this.docker.stop(host, containerName, 30)
-			await this.docker.run(host, {
-				name: containerName,
-				image: tag,
-				port: `127.0.0.1:${hostPort}:${servicePort}`,
-				envFile: envFilePath,
-				command: config.services?.[service]?.command,
-				labels: {
-					'shuttle.kind': 'service',
-					'shuttle.service': service,
-				},
-			})
-
-			try {
-				await this.runHealthCheck(config, host, service, containerName, hostPort)
-			} catch (err) {
-				if ((config.deploy?.auto_rollback ?? true) && previousTag !== undefined) {
-					await this.docker.stop(host, containerName)
-					await this.docker.run(host, {
-						name: containerName,
-						image: previousTag,
-						port: `127.0.0.1:${hostPort}:${servicePort}`,
-						envFile: envFilePath,
-						command: config.services?.[service]?.command,
-						labels: {
-							'shuttle.kind': 'service',
-							'shuttle.service': service,
-						},
-					})
-					await this.runHealthCheck(config, host, service, containerName, hostPort)
-				}
-
-				throw DeployError.wrap(
-					err,
-					`Health check failed for rolling replica ${containerName} on ${host}`,
-					'healthcheck',
-				)
-			}
-		}
-
-		logger.step(8, TOTAL_STEPS, 'Updating deployment state')
-
-		const newState: DeployState = {
-			active_slot: 'blue',
-			active_tag: tag,
-			previous_tag: previousTag,
-			port: basePort,
-			deployed_at: new Date().toISOString(),
-			version: (state?.version ?? 0) + 1,
-		}
-
-		await this.runtime.writeState(host, config.app, newState)
-		logger.success(`Rolling deploy of "${service}" complete on ${host}`)
 	}
 
 	async readState(host: string, app: string): Promise<DeployState> {

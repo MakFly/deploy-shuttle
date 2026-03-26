@@ -18,7 +18,7 @@ export interface InFlightDeployState {
 	status: 'running' | 'failed'
 	app: string
 	host: string
-	strategy: 'blue-green' | 'rolling'
+	strategy: 'blue-green' | 'rolling' | 'swarm'
 	service?: string
 	stage: string
 	error?: string
