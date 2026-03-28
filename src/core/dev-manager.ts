@@ -17,12 +17,18 @@ export class DevManager {
 		this.cwd = cwd
 	}
 
-	async up(): Promise<void> {
-		const config = await loadConfig()
+	async up(configOverride?: ShuttleConfig, watch = false): Promise<void> {
+		const config = configOverride ?? (await loadConfig())
 		const shuttleDir = path.join(this.cwd, '.shuttle')
 
 		// Step 1: SSL setup
-		const ssl = await this.setupSSL(shuttleDir, config.domain)
+		const devDomain = config.dev?.domain
+		const sslDomains = devDomain
+			? [devDomain]
+			: Array.isArray(config.domain)
+				? config.domain
+				: [config.domain]
+		const ssl = await this.setupSSL(shuttleDir, sslDomains)
 
 		// Step 2: Generate Caddyfile
 		const caddyServices = this.buildCaddyServices(config)
@@ -41,6 +47,16 @@ export class DevManager {
 
 		// Step 4: Run docker compose
 		logger.start('Starting development environment...')
+
+		if (watch) {
+			const proc = Bun.spawn(
+				['docker', 'compose', '-f', 'docker-compose.dev.yml', 'up', '--watch'],
+				{ cwd: this.cwd, stdout: 'inherit', stderr: 'inherit' },
+			)
+			await proc.exited
+			return
+		}
+
 		const result = Bun.spawnSync(
 			['docker', 'compose', '-f', 'docker-compose.dev.yml', 'up', '-d', '--build'],
 			{ cwd: this.cwd, stdout: 'inherit', stderr: 'inherit' },
@@ -53,7 +69,12 @@ export class DevManager {
 		// Step 5: Print URLs
 		logger.success('Development environment started!')
 		logger.info('')
-		const domains = Array.isArray(config.domain) ? config.domain : [config.domain]
+		const devDomainUrl = config.dev?.domain
+		const domains = devDomainUrl
+			? [devDomainUrl]
+			: Array.isArray(config.domain)
+				? config.domain
+				: [config.domain]
 		for (const domain of domains) {
 			logger.info(`  https://${domain}`)
 		}
@@ -141,7 +162,12 @@ export class DevManager {
 	}
 
 	private buildCaddyServices(config: ShuttleConfig): DevCaddyService[] {
-		const domains = Array.isArray(config.domain) ? config.domain : [config.domain]
+		const devDomain = config.dev?.domain
+		const domains = devDomain
+			? [devDomain]
+			: Array.isArray(config.domain)
+				? config.domain
+				: [config.domain]
 		const services: DevCaddyService[] = []
 
 		if (config.services) {
@@ -200,10 +226,12 @@ export class DevManager {
 
 		// Caddy proxy (only if SSL is available)
 		if (ssl.cert) {
+			const httpPort = config.dev?.ports?.http ?? 80
+			const httpsPort = config.dev?.ports?.https ?? 443
 			services.push({
 				name: 'caddy',
 				image: 'caddy:2-alpine',
-				ports: ['80:80', '443:443'],
+				ports: [`${httpPort}:80`, `${httpsPort}:443`],
 				volumes: ['.shuttle/certs:/certs:ro', '.shuttle/Caddyfile.dev:/etc/caddy/Caddyfile:ro'],
 				depends_on: config.services ? Object.keys(config.services).slice(0, 1) : [],
 			})

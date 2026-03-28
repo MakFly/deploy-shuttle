@@ -23,6 +23,7 @@ const mainCommand = defineCommand({
 		ci: () => import('./ci.ts').then((m) => m.default),
 		new: () => import('./new.ts').then((m) => m.default),
 		dev: () => import('./dev.ts').then((m) => m.default),
+		monitor: () => import('./monitor.ts').then((m) => m.default),
 	},
 })
 

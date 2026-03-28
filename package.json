@@ -7,6 +7,7 @@
 		"shuttle": "./src/index.ts"
 	},
 	"scripts": {
+		"build": "bun run scripts/build.ts",
 		"dev": "bun run src/index.ts",
 		"test": "bun test",
 		"test:integration": "SHUTTLE_INTEGRATION=1 bun test test/integration",

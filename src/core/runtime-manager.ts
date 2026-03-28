@@ -1,7 +1,7 @@
 import type { ShuttleConfig } from '../config/schema.ts'
 import { DeployError } from '../utils/errors.ts'
 import { shellEscape } from '../utils/shell.ts'
-import { ssh } from './ssh-manager.ts'
+import { type SSHManager, ssh as defaultSsh } from './ssh-manager.ts'
 
 const STATE_DIR = '/opt/shuttle'
 
@@ -34,6 +34,8 @@ export interface DeployLock {
 }
 
 export class RuntimeManager {
+	constructor(private readonly ssh: SSHManager = defaultSsh) {}
+
 	getAppDir(app: string): string {
 		return `${STATE_DIR}/${app}`
 	}
@@ -55,12 +57,12 @@ export class RuntimeManager {
 	}
 
 	async ensureAppDir(host: string, app: string): Promise<void> {
-		await ssh.exec(host, `mkdir -p ${shellEscape(this.getAppDir(app))}`)
+		await this.ssh.exec(host, `mkdir -p ${shellEscape(this.getAppDir(app))}`)
 	}
 
 	async readState(host: string, app: string): Promise<DeployState> {
 		const path = this.getStatePath(app)
-		const { stdout, code } = await ssh.exec(host, `cat ${shellEscape(path)}`)
+		const { stdout, code } = await this.ssh.exec(host, `cat ${shellEscape(path)}`)
 
 		if (code !== 0) {
 			throw new DeployError(`State file not found at ${path} on ${host}`, 'read-state')
@@ -75,23 +77,33 @@ export class RuntimeManager {
 
 	async writeState(host: string, app: string, state: DeployState): Promise<void> {
 		await this.ensureAppDir(host, app)
-		await ssh.uploadContent(host, JSON.stringify(state, null, 2), this.getStatePath(app), 0o644)
+		await this.ssh.uploadContent(
+			host,
+			JSON.stringify(state, null, 2),
+			this.getStatePath(app),
+			0o644,
+		)
 	}
 
 	async writeInFlight(host: string, app: string, state: InFlightDeployState): Promise<void> {
 		await this.ensureAppDir(host, app)
-		await ssh.uploadContent(host, JSON.stringify(state, null, 2), this.getInFlightPath(app), 0o644)
+		await this.ssh.uploadContent(
+			host,
+			JSON.stringify(state, null, 2),
+			this.getInFlightPath(app),
+			0o644,
+		)
 	}
 
 	async clearInFlight(host: string, app: string): Promise<void> {
-		await ssh.exec(host, `rm -f ${shellEscape(this.getInFlightPath(app))}`)
+		await this.ssh.exec(host, `rm -f ${shellEscape(this.getInFlightPath(app))}`)
 	}
 
 	async acquireLock(host: string, app: string): Promise<void> {
 		await this.ensureAppDir(host, app)
 
 		const lockDir = this.getLockDir(app)
-		const { code } = await ssh.exec(host, `mkdir ${shellEscape(lockDir)}`)
+		const { code } = await this.ssh.exec(host, `mkdir ${shellEscape(lockDir)}`)
 
 		if (code !== 0) {
 			let message = `Deployment lock already exists for "${app}" on ${host}`
@@ -112,14 +124,14 @@ export class RuntimeManager {
 		}
 
 		try {
-			await ssh.uploadContent(
+			await this.ssh.uploadContent(
 				host,
 				JSON.stringify(lock, null, 2),
 				`${lockDir}/metadata.json`,
 				0o644,
 			)
 		} catch (err) {
-			await ssh.exec(host, `rm -rf ${shellEscape(lockDir)}`)
+			await this.ssh.exec(host, `rm -rf ${shellEscape(lockDir)}`)
 			throw DeployError.wrap(
 				err,
 				`Failed to persist deployment lock for "${app}" on ${host}`,
@@ -129,12 +141,12 @@ export class RuntimeManager {
 	}
 
 	async releaseLock(host: string, app: string): Promise<void> {
-		await ssh.exec(host, `rm -rf ${shellEscape(this.getLockDir(app))}`)
+		await this.ssh.exec(host, `rm -rf ${shellEscape(this.getLockDir(app))}`)
 	}
 
 	async readLock(host: string, app: string): Promise<DeployLock> {
 		const path = `${this.getLockDir(app)}/metadata.json`
-		const { stdout, code } = await ssh.exec(host, `cat ${shellEscape(path)}`)
+		const { stdout, code } = await this.ssh.exec(host, `cat ${shellEscape(path)}`)
 
 		if (code !== 0) {
 			throw new DeployError(`Deployment lock metadata not found at ${path} on ${host}`, 'lock')
@@ -158,7 +170,7 @@ export class RuntimeManager {
 	): Promise<void> {
 		const workDir = this.getWorkDir(app)
 		const wrapped = `cd ${shellEscape(workDir)} && /bin/sh -lc ${shellEscape(command)}`
-		const { code, stderr } = await ssh.exec(host, wrapped)
+		const { code, stderr } = await this.ssh.exec(host, wrapped)
 
 		if (code !== 0) {
 			throw new DeployError(
@@ -170,7 +182,7 @@ export class RuntimeManager {
 
 	async forceReleaseLock(host: string, app: string): Promise<void> {
 		const lockDir = this.getLockDir(app)
-		await ssh.exec(host, `rm -rf ${shellEscape(lockDir)}`)
+		await this.ssh.exec(host, `rm -rf ${shellEscape(lockDir)}`)
 	}
 
 	async resolveServiceContainer(

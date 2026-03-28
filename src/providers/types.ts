@@ -104,3 +104,16 @@ export interface DeployOptions {
 export interface DeployStrategy {
 	execute(ctx: DeployContext): Promise<void>
 }
+
+// ---------------------------------------------------------------------------
+// Tunnel Provider
+// ---------------------------------------------------------------------------
+
+export interface TunnelProvider {
+	/** Start or ensure the tunnel container is running on the remote host. */
+	start(host: string, config: ShuttleConfig): Promise<void>
+	/** Stop and remove the tunnel container from the remote host. */
+	stop(host: string, config: ShuttleConfig): Promise<void>
+	/** Return tunnel container status string. */
+	getStatus(host: string): Promise<string>
+}

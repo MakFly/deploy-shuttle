@@ -7,10 +7,17 @@ const up = defineCommand({
 		name: 'up',
 		description: 'Start the development environment',
 	},
-	async run() {
+	args: {
+		watch: {
+			type: 'boolean',
+			description: 'Start in watch mode (Docker Compose Watch)',
+			default: false,
+		},
+	},
+	async run({ args }) {
 		try {
 			const manager = new DevManager()
-			await manager.up()
+			await manager.up(undefined, args.watch)
 		} catch (err) {
 			logger.error(err instanceof Error ? err : new Error(String(err)))
 			process.exit(1)

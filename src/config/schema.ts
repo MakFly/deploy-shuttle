@@ -216,6 +216,11 @@ export type ProxyConfig = z.infer<typeof proxySchema>
 
 export const notificationsSchema = z.object({
 	webhooks: z.array(z.string().url()).min(1).optional(),
+	slack: z
+		.object({
+			webhook_url: z.string().url(),
+		})
+		.optional(),
 })
 
 export type NotificationsConfig = z.infer<typeof notificationsSchema>

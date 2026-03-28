@@ -155,22 +155,13 @@ export class SwarmStrategy implements DeployStrategy {
 		monitor: string
 		convergence_timeout: number
 	} {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const swarm = (config as unknown as Record<string, unknown>).swarm as
-			| Record<string, unknown>
-			| undefined
 		return {
-			replicas: typeof swarm?.replicas === 'number' ? swarm.replicas : 2,
-			update_parallelism:
-				typeof swarm?.update_parallelism === 'number' ? swarm.update_parallelism : 1,
-			update_delay: typeof swarm?.update_delay === 'string' ? swarm.update_delay : '10s',
-			update_order:
-				swarm?.update_order === 'stop-first' || swarm?.update_order === 'start-first'
-					? swarm.update_order
-					: 'start-first',
-			monitor: typeof swarm?.monitor === 'string' ? swarm.monitor : '15s',
-			convergence_timeout:
-				typeof swarm?.convergence_timeout === 'number' ? swarm.convergence_timeout : 300,
+			replicas: config.swarm?.replicas ?? 2,
+			update_parallelism: config.swarm?.update_parallelism ?? 1,
+			update_delay: config.swarm?.update_delay ?? '10s',
+			update_order: config.swarm?.update_order ?? 'start-first',
+			monitor: config.swarm?.monitor ?? '15s',
+			convergence_timeout: config.swarm?.convergence_timeout ?? 300,
 		}
 	}
 

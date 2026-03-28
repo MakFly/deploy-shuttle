@@ -6,9 +6,11 @@ import { NotificationsManager } from './core/notifications-manager.ts'
 import { ProvisionManager } from './core/provision-manager.ts'
 import { ProxyManager } from './core/proxy-manager.ts'
 import { RollbackManager } from './core/rollback-manager.ts'
-import { type RuntimeManager, runtime } from './core/runtime-manager.ts'
+import { RuntimeManager } from './core/runtime-manager.ts'
 import { SecretsManager } from './core/secrets-manager.ts'
 import { SSHManager } from './core/ssh-manager.ts'
+
+export type { RuntimeManager }
 
 export interface ShuttleContainer {
 	ssh: SSHManager
@@ -27,15 +29,12 @@ export interface ShuttleContainer {
 /**
  * Creates a fully wired container with all managers connected via DI.
  * Accepts optional overrides for testing or custom configurations.
- *
- * Note: RuntimeManager uses its own module-level ssh singleton internally.
- * It will be refactored to accept an SSHManager in a future phase.
  */
 export function createContainer(overrides?: Partial<ShuttleContainer>): ShuttleContainer {
 	const ssh = overrides?.ssh ?? new SSHManager()
 	const docker = overrides?.docker ?? new DockerManager(ssh)
 	const proxy = overrides?.proxy ?? new ProxyManager(ssh)
-	const runtimeManager = overrides?.runtime ?? runtime
+	const runtimeManager = overrides?.runtime ?? new RuntimeManager(ssh)
 	const secrets = overrides?.secrets ?? new SecretsManager(ssh)
 	const notifications = overrides?.notifications ?? new NotificationsManager()
 	const accessories = overrides?.accessories ?? new AccessoryManager(docker)

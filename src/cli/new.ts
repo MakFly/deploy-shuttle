@@ -1,7 +1,11 @@
 import path from 'node:path'
 import { scaffold } from '@/starters/base.ts'
 import type { StarterOptions } from '@/starters/base.ts'
+import type { HonoStarterOptions } from '@/starters/hono.ts'
 import type { LaravelStarterOptions } from '@/starters/laravel.ts'
+import type { NextjsStarterOptions } from '@/starters/nextjs.ts'
+import type { NodeStarterOptions } from '@/starters/node.ts'
+import type { NuxtStarterOptions } from '@/starters/nuxt.ts'
 import type { SymfonyStarterOptions } from '@/starters/symfony.ts'
 import { logger } from '@/utils/logger.ts'
 import { defineCommand } from 'citty'
@@ -15,7 +19,7 @@ export default defineCommand({
 	args: {
 		framework: {
 			type: 'positional',
-			description: 'Framework template (laravel or symfony)',
+			description: 'Framework template (laravel, symfony, node, nextjs, nuxt, hono)',
 			required: false,
 		},
 		name: {
@@ -47,6 +51,10 @@ export default defineCommand({
 						choices: [
 							{ title: 'Laravel', value: 'laravel' },
 							{ title: 'Symfony', value: 'symfony' },
+							{ title: 'Node / Express', value: 'node' },
+							{ title: 'Next.js', value: 'nextjs' },
+							{ title: 'Nuxt', value: 'nuxt' },
+							{ title: 'Hono (Bun)', value: 'hono' },
 						],
 					},
 					{ onCancel },
@@ -54,8 +62,9 @@ export default defineCommand({
 				framework = value as string
 			}
 
-			if (framework !== 'laravel' && framework !== 'symfony') {
-				logger.error(`Unknown framework: ${framework}. Use "laravel" or "symfony".`)
+			const validFrameworks = ['laravel', 'symfony', 'node', 'nextjs', 'nuxt', 'hono']
+			if (!validFrameworks.includes(framework)) {
+				logger.error(`Unknown framework: ${framework}. Use one of: ${validFrameworks.join(', ')}`)
 				process.exit(1)
 			}
 
@@ -123,8 +132,16 @@ export default defineCommand({
 
 			if (framework === 'laravel') {
 				await scaffoldLaravel(targetDir, baseOptions, args.yes, onCancel)
-			} else {
+			} else if (framework === 'symfony') {
 				await scaffoldSymfony(targetDir, baseOptions, args.yes, onCancel)
+			} else if (framework === 'node') {
+				await scaffoldNode(targetDir, baseOptions, args.yes, onCancel)
+			} else if (framework === 'nextjs') {
+				await scaffoldNextjs(targetDir, baseOptions, args.yes, onCancel)
+			} else if (framework === 'nuxt') {
+				await scaffoldNuxt(targetDir, baseOptions, args.yes, onCancel)
+			} else if (framework === 'hono') {
+				await scaffoldHono(targetDir, baseOptions, args.yes, onCancel)
 			}
 
 			logger.info('')
@@ -281,5 +298,155 @@ async function scaffoldSymfony(
 	}
 
 	const files = getSymfonyFiles(opts)
+	await scaffold(targetDir, files, baseOptions)
+}
+
+async function scaffoldNode(
+	targetDir: string,
+	baseOptions: StarterOptions,
+	useDefaults: boolean,
+	onCancel: () => void,
+): Promise<void> {
+	const { getNodeFiles } = await import('@/starters/node.ts')
+
+	let opts: NodeStarterOptions
+
+	if (useDefaults) {
+		opts = { database: 'postgres', redis: true }
+	} else {
+		const answers = await prompts(
+			[
+				{
+					type: 'select',
+					name: 'database',
+					message: 'Database:',
+					choices: [
+						{ title: 'PostgreSQL', value: 'postgres' },
+						{ title: 'MySQL', value: 'mysql' },
+						{ title: 'None', value: 'none' },
+					],
+				},
+				{
+					type: 'confirm',
+					name: 'redis',
+					message: 'Redis?',
+					initial: true,
+				},
+			],
+			{ onCancel },
+		)
+		opts = answers as NodeStarterOptions
+	}
+
+	const files = getNodeFiles(opts)
+	await scaffold(targetDir, files, baseOptions)
+}
+
+async function scaffoldNextjs(
+	targetDir: string,
+	baseOptions: StarterOptions,
+	useDefaults: boolean,
+	onCancel: () => void,
+): Promise<void> {
+	const { getNextjsFiles } = await import('@/starters/nextjs.ts')
+
+	let opts: NextjsStarterOptions
+
+	if (useDefaults) {
+		opts = { database: 'none' }
+	} else {
+		const answers = await prompts(
+			[
+				{
+					type: 'select',
+					name: 'database',
+					message: 'Database:',
+					choices: [
+						{ title: 'PostgreSQL', value: 'postgres' },
+						{ title: 'None', value: 'none' },
+					],
+				},
+			],
+			{ onCancel },
+		)
+		opts = answers as NextjsStarterOptions
+	}
+
+	const files = getNextjsFiles(opts)
+	await scaffold(targetDir, files, baseOptions)
+}
+
+async function scaffoldNuxt(
+	targetDir: string,
+	baseOptions: StarterOptions,
+	useDefaults: boolean,
+	onCancel: () => void,
+): Promise<void> {
+	const { getNuxtFiles } = await import('@/starters/nuxt.ts')
+
+	let opts: NuxtStarterOptions
+
+	if (useDefaults) {
+		opts = { database: 'none' }
+	} else {
+		const answers = await prompts(
+			[
+				{
+					type: 'select',
+					name: 'database',
+					message: 'Database:',
+					choices: [
+						{ title: 'PostgreSQL', value: 'postgres' },
+						{ title: 'None', value: 'none' },
+					],
+				},
+			],
+			{ onCancel },
+		)
+		opts = answers as NuxtStarterOptions
+	}
+
+	const files = getNuxtFiles(opts)
+	await scaffold(targetDir, files, baseOptions)
+}
+
+async function scaffoldHono(
+	targetDir: string,
+	baseOptions: StarterOptions,
+	useDefaults: boolean,
+	onCancel: () => void,
+): Promise<void> {
+	const { getHonoFiles } = await import('@/starters/hono.ts')
+
+	let opts: HonoStarterOptions
+
+	if (useDefaults) {
+		opts = { database: 'postgres', redis: true }
+	} else {
+		const answers = await prompts(
+			[
+				{
+					type: 'select',
+					name: 'database',
+					message: 'Database:',
+					choices: [
+						{ title: 'PostgreSQL', value: 'postgres' },
+						{ title: 'MySQL', value: 'mysql' },
+						{ title: 'None', value: 'none' },
+					],
+				},
+				{
+					type: 'confirm',
+					name: 'redis',
+					message: 'Redis?',
+					initial: true,
+				},
+			],
+			{ onCancel },
+		)
+		opts = answers as HonoStarterOptions
+	}
+
+	const files = getHonoFiles(opts)
 	await scaffold(targetDir, files, baseOptions)
 }

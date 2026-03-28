@@ -9,12 +9,19 @@ import { getPublicKey } from './keys.ts'
 // Types
 // ---------------------------------------------------------------------------
 
+export type LicenseRole = 'viewer' | 'deployer' | 'admin'
+
 export interface LicenseInfo {
 	email: string
 	plan: string
 	features: string[]
 	expiresAt: Date
 	issuedAt: Date
+	orgId?: string
+	orgName?: string
+	seats?: number
+	role?: LicenseRole
+	seatId?: string
 }
 
 interface LicensePayload {
@@ -24,6 +31,11 @@ interface LicensePayload {
 	exp: number // expires at (unix seconds)
 	features: string[]
 	plan: string
+	org_id?: string
+	org_name?: string
+	seats?: number
+	role?: LicenseRole
+	seat_id?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -107,6 +119,11 @@ export function validateLicense(token: string): LicenseInfo | null {
 			features: Array.isArray(payload.features) ? payload.features : [],
 			expiresAt: new Date(payload.exp * 1000),
 			issuedAt: new Date(payload.iat * 1000),
+			orgId: payload.org_id,
+			orgName: payload.org_name,
+			seats: payload.seats,
+			role: payload.role,
+			seatId: payload.seat_id,
 		}
 	} catch (err) {
 		logger.debug(`License validation error: ${err instanceof Error ? err.message : String(err)}`)
@@ -143,7 +160,9 @@ export function loadLicense(): LicenseInfo | null {
 			if (info) return info
 			logger.debug('~/.shuttle/license exists but contains an invalid token')
 		} catch (err) {
-			logger.debug(`Failed to read license file: ${err instanceof Error ? err.message : String(err)}`)
+			logger.debug(
+				`Failed to read license file: ${err instanceof Error ? err.message : String(err)}`,
+			)
 		}
 	}
 

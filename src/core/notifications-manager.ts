@@ -1,11 +1,7 @@
 import type { ShuttleConfig } from '../config/schema.ts'
+import { resolveNotifications } from '../providers/resolver.ts'
+import type { ShuttleEvent } from '../providers/types.ts'
 import { logger } from '../utils/logger.ts'
-
-export type ShuttleEvent =
-	| 'deploy_succeeded'
-	| 'deploy_failed'
-	| 'rollback_succeeded'
-	| 'rollback_failed'
 
 export class NotificationsManager {
 	async notify(
@@ -13,31 +9,17 @@ export class NotificationsManager {
 		event: ShuttleEvent,
 		payload: Record<string, unknown>,
 	): Promise<void> {
-		for (const url of config.notifications?.webhooks ?? []) {
-			try {
-				const response = await fetch(url, {
-					method: 'POST',
-					headers: {
-						'content-type': 'application/json',
-					},
-					body: JSON.stringify({
-						event,
-						app: config.app,
-						timestamp: new Date().toISOString(),
-						...payload,
-					}),
-				})
+		const providers = resolveNotifications(config)
 
-				if (!response.ok) {
-					logger.warn(`Notification webhook ${url} returned ${response.status}`)
-				}
+		for (const provider of providers) {
+			try {
+				await provider.notify(config, event, payload)
 			} catch (err) {
-				logger.warn(
-					`Failed to notify webhook ${url}: ${err instanceof Error ? err.message : String(err)}`,
-				)
+				logger.warn(`Notification failed: ${err instanceof Error ? err.message : String(err)}`)
 			}
 		}
 	}
 }
 
+export type { ShuttleEvent } from '../providers/types.ts'
 export const notifications = new NotificationsManager()

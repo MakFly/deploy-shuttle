@@ -1,6 +1,5 @@
 import type { ShuttleConfig } from '../config/schema.ts'
-import { createCaddyProxyProvider } from '../providers/proxy/caddy.ts'
-import { resolveRegistry, resolveSecrets } from '../providers/resolver.ts'
+import { resolveProxy, resolveRegistry, resolveSecrets } from '../providers/resolver.ts'
 import { BlueGreenStrategy } from '../providers/strategy/blue-green.ts'
 import { RollingStrategy } from '../providers/strategy/rolling.ts'
 import { SwarmStrategy } from '../providers/strategy/swarm.ts'
@@ -113,7 +112,7 @@ export class DeployManager {
 
 	private createStrategy(name: string, config: ShuttleConfig): DeployStrategy {
 		const registry = resolveRegistry(config, this.docker, this.ssh)
-		const proxy = createCaddyProxyProvider(this.ssh)
+		const proxy = resolveProxy(config, this.ssh)
 		const secrets = resolveSecrets(config)
 		const deps = {
 			docker: this.docker,
