@@ -1,0 +1,137 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="GitLab CI"
+  description="Generate a GitLab CI/CD pipeline for building and deploying your app with Shuttle."
+  section="ci"
+>
+  <p>
+    Run <code>shuttle ci generate --provider gitlab</code> to generate a
+    <code>.gitlab-ci.yml</code> at the project root. The pipeline has two stages:
+    <strong>build</strong> (Docker-in-Docker build + GitLab registry push) and
+    <strong>deploy</strong> (SSH into the server and call <code>shuttle deploy --skip-build</code>).
+  </p>
+
+  <h2>Generate the pipeline</h2>
+  <pre><code class="language-bash">shuttle ci generate --provider gitlab
+
+# With options
+shuttle ci generate \
+  --provider gitlab \
+  --branch main \       # trigger branch (default: main)
+  --app my-app          # app name (defaults to shuttle.yml app)
+</code></pre>
+  <p>
+    The command writes <code>.gitlab-ci.yml</code> and prints the CI variables you need to
+    configure in GitLab's CI/CD settings.
+  </p>
+
+  <h2>Generated pipeline</h2>
+  <pre><code class="language-yaml">stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
+  IMAGE_LATEST: $CI_REGISTRY_IMAGE:latest
+
+build:
+  stage: build
+  image: docker:24.0.5-cli
+  services:
+    - docker:24.0.5-dind
+  variables:
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login $CI_REGISTRY -u $CI_REGISTRY_USER --password-stdin
+  script:
+    - docker pull $IMAGE_LATEST || true
+    - docker build --cache-from $IMAGE_LATEST -t $IMAGE_TAG -t $IMAGE_LATEST .
+    - docker push $IMAGE_TAG
+    - docker push $IMAGE_LATEST
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+deploy:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | ssh-add -
+    - mkdir -p ~/.ssh &amp;&amp; chmod 700 ~/.ssh
+    - echo "$SSH_HOST_KEY" &gt;&gt; ~/.ssh/known_hosts
+  script:
+    - ssh $DEPLOY_USER@$DEPLOY_HOST "shuttle deploy --skip-build --image $IMAGE_TAG"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  environment: production
+</code></pre>
+
+  <h2>CI/CD variables to configure</h2>
+  <p>
+    Add these in <strong>Settings &rarr; CI/CD &rarr; Variables</strong>:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Variable</th>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>SSH_PRIVATE_KEY</code></td>
+        <td><strong>File</strong></td>
+        <td>SSH private key for connecting to the server. Use type "File" so GitLab writes it to disk; ssh-add expects a file path or stdin.</td>
+      </tr>
+      <tr>
+        <td><code>SSH_HOST_KEY</code></td>
+        <td>Variable</td>
+        <td>Server's SSH public key fingerprint (output of <code>ssh-keyscan &lt;host&gt;</code>). Added to <code>known_hosts</code> to prevent host verification prompts.</td>
+      </tr>
+      <tr>
+        <td><code>DEPLOY_HOST</code></td>
+        <td>Variable</td>
+        <td>Server IP address or hostname</td>
+      </tr>
+      <tr>
+        <td><code>DEPLOY_USER</code></td>
+        <td>Variable</td>
+        <td>SSH username (e.g., <code>deploy</code>)</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    The <code>CI_REGISTRY_*</code> variables (<code>CI_REGISTRY</code>, <code>CI_REGISTRY_USER</code>,
+    <code>CI_REGISTRY_PASSWORD</code>, <code>CI_REGISTRY_IMAGE</code>) are provided automatically
+    by GitLab for every project with the Container Registry enabled. No manual configuration needed.
+  </p>
+
+  <h2>Getting the SSH host key</h2>
+  <pre><code class="language-bash">ssh-keyscan your-server-ip
+# Paste the output as the SSH_HOST_KEY variable value
+</code></pre>
+
+  <h2>Docker-in-Docker (DinD) notes</h2>
+  <p>
+    The build stage uses Docker-in-Docker (<code>docker:24.0.5-dind</code> as a service). The
+    <code>DOCKER_TLS_CERTDIR: "/certs"</code> variable enables TLS between the DinD daemon and
+    the Docker CLI client. This is the recommended secure DinD configuration for GitLab CI.
+  </p>
+  <p>
+    Layer caching is handled via <code>--cache-from $IMAGE_LATEST</code>. The first build on a
+    new runner won't have cache; subsequent builds will benefit from the cached layers in
+    <code>:latest</code>.
+  </p>
+
+  <h2>Environment protection</h2>
+  <p>
+    The deploy job uses <code>environment: production</code>. In GitLab, you can protect this
+    environment (Settings &rarr; CI/CD &rarr; Environments) to require manual approval before
+    production deploys, or restrict which branches can deploy to it.
+  </p>
+</DocsLayout>

@@ -1,0 +1,142 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="Registry Providers"
+  description="Five registry drivers for distributing Docker images to your servers — from local SSH transfer to GHCR and Docker Hub."
+  section="features"
+>
+  <p>
+    Shuttle needs to get your Docker image from your build machine to the server. The registry
+    provider controls how that distribution happens. Choose based on your topology: single-node
+    deploys, multi-node Swarm clusters, or external CI pipelines.
+  </p>
+
+  <h2>Driver comparison</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Driver</th>
+        <th>How it works</th>
+        <th>Best for</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>local-transfer</code></td>
+        <td><code>docker save | ssh docker load</code></td>
+        <td>Single-node deploys, no registry needed</td>
+      </tr>
+      <tr>
+        <td><code>local-registry</code></td>
+        <td>Ephemeral registry on manager + SSH tunnel from local to push</td>
+        <td>Multi-node Swarm without an external registry</td>
+      </tr>
+      <tr>
+        <td><code>ghcr</code></td>
+        <td><code>docker push</code> to ghcr.io, server pulls</td>
+        <td>GitHub-hosted projects, CI with GITHUB_TOKEN</td>
+      </tr>
+      <tr>
+        <td><code>docker-hub</code></td>
+        <td><code>docker push</code> to Docker Hub, server pulls</td>
+        <td>Public images or Docker Hub subscribers</td>
+      </tr>
+      <tr>
+        <td><code>custom</code></td>
+        <td><code>docker push</code> to any OCI-compliant registry, server pulls</td>
+        <td>Self-hosted registries (Harbor, Gitea, ECR, etc.)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>local-transfer (default)</h2>
+  <p>
+    The simplest driver. Shuttle builds the image locally, saves it with <code>docker save</code>,
+    and streams it into <code>docker load</code> over SSH. No registry account or credentials
+    required.
+  </p>
+  <p>
+    The main drawback is transfer time: a 500MB image over a typical VPS connection takes 30-60
+    seconds. Once cached on the server, subsequent deploys of images with similar layers are faster
+    because Docker skips already-present layers.
+  </p>
+  <pre><code class="language-yaml">registry:
+  driver: local-transfer   # default — can be omitted entirely
+</code></pre>
+
+  <h2>local-registry</h2>
+  <p>
+    For multi-node Swarm deployments without an external registry. Shuttle:
+  </p>
+  <ol>
+    <li>Starts an ephemeral <code>registry:2</code> container on the Swarm manager</li>
+    <li>Creates an SSH tunnel from your local machine to the registry port</li>
+    <li>Pushes the image through the tunnel to the ephemeral registry</li>
+    <li>All Swarm nodes pull from the manager's registry over the internal network</li>
+    <li>Tears down the ephemeral registry after deploy completes</li>
+  </ol>
+  <pre><code class="language-yaml">registry:
+  driver: local-registry
+</code></pre>
+
+  <h2>ghcr</h2>
+  <p>
+    Push to GitHub Container Registry. Requires a personal access token (or <code>GITHUB_TOKEN</code>
+    in GitHub Actions) with <code>write:packages</code> scope.
+  </p>
+  <pre><code class="language-yaml">registry:
+  driver: ghcr
+  username: your-github-username
+  password_env: GHCR_TOKEN     # name of the env var holding the token
+</code></pre>
+  <p>
+    In CI with GitHub Actions, use <code>GITHUB_TOKEN</code> directly — it has automatic
+    <code>write:packages</code> permission for the current repo.
+  </p>
+
+  <h2>docker-hub</h2>
+  <p>
+    Push to Docker Hub. Requires a Docker Hub account and an access token (not your password).
+  </p>
+  <pre><code class="language-yaml">registry:
+  driver: docker-hub
+  username: your-dockerhub-username
+  password_env: DOCKERHUB_TOKEN
+</code></pre>
+  <p>
+    Create an access token at
+    <a href="https://hub.docker.com/settings/security" target="_blank">hub.docker.com/settings/security</a>.
+    Store the token value in the <code>DOCKERHUB_TOKEN</code> environment variable (or whichever
+    name you set in <code>password_env</code>).
+  </p>
+
+  <h2>custom</h2>
+  <p>
+    Any OCI-compliant registry: Harbor, Gitea Container Registry, Amazon ECR, Google Artifact
+    Registry, etc.
+  </p>
+  <pre><code class="language-yaml">registry:
+  driver: custom
+  url: registry.example.com           # registry hostname (no protocol)
+  username: robot$my-project+deploy
+  password_env: REGISTRY_TOKEN
+</code></pre>
+  <p>
+    For AWS ECR, generate a temporary password with
+    <code>aws ecr get-login-password</code> and export it as the value of <code>password_env</code>
+    before running <code>shuttle deploy</code>.
+  </p>
+
+  <h2>--skip-build flag</h2>
+  <p>
+    When deploying from CI after a separate build step, use <code>--skip-build</code> to skip the
+    local build and transfer. The server will pull the image that was already pushed to the
+    registry by the build job:
+  </p>
+  <pre><code class="language-bash">shuttle deploy --skip-build
+</code></pre>
+  <p>
+    This is the pattern used by the generated GitHub Actions and GitLab CI workflows.
+  </p>
+</DocsLayout>

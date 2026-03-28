@@ -1,0 +1,123 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="Rolling Deploy"
+  description="Replace replicas one at a time with health checks between each, for high-availability multi-replica services."
+  section="strategies"
+>
+  <p>
+    The rolling strategy replaces containers one replica at a time. Traffic is routed to all healthy
+    replicas throughout the deploy. If a replica fails its health check, Shuttle restores it from the
+    previous image before aborting — your fleet is never left in a partially-broken state.
+  </p>
+  <p>
+    Rolling is best suited when you run multiple replicas of the same service and want continuous
+    availability without the port-doubling overhead of blue-green.
+  </p>
+
+  <h2>8-step deploy pipeline</h2>
+  <ol>
+    <li><strong>Generate image tag</strong> — format: <code>shuttle/&lt;app&gt;:deploy-YYYYMMDD-&lt;shortsha&gt;</code>. Reads previous state to record <code>previous_tag</code> for auto-rollback.</li>
+    <li><strong>Build image</strong> — build and distribute to the host via the configured registry provider. Skipped with <code>--skip-build</code>.</li>
+    <li><strong>Transfer image</strong> — upload the saved tarball over SSH. Skipped with <code>--skip-build</code>.</li>
+    <li><strong>Upload environment</strong> — push AES-encrypted secrets as <code>.env</code> to <code>/opt/shuttle/&lt;app&gt;/&lt;app&gt;/.env</code>.</li>
+    <li><strong>Replace replicas</strong> — for each replica <code>0..N-1</code>: stop the old container, start the new one, run the health check. If the health check fails and <code>auto_rollback</code> is enabled, that replica is immediately restored to the previous image and re-checked before the error is surfaced.</li>
+    <li><strong>Switch proxy upstream</strong> — after all replicas are healthy, Caddy is updated to point to the base port of the new replicas.</li>
+    <li><strong>Tag images</strong> — new image tagged as <code>shuttle/&lt;app&gt;:current</code>, previous as <code>shuttle/&lt;app&gt;:previous</code>.</li>
+    <li><strong>Update deployment state</strong> — write <code>state.json</code> with new tag, port, and incremented version.</li>
+  </ol>
+
+  <h2>Container naming and ports</h2>
+  <p>
+    Replicas are named <code>&lt;app&gt;_&lt;service&gt;_0</code>, <code>&lt;app&gt;_&lt;service&gt;_1</code>, etc.
+    Each gets its own port:
+  </p>
+  <ul>
+    <li>Replica 0: <code>10000 + serviceIndex * 2</code></li>
+    <li>Replica 1: <code>10000 + serviceIndex * 2 + 2</code></li>
+    <li>Replica N: base port + N * 2</li>
+  </ul>
+  <p>
+    All ports are bound to <code>127.0.0.1</code>. Caddy load-balances across them using its
+    upstream round-robin.
+  </p>
+
+  <h2>Auto-rollback per replica</h2>
+  <p>
+    When a replica fails its health check and <code>auto_rollback: true</code> (default), Shuttle
+    performs a per-replica rollback:
+  </p>
+  <ol>
+    <li>Stop the failing new container.</li>
+    <li>Start the old <code>previous_tag</code> image under the same replica name and port.</li>
+    <li>Run the health check against the restored container.</li>
+    <li>Throw the original error — deploy is aborted, but the restored replica is serving traffic.</li>
+  </ol>
+  <p>
+    This means a rolling deploy that fails midway leaves replicas in a mixed state (some on the new
+    image, some restored to old). If this is unacceptable for your app, prefer blue-green.
+  </p>
+
+  <h2>Configuration</h2>
+  <pre><code class="language-yaml">app: my-app
+domain: my-app.example.com
+
+server:
+  host: 203.0.113.10
+  user: deploy
+
+build:
+  dockerfile: Dockerfile
+
+services:
+  web:
+    command: node server.js
+    port: 3000
+    replicas: 3                 # number of rolling replicas
+    healthcheck:
+      type: http
+      path: /healthz
+      interval: 5
+      timeout: 3
+      retries: 5
+
+deploy:
+  strategy: rolling
+  timeout: 120
+  retain: 5
+  auto_rollback: true
+</code></pre>
+
+  <h2>When to use rolling vs blue-green</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Scenario</th>
+        <th>Recommended strategy</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Single-replica app, zero downtime required</td>
+        <td>Blue-green</td>
+      </tr>
+      <tr>
+        <td>Multi-replica, partial rollouts acceptable</td>
+        <td>Rolling</td>
+      </tr>
+      <tr>
+        <td>Resource-constrained server (can't run 2x containers)</td>
+        <td>Rolling</td>
+      </tr>
+      <tr>
+        <td>Stateful app where mixed versions are dangerous</td>
+        <td>Blue-green</td>
+      </tr>
+      <tr>
+        <td>Docker Swarm cluster with orchestrated updates</td>
+        <td>Swarm</td>
+      </tr>
+    </tbody>
+  </table>
+</DocsLayout>

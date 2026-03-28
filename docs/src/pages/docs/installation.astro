@@ -1,0 +1,100 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+
+<DocsLayout
+  title="Installation"
+  description="Install the Shuttle CLI and set up your environment"
+  section="Getting Started"
+>
+  <h2>Prerequisites</h2>
+  <p>Before installing Shuttle, make sure you have the following on your local machine:</p>
+
+  <h3>Bun runtime</h3>
+  <p>
+    Shuttle is built with Bun. Install it with the official installer:
+  </p>
+  <pre><code class="language-bash">curl -fsSL https://bun.sh/install | bash</code></pre>
+  <p>
+    Verify the installation:
+  </p>
+  <pre><code class="language-bash">bun --version
+# 1.1.0 or newer</code></pre>
+
+  <h3>Docker</h3>
+  <p>
+    Shuttle builds Docker images locally and transfers them to the server. You need Docker
+    Desktop (macOS/Windows) or Docker Engine (Linux) installed and running.
+  </p>
+  <pre><code class="language-bash">docker --version
+# Docker version 26.x or newer</code></pre>
+
+  <h3>SSH key pair</h3>
+  <p>
+    Shuttle connects to your VPS over SSH using public key authentication. If you do not
+    already have an SSH key pair, generate one:
+  </p>
+  <pre><code class="language-bash">ssh-keygen -t ed25519 -C "shuttle-deploy"
+# Your public key: ~/.ssh/id_ed25519.pub</code></pre>
+  <p>
+    Copy your public key to the target server. The user you deploy as must have
+    <code>sudo</code> access (or be <code>root</code>) for the initial provisioning step.
+    After provisioning, a dedicated <code>deploy</code> system user is created.
+  </p>
+  <pre><code class="language-bash">ssh-copy-id deploy@YOUR_SERVER_IP</code></pre>
+
+  <h2>Install Shuttle</h2>
+
+  <h3>Global install (recommended)</h3>
+  <pre><code class="language-bash">bun add -g shuttle-deploy</code></pre>
+  <p>This installs the <code>shuttle</code> binary globally and makes it available in your <code>PATH</code>.</p>
+
+  <h3>Project-local install</h3>
+  <p>
+    If you prefer to pin the version per project, add it as a dev dependency:
+  </p>
+  <pre><code class="language-bash">bun add -d shuttle-deploy</code></pre>
+  <p>
+    Then invoke it via <code>bunx shuttle</code> or add scripts to your <code>package.json</code>:
+  </p>
+  <pre><code class="language-json">&#123;
+  "scripts": &#123;
+    "deploy": "shuttle deploy",
+    "provision": "shuttle provision"
+  &#125;
+&#125;</code></pre>
+
+  <h2>Verify the installation</h2>
+  <pre><code class="language-bash">shuttle --version
+# shuttle 0.x.x</code></pre>
+  <pre><code class="language-bash">shuttle --help</code></pre>
+  <p>You should see the full command list including <code>init</code>, <code>provision</code>, <code>deploy</code>, and others.</p>
+
+  <h2>Server requirements</h2>
+  <p>
+    The target VPS must meet the following requirements before running <code>shuttle provision</code>:
+  </p>
+  <ul>
+    <li>Debian 11+ or Ubuntu 22.04+ (64-bit)</li>
+    <li>Minimum 1 GB RAM (2 GB recommended)</li>
+    <li>SSH access with a user that has <code>sudo</code> privileges</li>
+    <li>Ports 22, 80, and 443 open on the firewall</li>
+  </ul>
+  <p>
+    The <code>shuttle provision</code> command will install Docker, Caddy, and configure UFW
+    automatically. You do not need to pre-install anything on the server.
+  </p>
+
+  <h2>Shell completion</h2>
+  <p>
+    Shell completion support is planned for a future release. Watch the
+    <a href="https://github.com/shuttle-hq/shuttle" target="_blank" rel="noopener noreferrer">GitHub repository</a>
+    for updates.
+  </p>
+
+  <h2>Next steps</h2>
+  <ul>
+    <li><a href="/docs/getting-started">Quick Start — deploy your first app</a></li>
+    <li><a href="/docs/configuration">Configuration reference</a></li>
+  </ul>
+</DocsLayout>

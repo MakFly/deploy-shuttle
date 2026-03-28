@@ -1,0 +1,192 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+
+<DocsLayout
+  title="Quick Start"
+  description="Deploy your first app in 5 minutes"
+  section="Getting Started"
+>
+  <p>
+    This guide walks you through deploying a Dockerized application to a fresh VPS. By the end
+    you will have a running app served over HTTPS with zero-downtime blue-green deploys.
+  </p>
+  <p>
+    <strong>Prerequisites:</strong> Shuttle installed, Docker running locally, a VPS with SSH
+    access, and a domain pointing at your server's IP. See <a href="/docs/installation">Installation</a>
+    if you haven't set up Shuttle yet.
+  </p>
+
+  <h2>Step 1 — Initialize your project</h2>
+  <p>
+    Run <code>shuttle init</code> from the root of your application repository. It will ask
+    a few questions and generate a <code>shuttle.yml</code> config file.
+  </p>
+  <pre><code class="language-bash">cd my-app
+shuttle init</code></pre>
+  <p>The interactive wizard asks for:</p>
+  <ul>
+    <li>Your application name</li>
+    <li>Your domain (e.g. <code>my-app.example.com</code>)</li>
+    <li>Your server address (e.g. <code>deploy@203.0.113.10</code>)</li>
+    <li>Deploy strategy (blue-green, rolling, or swarm)</li>
+  </ul>
+
+  <h2>Step 2 — Edit shuttle.yml</h2>
+  <p>
+    Open the generated <code>shuttle.yml</code> and fill in the details for your application.
+    Here is a typical config for a web app with a Postgres database:
+  </p>
+  <pre><code class="language-yaml">app: my-app
+domain: my-app.example.com
+server: deploy@203.0.113.10
+
+build:
+  context: .
+  dockerfile: Dockerfile
+
+deploy:
+  strategy: blue-green
+  timeout: 120
+  retain: 5
+  auto_rollback: true
+
+services:
+  web:
+    port: 3000
+    healthcheck:
+      path: /up
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+accessories:
+  postgres:
+    preset: postgres
+    env:
+      POSTGRES_DB: my_app_production
+      POSTGRES_USER: my_app
+      POSTGRES_PASSWORD: !secret DB_PASSWORD
+
+env:
+  clear:
+    NODE_ENV: production
+    PORT: "3000"
+  secret:
+    - DATABASE_URL
+
+secrets:
+  file: .shuttle.secrets
+
+proxy:
+  driver: caddy
+  ssl: true</code></pre>
+  <p>
+    The <code>!secret</code> tag references an encrypted value from your secrets file.
+    We will set that up in a moment.
+  </p>
+
+  <h2>Step 3 — Set up secrets</h2>
+  <p>
+    Create your secrets file and add the values your application needs. Shuttle encrypts this
+    file using AES-256-GCM so it is safe to commit to your repository.
+  </p>
+  <pre><code class="language-bash"># Set individual secrets
+shuttle secrets set DB_PASSWORD "a-strong-password"
+shuttle secrets set DATABASE_URL "postgres://my_app:a-strong-password@localhost/my_app_production"</code></pre>
+  <p>
+    This writes encrypted values to <code>.shuttle.secrets</code>. Add this file to git:
+  </p>
+  <pre><code class="language-bash">git add .shuttle.secrets
+git commit -m "chore: add shuttle secrets"</code></pre>
+
+  <h2>Step 4 — Provision your server</h2>
+  <p>
+    <code>shuttle provision</code> bootstraps your VPS. It connects over SSH and installs
+    Docker, Caddy, and configures the firewall. This is a one-time step per server.
+  </p>
+  <pre><code class="language-bash">shuttle provision</code></pre>
+  <p>Provisioning takes 2–5 minutes. Shuttle will:</p>
+  <ol>
+    <li>Update system packages</li>
+    <li>Install Docker Engine and Docker Compose</li>
+    <li>Install Caddy as the reverse proxy</li>
+    <li>Configure UFW to allow ports 22, 80, and 443</li>
+    <li>Create the <code>/opt/shuttle/my-app/</code> directory structure</li>
+    <li>Set up the deploy user and SSH authorized keys</li>
+    <li>Start accessories (Postgres in this case)</li>
+    <li>Push your secrets to the server</li>
+    <li>Verify Docker is healthy</li>
+  </ol>
+
+  <h2>Step 5 — Deploy</h2>
+  <p>
+    Now deploy your application:
+  </p>
+  <pre><code class="language-bash">shuttle deploy</code></pre>
+  <p>Shuttle will walk through 12 steps:</p>
+  <ol>
+    <li>Validate configuration</li>
+    <li>Acquire deploy lock (prevents concurrent deploys)</li>
+    <li>Build the Docker image locally: <code>shuttle/my-app:deploy-20240315-abc1234</code></li>
+    <li>Save the image to a tarball</li>
+    <li>Transfer the tarball to the server over SFTP</li>
+    <li>Load the image on the server</li>
+    <li>Start the new container on the green slot</li>
+    <li>Run health checks against the new container</li>
+    <li>Update Caddy to route traffic to the new container</li>
+    <li>Stop the old container (blue slot)</li>
+    <li>Prune old images (keeping the last <code>retain</code> tags)</li>
+    <li>Release the deploy lock</li>
+  </ol>
+  <p>
+    If health checks fail, Shuttle automatically rolls back: Caddy is reverted to the previous
+    slot and the failed container is stopped.
+  </p>
+
+  <h2>Step 6 — Visit your domain</h2>
+  <p>
+    Open <code>https://my-app.example.com</code> in your browser. Caddy will have obtained a
+    Let's Encrypt certificate automatically.
+  </p>
+
+  <h2>Step 7 — Check status</h2>
+  <p>
+    Verify your deployment at any time:
+  </p>
+  <pre><code class="language-bash">shuttle status</code></pre>
+  <p>
+    This connects to the server and reports:
+  </p>
+  <ul>
+    <li>Active slot (blue or green) and container ID</li>
+    <li>Current image tag</li>
+    <li>Uptime of the running container</li>
+    <li>Health check status</li>
+    <li>Accessory container states</li>
+  </ul>
+
+  <h2>Subsequent deploys</h2>
+  <p>
+    Every subsequent deploy is just:
+  </p>
+  <pre><code class="language-bash">shuttle deploy</code></pre>
+  <p>
+    Or with a specific version tag:
+  </p>
+  <pre><code class="language-bash">shuttle deploy --tag v1.2.0</code></pre>
+
+  <h2>Rolling back</h2>
+  <p>
+    Roll back to the previous deploy instantly:
+  </p>
+  <pre><code class="language-bash">shuttle rollback</code></pre>
+
+  <h2>Next steps</h2>
+  <ul>
+    <li><a href="/docs/configuration">Explore all configuration options</a></li>
+    <li><a href="/docs/configuration/accessories">Set up database and cache accessories</a></li>
+    <li><a href="/docs/features/secrets">Learn more about secrets management</a></li>
+    <li><a href="/docs/ci/github">Set up GitHub Actions CI/CD</a></li>
+  </ul>
+</DocsLayout>

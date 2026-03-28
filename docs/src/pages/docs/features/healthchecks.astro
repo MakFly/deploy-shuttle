@@ -1,0 +1,140 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="Health Checks"
+  description="Configure HTTP, TCP, and exec health checks per service to gate deployments and drive automatic rollback."
+  section="features"
+>
+  <p>
+    Health checks are the gate between starting a new container and switching traffic. Shuttle runs
+    checks <strong>remotely via SSH</strong> — <code>curl</code> for HTTP and <code>/dev/tcp</code>
+    for TCP — so they reflect actual network reachability on the server, not just process liveness.
+    A failed check triggers automatic rollback (if enabled) before the proxy is ever updated.
+  </p>
+
+  <h2>Check types</h2>
+
+  <h3>HTTP</h3>
+  <p>
+    Issues a <code>curl -sf -o /dev/null</code> request to the container's port on the server.
+    Passes on any 2xx or 3xx HTTP response.
+  </p>
+  <pre><code class="language-yaml">services:
+  web:
+    port: 3000
+    healthcheck:
+      type: http
+      path: /health          # default: /
+      interval: 5            # seconds between retries (default: 2)
+      timeout: 3             # curl timeout per attempt in seconds
+      retries: 5             # total attempts before failure (default: 5)
+</code></pre>
+
+  <h3>TCP</h3>
+  <p>
+    Opens a TCP connection to the container port using bash's <code>/dev/tcp</code> pseudo-device.
+    Passes as soon as the port accepts a connection — no HTTP response required. Useful for databases,
+    message queues, or any service that doesn't speak HTTP on its main port.
+  </p>
+  <pre><code class="language-yaml">services:
+  worker:
+    port: 9000
+    healthcheck:
+      type: tcp
+      interval: 5
+      timeout: 3
+      retries: 5
+</code></pre>
+
+  <h3>Exec</h3>
+  <p>
+    Runs an arbitrary command inside the container via <code>docker exec</code>. Passes when the
+    command exits with code 0. Useful for custom readiness scripts or when the health endpoint is on
+    a different port than the public one.
+  </p>
+  <pre><code class="language-yaml">services:
+  api:
+    healthcheck:
+      type: exec
+      command: "php artisan health:check"
+      interval: 10
+      timeout: 5
+      retries: 3
+</code></pre>
+
+  <h2>Defaults</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Parameter</th>
+        <th>Default</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>path</code></td>
+        <td><code>/</code></td>
+        <td>HTTP only</td>
+      </tr>
+      <tr>
+        <td><code>interval</code></td>
+        <td><code>2</code>s</td>
+        <td>Pause between retry attempts</td>
+      </tr>
+      <tr>
+        <td><code>timeout</code></td>
+        <td>Falls back to <code>deploy.timeout</code> (default 60s)</td>
+        <td>Per-attempt timeout</td>
+      </tr>
+      <tr>
+        <td><code>retries</code></td>
+        <td><code>5</code></td>
+        <td>Total attempts before marking unhealthy</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Readiness delay (blue-green only)</h2>
+  <p>
+    Some apps need time to bind their port or run initialization before they can accept connections.
+    Use <code>deploy.blue_green.readiness_delay</code> to insert a sleep before the first probe:
+  </p>
+  <pre><code class="language-yaml">deploy:
+  blue_green:
+    readiness_delay: 3    # wait 3 seconds before the first health probe
+</code></pre>
+
+  <h2>Health checks are remote</h2>
+  <p>
+    Shuttle does not run health checks from your local machine. All probes execute on the remote host
+    via SSH:
+  </p>
+  <ul>
+    <li><strong>HTTP</strong>: <code>ssh user@host "curl -sf -o /dev/null -m &lt;timeout&gt; http://127.0.0.1:&lt;port&gt;&lt;path&gt;"</code></li>
+    <li><strong>TCP</strong>: <code>ssh user@host "timeout &lt;t&gt; bash -c 'echo &gt; /dev/tcp/127.0.0.1/&lt;port&gt;'"</code></li>
+    <li><strong>Exec</strong>: <code>docker exec &lt;container&gt; &lt;command&gt;</code> via SSH</li>
+  </ul>
+  <p>
+    This ensures that network policies, firewall rules, and container networking on the server are
+    validated — not your laptop's connectivity to the host.
+  </p>
+
+  <h2>Auto-rollback on failure</h2>
+  <p>
+    When <code>deploy.auto_rollback: true</code> (the default) and a health check fails:
+  </p>
+  <ul>
+    <li><strong>Blue-green</strong>: the new container is stopped immediately. The old container was never stopped, so traffic is unaffected.</li>
+    <li><strong>Rolling</strong>: the failing replica is restored from <code>previous_tag</code> and re-health-checked before the error is thrown.</li>
+    <li><strong>Swarm</strong>: Swarm's native rollback triggers automatically when the update monitor detects an unhealthy task. Shuttle surfaces the <code>rollback_completed</code> or <code>rollback_paused</code> state as a deploy error.</li>
+  </ul>
+
+  <h2>No health check configured</h2>
+  <p>
+    If a service has no <code>healthcheck</code> block, Shuttle skips the check and proceeds
+    directly to the proxy switch. The container is assumed healthy as soon as it starts. This is fine
+    for background workers with no public port, but is not recommended for web services.
+  </p>
+</DocsLayout>

@@ -1,0 +1,111 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+
+<DocsLayout
+  title="Introduction"
+  description="What is Shuttle and why use it"
+  section="Getting Started"
+>
+  <h2>What is Shuttle?</h2>
+  <p>
+    Shuttle is an open-source Docker deployment CLI written in TypeScript and powered by Bun.
+    It provisions VPS servers and deploys containerized applications over SSH — no platform
+    lock-in, no proprietary infrastructure, no Kubernetes required.
+  </p>
+  <p>
+    You define your deployment in a single <code>shuttle.yml</code> file. Shuttle handles the
+    rest: building your Docker image, transferring it to the server, starting the new container,
+    running health checks, and switching traffic over — all with zero downtime.
+  </p>
+
+  <h2>Core concepts</h2>
+
+  <h3>Declarative config</h3>
+  <p>
+    Everything lives in <code>shuttle.yml</code> alongside your code. There is no separate
+    Ansible playbook, no Terraform state, no server-side daemon. The config is version-controlled
+    and human-readable.
+  </p>
+
+  <h3>Pluggable architecture</h3>
+  <p>
+    Every major component is backed by an interface with swappable drivers:
+  </p>
+  <ul>
+    <li><strong>Proxy:</strong> Caddy (default), with Nginx and Traefik planned</li>
+    <li><strong>Registry:</strong> local transfer (default), local registry, GHCR, Docker Hub, custom</li>
+    <li><strong>Secrets:</strong> AES-256-GCM file-based encryption</li>
+    <li><strong>Deploy strategy:</strong> blue-green (default), rolling, Docker Swarm</li>
+  </ul>
+  <p>
+    Premium drivers (GHCR, Docker Hub, Docker Swarm) are gated behind a license key. Everything
+    you need to deploy a production app is free.
+  </p>
+
+  <h3>SSH-native</h3>
+  <p>
+    Shuttle connects to your server over standard SSH using your existing key pair. It maintains
+    a connection pool, executes remote commands, and uploads files over SFTP. No agent, no daemon,
+    no open ports beyond 22, 80, and 443.
+  </p>
+
+  <h2>Deploy strategies</h2>
+  <p>Shuttle ships with three deployment strategies:</p>
+  <ul>
+    <li>
+      <strong>Blue-green</strong> — runs two slots (blue and green) in parallel. Caddy routes
+      traffic to the live slot; the new slot is started, health-checked, and then Caddy is
+      atomically updated. The old slot is stopped after cutover. Instant rollback: flip Caddy
+      back and restart the old container.
+    </li>
+    <li>
+      <strong>Rolling</strong> — sequentially updates containers across multiple servers one
+      at a time (or in configurable batches). Each server must pass health checks before the
+      next is updated.
+    </li>
+    <li>
+      <strong>Docker Swarm</strong> — delegates orchestration to a Swarm cluster. Shuttle
+      generates the stack config and issues <code>docker stack deploy</code>. Replicas,
+      update parallelism, rollback behaviour, and convergence timeouts are all configurable.
+    </li>
+  </ul>
+
+  <h2>How it compares</h2>
+
+  <h3>vs. Kamal</h3>
+  <p>
+    Kamal (formerly MRSK, from the Rails team) is the closest spiritual cousin. Both are
+    zero-downtime SSH-based CLI tools. Shuttle differs in a few ways:
+  </p>
+  <ul>
+    <li>Pluggable proxy — you are not tied to Traefik</li>
+    <li>Built-in secrets encryption rather than relying on 1Password or env files</li>
+    <li>Docker Swarm strategy for high-availability clusters</li>
+    <li>Local dev mode with Caddy + mkcert for production-parity development</li>
+    <li>TypeScript/Bun — easier to extend if you live in the JS/TS ecosystem</li>
+  </ul>
+
+  <h3>vs. Dokku</h3>
+  <p>
+    Dokku is a self-hosted Heroku. It lives on the server and manages app lifecycles via a
+    git push interface. Shuttle is a <em>client-side</em> CLI — there is nothing installed on
+    the server beyond Docker and Caddy. This makes it easier to use across multiple servers
+    and environments without coupling your deployment process to a server-side daemon.
+  </p>
+
+  <h3>vs. Spin (Laravel)</h3>
+  <p>
+    Spin is a Laravel-focused tool built on Docker Swarm. Shuttle is framework-agnostic:
+    any Dockerized app can be deployed. Shuttle also provides the <code>shuttle new</code>
+    scaffolding command which generates Laravel and Symfony starters, so you still get that
+    first-class framework experience.
+  </p>
+
+  <h2>Next steps</h2>
+  <ul>
+    <li><a href="/docs/installation">Install the Shuttle CLI</a></li>
+    <li><a href="/docs/getting-started">Deploy your first app in 5 minutes</a></li>
+    <li><a href="/docs/configuration">Full configuration reference</a></li>
+  </ul>
+</DocsLayout>

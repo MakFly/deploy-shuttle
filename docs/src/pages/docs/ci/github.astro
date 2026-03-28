@@ -1,0 +1,165 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="GitHub Actions"
+  description="Generate a ready-to-use GitHub Actions workflow for building and deploying your app with Shuttle."
+  section="ci"
+>
+  <p>
+    Run <code>shuttle ci generate --provider github</code> to generate a GitHub Actions workflow
+    at <code>.github/workflows/shuttle-deploy.yml</code>. The workflow has two jobs:
+    <strong>build</strong> (Docker build + registry push) and <strong>deploy</strong> (SSH into
+    the server and call <code>shuttle deploy --skip-build</code>).
+  </p>
+
+  <h2>Generate the workflow</h2>
+  <pre><code class="language-bash">shuttle ci generate --provider github
+
+# With options
+shuttle ci generate \
+  --provider github \
+  --registry ghcr \        # ghcr (default) or docker-hub
+  --branch main \          # trigger branch (default: main)
+  --app my-app             # app name (defaults to shuttle.yml app name)
+</code></pre>
+  <p>
+    The command writes the workflow file and prints the required secrets you need to configure in
+    GitHub repository settings.
+  </p>
+
+  <h2>Generated workflow (GHCR)</h2>
+  <pre><code class="language-yaml">name: Deploy my-app
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: $&#123;&#123; steps.meta.outputs.tags &#125;&#125;
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: $&#123;&#123; github.actor &#125;&#125;
+          password: $&#123;&#123; secrets.GITHUB_TOKEN &#125;&#125;
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/$&#123;&#123; github.repository &#125;&#125;:latest
+            ghcr.io/$&#123;&#123; github.repository &#125;&#125;:$&#123;&#123; github.sha &#125;&#125;
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: $&#123;&#123; secrets.DEPLOY_HOST &#125;&#125;
+          username: $&#123;&#123; secrets.DEPLOY_USER &#125;&#125;
+          key: $&#123;&#123; secrets.DEPLOY_SSH_KEY &#125;&#125;
+          script: |
+            shuttle deploy --skip-build --image ghcr.io/$&#123;&#123; github.repository &#125;&#125;:$&#123;&#123; github.sha &#125;&#125;
+</code></pre>
+
+  <h2>Required repository secrets</h2>
+  <p>
+    Configure these in <strong>Settings &rarr; Secrets and variables &rarr; Actions</strong>:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Secret</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>DEPLOY_HOST</code></td>
+        <td>Server IP address or hostname</td>
+      </tr>
+      <tr>
+        <td><code>DEPLOY_USER</code></td>
+        <td>SSH username (e.g., <code>deploy</code>)</td>
+      </tr>
+      <tr>
+        <td><code>DEPLOY_SSH_KEY</code></td>
+        <td>SSH private key (contents of <code>~/.ssh/id_ed25519</code>)</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    <code>GITHUB_TOKEN</code> is provided automatically by GitHub Actions for GHCR authentication.
+    No additional secret is needed for GHCR.
+  </p>
+
+  <h2>Docker Hub variant</h2>
+  <p>
+    Generate with <code>--registry docker-hub</code> to use Docker Hub instead of GHCR:
+  </p>
+  <pre><code class="language-bash">shuttle ci generate --provider github --registry docker-hub
+</code></pre>
+  <p>
+    Two additional secrets are required:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Secret</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>DOCKERHUB_USERNAME</code></td>
+        <td>Docker Hub username</td>
+      </tr>
+      <tr>
+        <td><code>DOCKERHUB_TOKEN</code></td>
+        <td>Docker Hub access token (from hub.docker.com/settings/security)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Secrets key in CI</h2>
+  <p>
+    If you use Shuttle's encrypted secrets, the <code>.shuttle/key</code> file must be available
+    on the server before <code>shuttle deploy</code> runs. The typical approach is to copy the
+    key during provisioning and never store it in CI. Alternatively, store it as a CI secret and
+    restore it on the server during the deploy step:
+  </p>
+  <pre><code class="language-yaml">- name: Deploy via SSH
+  uses: appleboy/ssh-action@v1
+  with:
+    host: $&#123;&#123; secrets.DEPLOY_HOST &#125;&#125;
+    username: $&#123;&#123; secrets.DEPLOY_USER &#125;&#125;
+    key: $&#123;&#123; secrets.DEPLOY_SSH_KEY &#125;&#125;
+    script: |
+      mkdir -p ~/.shuttle
+      echo "$SHUTTLE_KEY" &gt; ~/.shuttle/key
+      chmod 600 ~/.shuttle/key
+      shuttle deploy --skip-build
+  env:
+    SHUTTLE_KEY: $&#123;&#123; secrets.SHUTTLE_KEY &#125;&#125;
+</code></pre>
+</DocsLayout>

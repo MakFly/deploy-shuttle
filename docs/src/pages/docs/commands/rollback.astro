@@ -1,0 +1,119 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="shuttle rollback"
+  description="Roll back to the previous deployment or a specific image tag, with health checks and proxy switching."
+  section="commands"
+>
+  <p>
+    <code>shuttle rollback</code> reverts your app to a previous deployment. It starts containers
+    from an already-present image (no build step), runs health checks, atomically switches the
+    proxy, drains the current containers, and updates the deployment state. The operation fires
+    webhook notifications on completion.
+  </p>
+
+  <h2>Usage</h2>
+  <pre><code class="language-bash">shuttle rollback                    # roll back to previous_tag from state.json
+shuttle rollback --to &lt;tag&gt;        # roll back to a specific image tag
+</code></pre>
+
+  <h2>Flags</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Flag</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>--to &lt;tag&gt;</code></td>
+        <td>Target image tag to roll back to (e.g., <code>shuttle/my-app:deploy-20260326-abc1234</code>). Defaults to <code>previous_tag</code> from <code>state.json</code>.</td>
+      </tr>
+      <tr>
+        <td><code>--config &lt;path&gt;</code></td>
+        <td>Explicit path to <code>shuttle.yml</code></td>
+      </tr>
+      <tr>
+        <td><code>--env &lt;name&gt;</code></td>
+        <td>Load <code>shuttle.&lt;name&gt;.yml</code> overlay</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>6-step rollback process</h2>
+  <ol>
+    <li>
+      <strong>Resolve target tag</strong> — reads <code>state.json</code> from
+      <code>/opt/shuttle/&lt;app&gt;/</code> on the server. Uses <code>--to</code> if provided,
+      otherwise falls back to <code>previous_tag</code>. Throws if no previous tag exists.
+    </li>
+    <li>
+      <strong>Start rollback containers</strong> — for each service, stops any stale container
+      on the inactive slot and starts a new container from the rollback image. No image build
+      or transfer occurs — the image must already be present on the server.
+    </li>
+    <li>
+      <strong>Health check</strong> — runs the health check for the first service (if configured)
+      against the new containers. Uses the same retry and timeout settings as a normal deploy.
+    </li>
+    <li>
+      <strong>Switch proxy upstream</strong> — Caddy is updated to point to the rollback
+      containers. No connections are dropped.
+    </li>
+    <li>
+      <strong>Drain old containers</strong> — stops the currently active containers after the
+      proxy has switched. Respects <code>deploy.blue_green.drain_timeout</code> (default: 30s).
+    </li>
+    <li>
+      <strong>Update deployment state</strong> — writes updated <code>state.json</code> with the
+      rollback tag as <code>active_tag</code> and the previous active tag as <code>previous_tag</code>.
+      The version counter increments — rollbacks are tracked as deployments.
+    </li>
+  </ol>
+
+  <h2>Listing available versions</h2>
+  <p>
+    Available rollback targets are Docker images with the <code>shuttle/&lt;app&gt;:deploy-</code>
+    prefix currently present on the server. You can list them directly:
+  </p>
+  <pre><code class="language-bash">ssh deploy@your-server "docker images 'shuttle/my-app:deploy-*' --format '&#123;&#123;.Tag&#125;&#125;'"
+# deploy-20260326-abc1234
+# deploy-20260325-def5678
+# deploy-20260324-ghi9012
+</code></pre>
+  <p>
+    Shuttle retains the last <code>deploy.retain</code> images (default: 3) on the server, so you
+    can roll back up to 3 releases by default.
+  </p>
+
+  <h2>Rolling back to a specific version</h2>
+  <pre><code class="language-bash">shuttle rollback --to shuttle/my-app:deploy-20260325-def5678
+</code></pre>
+
+  <h2>Webhook notifications</h2>
+  <p>
+    Rollback fires <code>rollback_succeeded</code> or <code>rollback_failed</code> webhook events
+    to all URLs configured under <code>notifications.webhooks</code>. This is the same
+    notification system as deploy events.
+  </p>
+
+  <h2>Multi-server rollback</h2>
+  <p>
+    Rollback runs sequentially across hosts (not in parallel). Each host acquires its deploy lock
+    before starting and releases it after completion, preventing concurrent rollbacks on the same
+    host.
+  </p>
+
+  <h2>No previous version available</h2>
+  <p>
+    If this is the first deploy or the state file has no <code>previous_tag</code> entry,
+    <code>shuttle rollback</code> without <code>--to</code> will fail with:
+  </p>
+  <pre><code class="language-bash">DeployError: No previous version available to roll back to for "my-app" on 203.0.113.10
+</code></pre>
+  <p>
+    In this case, use <code>--to</code> with an explicit image tag that is present on the server.
+  </p>
+</DocsLayout>

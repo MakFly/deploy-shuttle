@@ -1,0 +1,114 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="Notifications"
+  description="Send webhook notifications on deploy success, failure, and rollback events."
+  section="features"
+>
+  <p>
+    Shuttle can send HTTP POST webhooks to notify external services — Slack, Discord, PagerDuty,
+    custom endpoints — when deploys and rollbacks complete or fail. Notifications are
+    <strong>best-effort</strong>: a webhook delivery failure is logged but does not affect the
+    deploy outcome.
+  </p>
+
+  <h2>Configuration</h2>
+  <pre><code class="language-yaml">notifications:
+  webhooks:
+    - https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXX
+    - https://discord.com/api/webhooks/000000000000000000/XXXX
+    - https://your-app.example.com/hooks/shuttle
+</code></pre>
+  <p>
+    Multiple webhook URLs are supported. Shuttle fires all of them for every event.
+  </p>
+
+  <h2>Events</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Event</th>
+        <th>Trigger</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>deploy_succeeded</code></td>
+        <td>All hosts deployed successfully</td>
+      </tr>
+      <tr>
+        <td><code>deploy_failed</code></td>
+        <td>One or more hosts failed during deploy</td>
+      </tr>
+      <tr>
+        <td><code>rollback_succeeded</code></td>
+        <td>Rollback completed successfully on all hosts</td>
+      </tr>
+      <tr>
+        <td><code>rollback_failed</code></td>
+        <td>Rollback failed on one or more hosts</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Webhook payload</h2>
+  <p>
+    Shuttle sends a JSON POST with <code>Content-Type: application/json</code>:
+  </p>
+  <pre><code class="language-json">&#123;
+  "event": "deploy_succeeded",
+  "app": "my-app",
+  "timestamp": "2026-03-26T14:32:00.000Z"
+&#125;
+</code></pre>
+  <p>
+    For failure events, an additional <code>error</code> field is included:
+  </p>
+  <pre><code class="language-json">&#123;
+  "event": "deploy_failed",
+  "app": "my-app",
+  "timestamp": "2026-03-26T14:35:12.000Z",
+  "error": "Health check failed for 'web' on 203.0.113.10"
+&#125;
+</code></pre>
+
+  <h2>Best-effort delivery</h2>
+  <p>
+    Webhook calls have a timeout and do not block the deploy pipeline. If a webhook endpoint is
+    unavailable or returns a non-2xx response, Shuttle logs a warning and continues. This ensures
+    that a flaky notification endpoint never causes a deploy to fail or stall.
+  </p>
+
+  <h2>Slack integration example</h2>
+  <p>
+    Create an <a href="https://api.slack.com/messaging/webhooks" target="_blank">Incoming Webhook</a>
+    in your Slack workspace and add the URL to your config:
+  </p>
+  <pre><code class="language-yaml">notifications:
+  webhooks:
+    - https://hooks.slack.com/services/T.../B.../...
+</code></pre>
+  <p>
+    Note: Slack's Incoming Webhook format expects a different JSON shape than Shuttle's default
+    payload. If you need rich Slack messages, route through a small middleware (e.g., a Cloudflare
+    Worker or Lambda) that transforms the payload.
+  </p>
+
+  <h2>Custom webhook server example</h2>
+  <pre><code class="language-javascript">// Express.js endpoint that receives Shuttle notifications
+app.post('/hooks/shuttle', express.json(), (req, res) =&gt; &#123;
+  const &#123; event, app, timestamp, error &#125; = req.body
+
+  if (event === 'deploy_failed') &#123;
+    alertOncall(&#123; app, error, timestamp &#125;)
+  &#125;
+
+  if (event === 'deploy_succeeded') &#123;
+    notifyTeam(&#123; app, timestamp &#125;)
+  &#125;
+
+  res.json(&#123; ok: true &#125;)
+&#125;)
+</code></pre>
+</DocsLayout>

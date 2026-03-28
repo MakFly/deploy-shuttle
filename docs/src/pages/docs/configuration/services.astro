@@ -1,0 +1,177 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+
+<DocsLayout
+  title="Services"
+  description="Configure application services — the containers that make up your app"
+  section="Configuration"
+>
+  <p>
+    A <em>service</em> is a Docker container that Shuttle manages as part of your application.
+    Each service in <code>shuttle.yml</code> maps to one container (or one set of replicas in
+    Swarm mode) running your application code.
+  </p>
+  <p>
+    Services are different from <a href="/docs/configuration/accessories">accessories</a>: services
+    run your application image (built from <code>build</code> or pulled from <code>image</code>),
+    while accessories run third-party images like Postgres or Redis.
+  </p>
+
+  <h2>Minimal configuration</h2>
+  <pre><code class="language-yaml">services:
+  web:
+    port: 3000</code></pre>
+  <p>
+    This is the most common configuration. The <code>web</code> service is started using the
+    default command from the <code>Dockerfile</code> (<code>CMD</code>) and exposed on port 3000.
+    Caddy proxies incoming requests to this port.
+  </p>
+
+  <h2>Service fields</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Type</th>
+        <th>Required</th>
+        <th>Default</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>command</code></td>
+        <td>string</td>
+        <td>No</td>
+        <td>Dockerfile CMD</td>
+        <td>Override the Docker image's default command.</td>
+      </tr>
+      <tr>
+        <td><code>port</code></td>
+        <td>number</td>
+        <td>No</td>
+        <td>—</td>
+        <td>Container port to expose via the proxy. Services without a port are not proxied.</td>
+      </tr>
+      <tr>
+        <td><code>replicas</code></td>
+        <td>number</td>
+        <td>No</td>
+        <td><code>1</code></td>
+        <td>Number of container replicas (Swarm strategy only).</td>
+      </tr>
+      <tr>
+        <td><code>healthcheck</code></td>
+        <td>object</td>
+        <td>No</td>
+        <td>—</td>
+        <td>HTTP health check configuration. See below.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Health checks</h2>
+  <p>
+    A health check polls an HTTP endpoint on the container and gates traffic cutover.
+    Shuttle will not switch Caddy to the new container until the health check passes.
+    If it never passes within <code>deploy.timeout</code> seconds, the deploy is rolled back.
+  </p>
+  <pre><code class="language-yaml">services:
+  web:
+    port: 3000
+    healthcheck:
+      path: /up          # HTTP GET path
+      interval: 10s      # polling interval
+      timeout: 5s        # per-request timeout
+      retries: 6         # consecutive failures before giving up</code></pre>
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>path</code></td><td>string</td><td><code>/</code></td><td>HTTP path to poll. Must return 2xx to be considered healthy.</td></tr>
+      <tr><td><code>interval</code></td><td>string</td><td><code>10s</code></td><td>Time between health check requests.</td></tr>
+      <tr><td><code>timeout</code></td><td>string</td><td><code>5s</code></td><td>Per-request timeout.</td></tr>
+      <tr><td><code>retries</code></td><td>number</td><td><code>6</code></td><td>Number of consecutive successes required before the container is considered healthy.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Port assignment</h2>
+  <p>
+    For blue-green deployments, Shuttle assigns host ports automatically so that the blue and
+    green containers can run simultaneously on the same server without conflict:
+  </p>
+  <pre><code class="language-text">host_port = BASE_PORT + (serviceIndex * 2) + slotOffset
+
+where:
+  BASE_PORT   = 10000
+  serviceIndex = 0-based index of the service in the services map
+  slotOffset   = 0 for blue, 1 for green</code></pre>
+  <p>
+    For a single <code>web</code> service:
+  </p>
+  <ul>
+    <li>Blue slot: host port <code>10000</code> → container port <code>3000</code></li>
+    <li>Green slot: host port <code>10001</code> → container port <code>3000</code></li>
+  </ul>
+  <p>
+    For two services (<code>web</code> and <code>api</code>):
+  </p>
+  <ul>
+    <li>web blue: <code>10000</code>, web green: <code>10001</code></li>
+    <li>api blue: <code>10002</code>, api green: <code>10003</code></li>
+  </ul>
+  <p>
+    You do not need to manage these port assignments yourself — Shuttle handles them automatically.
+  </p>
+
+  <h2>Multi-service example</h2>
+  <p>
+    A typical web application with a background worker and a scheduled task runner:
+  </p>
+  <pre><code class="language-yaml">services:
+  web:
+    port: 3000
+    healthcheck:
+      path: /up
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  worker:
+    command: node worker.js
+    # no port — this service is not proxied
+    # no healthcheck — worker is considered healthy if it starts without crashing
+
+  scheduler:
+    command: node scheduler.js
+    # cron-like scheduler process; also not proxied</code></pre>
+  <p>
+    All three services share the same Docker image. Shuttle starts each as a separate container
+    and manages their lifecycle together. During a blue-green deploy, all three containers are
+    rotated atomically.
+  </p>
+
+  <h2>Worker services without a port</h2>
+  <p>
+    Services without a <code>port</code> are started but not added to the Caddy upstream.
+    They are useful for background workers, schedulers, and queue consumers that do not
+    serve HTTP traffic. Shuttle still manages their lifecycle: they are started with the
+    new image after a successful deploy and stopped when the old slots are cleaned up.
+  </p>
+
+  <h2>Command override</h2>
+  <p>
+    Override the Docker image's default <code>CMD</code> for a specific service. This is useful
+    when a single image runs multiple roles:
+  </p>
+  <pre><code class="language-yaml">services:
+  web:
+    port: 8000
+    command: gunicorn myapp.wsgi:application --bind 0.0.0.0:8000
+  celery:
+    command: celery -A myapp worker --loglevel=info
+  beat:
+    command: celery -A myapp beat --loglevel=info</code></pre>
+</DocsLayout>

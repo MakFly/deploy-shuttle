@@ -1,0 +1,277 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+
+<DocsLayout
+  title="Configuration Reference"
+  description="Complete shuttle.yml reference with all options, types, and defaults"
+  section="Configuration"
+>
+  <p>
+    All Shuttle configuration lives in <code>shuttle.yml</code> at the root of your repository.
+    This page documents every supported key. Environment-specific overlays are described in
+    <a href="/docs/configuration/environments">Environment Overlays</a>.
+  </p>
+
+  <h2>Top-level fields</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Type</th>
+        <th>Required</th>
+        <th>Default</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>app</code></td>
+        <td>string</td>
+        <td>Yes</td>
+        <td>—</td>
+        <td>Application name. Used as Docker image prefix and remote directory name.</td>
+      </tr>
+      <tr>
+        <td><code>domain</code></td>
+        <td>string</td>
+        <td>Yes</td>
+        <td>—</td>
+        <td>Public domain (e.g. <code>my-app.example.com</code>). Used for Caddy SSL provisioning.</td>
+      </tr>
+      <tr>
+        <td><code>server</code></td>
+        <td>string</td>
+        <td>Yes*</td>
+        <td>—</td>
+        <td>Shorthand for a single server: <code>user@host</code>. Normalised to <code>servers</code> internally.</td>
+      </tr>
+      <tr>
+        <td><code>servers</code></td>
+        <td>map</td>
+        <td>Yes*</td>
+        <td>—</td>
+        <td>Named server map for multi-server setups. Keys are arbitrary names; values are <code>user@host</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>*Either <code>server</code> (shorthand) or <code>servers</code> (map) is required. They are mutually exclusive.</p>
+
+  <h2>build</h2>
+  <p>
+    Describes how to build the Docker image locally. Mutually exclusive with <code>image</code>.
+  </p>
+  <pre><code class="language-yaml">build:
+  context: .
+  dockerfile: Dockerfile
+  args:
+    NODE_ENV: production
+  target: production   # multi-stage target</code></pre>
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>context</code></td><td>string</td><td><code>.</code></td><td>Docker build context path.</td></tr>
+      <tr><td><code>dockerfile</code></td><td>string</td><td><code>Dockerfile</code></td><td>Path to Dockerfile relative to context.</td></tr>
+      <tr><td><code>args</code></td><td>map&lt;string, string&gt;</td><td>—</td><td>Build-time <code>--build-arg</code> values.</td></tr>
+      <tr><td><code>target</code></td><td>string</td><td>—</td><td>Multi-stage build target.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>image</h2>
+  <p>
+    Use a pre-built image instead of building locally. Mutually exclusive with <code>build</code>.
+  </p>
+  <pre><code class="language-yaml">image: ghcr.io/my-org/my-app:latest</code></pre>
+  <p>
+    When using <code>image</code>, Shuttle pulls the image on the remote server rather than
+    building and transferring it. Useful for CD pipelines where the image is already published
+    to a registry.
+  </p>
+
+  <h2>registry</h2>
+  <p>
+    Controls how the built image is transferred to the server. Defaults to <code>local-transfer</code>
+    (save as tarball, upload over SFTP).
+  </p>
+  <pre><code class="language-yaml">registry:
+  driver: ghcr          # local-transfer | local-registry | ghcr | docker-hub | custom
+  host: ghcr.io
+  username: my-org
+  password: !secret GHCR_TOKEN</code></pre>
+  <table>
+    <thead>
+      <tr><th>Driver</th><th>Tier</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>local-transfer</code></td><td>Free</td><td>Saves image as <code>.tar.gz</code>, uploads over SFTP. No registry needed.</td></tr>
+      <tr><td><code>local-registry</code></td><td>Free</td><td>Runs a temporary local Docker registry on the server to push/pull.</td></tr>
+      <tr><td><code>ghcr</code></td><td>Premium</td><td>GitHub Container Registry. Pushes locally, pulls on server.</td></tr>
+      <tr><td><code>docker-hub</code></td><td>Premium</td><td>Docker Hub registry.</td></tr>
+      <tr><td><code>custom</code></td><td>Premium</td><td>Any OCI-compatible registry. Provide <code>host</code>, <code>username</code>, <code>password</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>deploy</h2>
+  <pre><code class="language-yaml">deploy:
+  strategy: blue-green       # blue-green | rolling | swarm
+  timeout: 120               # seconds to wait for health checks
+  retain: 5                  # number of old image tags to keep
+  auto_rollback: true        # roll back automatically on health check failure
+  concurrency: 1             # servers to update simultaneously (rolling only)
+  hooks:
+    pre_deploy:
+      - echo "starting deploy"
+    post_deploy:
+      - php artisan migrate --force
+  blue_green:
+    port_offset: 0           # offset added to blue/green port calculation</code></pre>
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>strategy</code></td><td>string</td><td><code>blue-green</code></td><td>Deployment strategy.</td></tr>
+      <tr><td><code>timeout</code></td><td>number</td><td><code>120</code></td><td>Max seconds to wait for containers to become healthy.</td></tr>
+      <tr><td><code>retain</code></td><td>number</td><td><code>5</code></td><td>Number of old image tags to retain for rollback.</td></tr>
+      <tr><td><code>auto_rollback</code></td><td>boolean</td><td><code>true</code></td><td>Automatically roll back if health checks fail.</td></tr>
+      <tr><td><code>concurrency</code></td><td>number</td><td><code>1</code></td><td>How many servers to update at once (rolling strategy).</td></tr>
+      <tr><td><code>hooks.pre_deploy</code></td><td>string[]</td><td>—</td><td>Shell commands run on the server before the new container starts.</td></tr>
+      <tr><td><code>hooks.post_deploy</code></td><td>string[]</td><td>—</td><td>Shell commands run on the server after traffic switches over.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>swarm</h2>
+  <p>Only relevant when <code>deploy.strategy</code> is <code>swarm</code>. Requires a Premium license.</p>
+  <pre><code class="language-yaml">swarm:
+  replicas: 3
+  update_parallelism: 1
+  update_delay: 10s
+  update_order: start-first   # start-first | stop-first
+  monitor: 15s
+  convergence_timeout: 300</code></pre>
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>replicas</code></td><td>number</td><td><code>1</code></td><td>Number of task replicas in the Swarm service.</td></tr>
+      <tr><td><code>update_parallelism</code></td><td>number</td><td><code>1</code></td><td>Tasks updated simultaneously during a rolling update.</td></tr>
+      <tr><td><code>update_delay</code></td><td>string</td><td><code>10s</code></td><td>Delay between updating each batch of tasks.</td></tr>
+      <tr><td><code>update_order</code></td><td>string</td><td><code>stop-first</code></td><td><code>start-first</code> starts the new task before stopping the old one.</td></tr>
+      <tr><td><code>monitor</code></td><td>string</td><td><code>15s</code></td><td>Duration to monitor each updated task for failures.</td></tr>
+      <tr><td><code>convergence_timeout</code></td><td>number</td><td><code>300</code></td><td>Max seconds to wait for the service to converge.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>services</h2>
+  <p>
+    Defines the containers that make up your application. Each key is a service name; each
+    value is a service config. See <a href="/docs/configuration/services">Services</a> for
+    full details.
+  </p>
+  <pre><code class="language-yaml">services:
+  web:
+    port: 3000
+    healthcheck:
+      path: /up
+  worker:
+    command: node worker.js</code></pre>
+
+  <h2>accessories</h2>
+  <p>
+    Long-running sidecar containers (databases, caches, mail catchers) that Shuttle manages
+    alongside your application. See <a href="/docs/configuration/accessories">Accessories</a>
+    for full details.
+  </p>
+  <pre><code class="language-yaml">accessories:
+  postgres:
+    preset: postgres
+  redis:
+    preset: redis</code></pre>
+
+  <h2>secrets</h2>
+  <pre><code class="language-yaml">secrets:
+  file: .shuttle.secrets
+  driver: aes</code></pre>
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>file</code></td><td>string</td><td><code>.shuttle.secrets</code></td><td>Path to the encrypted secrets file.</td></tr>
+      <tr><td><code>driver</code></td><td>string</td><td><code>aes</code></td><td>Encryption driver. Currently only <code>aes</code> (AES-256-GCM) is supported.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>env</h2>
+  <p>Environment variables injected into service containers.</p>
+  <pre><code class="language-yaml">env:
+  clear:
+    NODE_ENV: production
+    PORT: "3000"
+  secret:
+    - DATABASE_URL
+    - APP_KEY</code></pre>
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>clear</code></td><td>Plain-text key/value pairs committed openly in <code>shuttle.yml</code>.</td></tr>
+      <tr><td><code>secret</code></td><td>List of secret names whose values come from the encrypted secrets file.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>proxy</h2>
+  <pre><code class="language-yaml">{`proxy:
+  driver: caddy         # caddy (default; more planned)
+  ssl: true             # auto-provision Let's Encrypt certificate
+  headers:
+    X-Forwarded-For: "{remote}"
+    X-Real-IP: "{remote}"`}</code></pre>
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>driver</code></td><td>string</td><td><code>caddy</code></td><td>Proxy driver.</td></tr>
+      <tr><td><code>ssl</code></td><td>boolean</td><td><code>true</code></td><td>Enable automatic HTTPS via Let's Encrypt.</td></tr>
+      <tr><td><code>headers</code></td><td>map&lt;string, string&gt;</td><td>—</td><td>Additional headers to set on proxied requests.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>notifications</h2>
+  <pre><code class="language-yaml">notifications:
+  webhooks:
+    - url: https://hooks.slack.com/services/...
+      on:
+        - deploy_started
+        - deploy_succeeded
+        - deploy_failed
+        - rollback</code></pre>
+  <p>
+    Shuttle sends a JSON POST to each configured webhook URL on the specified events.
+    The payload includes the app name, event type, timestamp, and deploy metadata.
+  </p>
+
+  <h2>dev</h2>
+  <p>Controls the local development environment started by <code>shuttle dev</code>.</p>
+  <pre><code class="language-yaml">dev:
+  ssl: true
+  domain: my-app.localhost
+  ports:
+    - "3000:3000"
+    - "5432:5432"</code></pre>
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>ssl</code></td><td>boolean</td><td><code>false</code></td><td>Use mkcert to provision a local trusted certificate.</td></tr>
+      <tr><td><code>domain</code></td><td>string</td><td><code>app-name.localhost</code></td><td>Local domain for the dev environment.</td></tr>
+      <tr><td><code>ports</code></td><td>string[]</td><td>—</td><td>Extra host-to-container port mappings.</td></tr>
+    </tbody>
+  </table>
+</DocsLayout>

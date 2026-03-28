@@ -1,0 +1,21 @@
+---
+interface Props {
+  lang?: string
+  title?: string
+}
+
+const { lang = 'bash', title } = Astro.props
+---
+
+<div class="not-prose my-4">
+  {title && (
+    <div class="rounded-t-lg border border-b-0 bg-muted px-4 py-2 text-sm font-mono text-muted-foreground">
+      {title}
+    </div>
+  )}
+  <pre class={`${title ? 'rounded-b-lg' : 'rounded-lg'} border bg-[oklch(0.18_0_0)] p-4 overflow-x-auto`}>
+    <code class={`language-${lang} text-sm text-[oklch(0.9_0_0)]`}>
+      <slot />
+    </code>
+  </pre>
+</div>

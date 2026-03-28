@@ -1,0 +1,105 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="shuttle dev"
+  description="Full reference for the dev command: up, down, restart, logs, and status subcommands."
+  section="commands"
+>
+  <p>
+    <code>shuttle dev</code> manages a local Docker Compose development environment that mirrors
+    your production <code>shuttle.yml</code> configuration. Running <code>shuttle dev</code>
+    without a subcommand is equivalent to <code>shuttle dev up</code>.
+  </p>
+
+  <h2>shuttle dev up</h2>
+  <p>Start (or restart) the development environment.</p>
+  <pre><code class="language-bash">shuttle dev up
+shuttle dev      # same as above
+</code></pre>
+  <p>What this does:</p>
+  <ol>
+    <li>Checks for mkcert SSL certificates in <code>.shuttle/certs/</code> — generates them if mkcert is installed and they don't exist yet.</li>
+    <li>Generates <code>.shuttle/Caddyfile.dev</code> with reverse proxy entries for your app services.</li>
+    <li>Generates <code>docker-compose.dev.yml</code> in the project root with all services, accessories, and the Caddy container.</li>
+    <li>Runs <code>docker compose -f docker-compose.dev.yml up -d --build</code>.</li>
+    <li>Prints the HTTPS URL(s) for your app.</li>
+  </ol>
+
+  <h2>shuttle dev down</h2>
+  <p>Stop all development containers.</p>
+  <pre><code class="language-bash">shuttle dev down
+</code></pre>
+  <p>
+    Runs <code>docker compose -f docker-compose.dev.yml down</code>. Named volumes are preserved
+    — your database data survives a <code>down</code> and <code>up</code> cycle. Use
+    <code>docker compose -f docker-compose.dev.yml down -v</code> to remove volumes too.
+  </p>
+
+  <h2>shuttle dev restart</h2>
+  <p>Stop then start the development environment.</p>
+  <pre><code class="language-bash">shuttle dev restart
+</code></pre>
+  <p>
+    Equivalent to <code>shuttle dev down &amp;&amp; shuttle dev up</code>. Useful after changing
+    your <code>shuttle.yml</code> to regenerate the compose file and Caddyfile.
+  </p>
+
+  <h2>shuttle dev logs</h2>
+  <p>Stream logs from all development containers.</p>
+  <pre><code class="language-bash">shuttle dev logs              # follow mode (default)
+shuttle dev logs --no-follow  # print current logs and exit
+</code></pre>
+  <p>
+    Wraps <code>docker compose -f docker-compose.dev.yml logs [-f]</code>. All containers
+    (app services, Caddy, accessories) output to the same stream with container name prefixes.
+  </p>
+
+  <h2>shuttle dev status</h2>
+  <p>Show the running status of all development containers.</p>
+  <pre><code class="language-bash">shuttle dev status
+</code></pre>
+  <p>
+    Runs <code>docker compose -f docker-compose.dev.yml ps</code>. Shows container names,
+    images, commands, and status (Up/Exit):
+  </p>
+  <pre><code class="language-bash">NAME                    IMAGE               STATUS          PORTS
+myapp-web-1             myapp-web           Up 5 minutes    3000/tcp
+myapp-caddy-1           caddy:2-alpine      Up 5 minutes    0.0.0.0:80-&gt;80/tcp, 0.0.0.0:443-&gt;443/tcp
+myapp-postgres-1        postgres:16         Up 5 minutes    5432/tcp
+myapp-redis-1           redis:7-alpine      Up 5 minutes    6379/tcp
+</code></pre>
+
+  <h2>Generated files</h2>
+  <p>
+    Both files are regenerated on each <code>shuttle dev up</code> call:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>File</th>
+        <th>Location</th>
+        <th>Purpose</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>Caddyfile.dev</code></td>
+        <td><code>.shuttle/Caddyfile.dev</code></td>
+        <td>Caddy reverse proxy config for local dev</td>
+      </tr>
+      <tr>
+        <td><code>docker-compose.dev.yml</code></td>
+        <td>Project root</td>
+        <td>Compose file with all services and accessories</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    These can be safely added to <code>.gitignore</code>:
+  </p>
+  <pre><code class="language-bash">docker-compose.dev.yml
+.shuttle/Caddyfile.dev
+.shuttle/certs/
+</code></pre>
+</DocsLayout>

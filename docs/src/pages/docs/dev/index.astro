@@ -1,0 +1,83 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="Local Development"
+  description="Run your app locally with Docker Compose, Caddy reverse proxy, and mkcert SSL certificates — matching production as closely as possible."
+  section="dev"
+>
+  <p>
+    <code>shuttle dev</code> spins up a local development environment that mirrors your production
+    setup. It reads your <code>shuttle.yml</code>, generates a <code>docker-compose.dev.yml</code>
+    and a <code>Caddyfile.dev</code>, optionally provisions mkcert SSL certificates, and runs
+    everything with <code>docker compose up</code>.
+  </p>
+
+  <h2>Quick start</h2>
+  <pre><code class="language-bash">shuttle dev          # start (default subcommand is "up")
+shuttle dev up       # same as above
+shuttle dev down     # stop all containers
+shuttle dev restart  # down + up
+shuttle dev logs     # stream logs from all containers
+shuttle dev status   # show running containers and ports
+</code></pre>
+
+  <h2>What shuttle dev up does</h2>
+  <ol>
+    <li><strong>SSL setup</strong> — checks for existing certs at <code>.shuttle/certs/</code>. If mkcert is installed, generates trusted certificates for your domain(s). Falls back to plain HTTP if mkcert is missing.</li>
+    <li><strong>Generate Caddyfile.dev</strong> — writes <code>.shuttle/Caddyfile.dev</code> with a reverse proxy entry pointing to your app container port. If certs exist, configures TLS with <code>tls cert.pem key.pem</code>.</li>
+    <li><strong>Generate docker-compose.dev.yml</strong> — writes a compose file in the project root with all services (app, accessories from <code>shuttle.yml</code>) and a Caddy service (when SSL is available).</li>
+    <li><strong>docker compose up -d --build</strong> — starts all containers in detached mode, building from your Dockerfile.</li>
+    <li><strong>Print URLs</strong> — shows <code>https://&lt;your-domain&gt;</code> and <code>https://localhost</code>. Mailpit UI is shown at <code>http://localhost:8025</code> if configured.</li>
+  </ol>
+
+  <h2>Dev configuration block</h2>
+  <pre><code class="language-yaml">dev:
+  ssl: true                  # enable mkcert SSL (default: true)
+  domain: my-app.test        # override domain for local dev (defaults to top-level domain)
+  ports:
+    http: 80                 # host port for HTTP (default: 80)
+    https: 443               # host port for HTTPS (default: 443)
+</code></pre>
+
+  <h2>Generated files</h2>
+  <p>
+    Shuttle generates two files that you can inspect or customize:
+  </p>
+  <ul>
+    <li><code>.shuttle/Caddyfile.dev</code> — Caddy configuration for local dev</li>
+    <li><code>docker-compose.dev.yml</code> — compose file in project root</li>
+  </ul>
+  <p>
+    These files are regenerated on every <code>shuttle dev up</code> call. Add them to
+    <code>.gitignore</code> unless you want to commit the generated config:
+  </p>
+  <pre><code class="language-bash">docker-compose.dev.yml
+.shuttle/Caddyfile.dev
+.shuttle/certs/
+</code></pre>
+
+  <h2>Accessories in dev</h2>
+  <p>
+    All <code>accessories:</code> defined in <code>shuttle.yml</code> are included in the dev
+    compose file. Named volumes from remote paths (<code>/data/...</code>) are converted to
+    local Docker volumes so data persists across restarts.
+  </p>
+  <p>
+    Example: if your production config has a Postgres accessory, <code>shuttle dev up</code>
+    starts Postgres locally as well — same image, same environment variables.
+  </p>
+
+  <h2>Logs</h2>
+  <pre><code class="language-bash">shuttle dev logs          # stream all logs (follows by default)
+shuttle dev logs --no-follow   # print logs and exit
+</code></pre>
+
+  <h2>Status</h2>
+  <pre><code class="language-bash">shuttle dev status
+# NAME                IMAGE               COMMAND                  STATUS
+# myapp-web-1         myapp-web           "node server.js"         Up 3 minutes
+# myapp-caddy-1       caddy:2-alpine      "caddy run --config…"    Up 3 minutes
+# myapp-postgres-1    postgres:16         "docker-entrypoint.s…"   Up 3 minutes
+</code></pre>
+</DocsLayout>

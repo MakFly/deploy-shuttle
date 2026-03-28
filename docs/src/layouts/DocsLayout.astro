@@ -1,0 +1,55 @@
+---
+import '../styles/global.css'
+import { Sidebar } from '@/components/docs/Sidebar'
+import { Header } from '@/components/docs/Header'
+import { TableOfContents } from '@/components/docs/TableOfContents'
+import CodeHighlight from '@/components/docs/CodeHighlight.astro'
+
+interface Props {
+  title: string
+  description?: string
+  section?: string
+}
+
+const { title, description, section } = Astro.props
+---
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content={description || `Shuttle docs — ${title}`} />
+    <title>{title} — Shuttle</title>
+    <script is:inline>
+      (function() {
+        var theme = localStorage.getItem('theme');
+        if (theme === 'light') {
+          document.documentElement.classList.remove('dark');
+        } else {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
+  </head>
+  <body class="min-h-screen bg-background font-sans antialiased">
+    <Header client:load />
+    <div class="flex">
+      <Sidebar section={section} client:load />
+      <main class="flex-1 min-w-0 px-6 py-8 lg:px-12 lg:py-10">
+        <div class="max-w-4xl">
+          <div class="mb-8">
+            <h1 class="text-3xl font-bold tracking-tight">{title}</h1>
+            {description && <p class="mt-2 text-lg text-muted-foreground">{description}</p>}
+          </div>
+          <div class="prose prose-neutral dark:prose-invert max-w-none">
+            <slot />
+          </div>
+        </div>
+      </main>
+      <TableOfContents client:load />
+    </div>
+    <CodeHighlight />
+  </body>
+</html>

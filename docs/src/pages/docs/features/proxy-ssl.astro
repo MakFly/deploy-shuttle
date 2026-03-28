@@ -1,0 +1,118 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="SSL & Proxy"
+  description="Caddy as a reverse proxy with automatic Let's Encrypt SSL, zero-downtime upstream switching, and custom headers."
+  section="features"
+>
+  <p>
+    Shuttle provisions and manages a <a href="https://caddyserver.com" target="_blank">Caddy</a>
+    reverse proxy on your server. Caddy handles TLS termination with automatic Let's Encrypt
+    certificates, HTTP-to-HTTPS redirects, and upstream routing. Shuttle uses Caddy's JSON admin
+    API to atomically switch upstreams at deploy time — without restarting Caddy or dropping a
+    single connection.
+  </p>
+
+  <h2>How Caddy is deployed</h2>
+  <p>
+    During <code>shuttle provision</code>, Shuttle starts a Caddy Docker container with:
+  </p>
+  <ul>
+    <li>Ports 80 and 443 bound on the host</li>
+    <li>The Caddyfile mounted at <code>/opt/caddy/Caddyfile</code></li>
+    <li>A volume for Let's Encrypt certificate storage at <code>/data</code></li>
+    <li>Container name <code>shuttle-caddy</code>, restarted automatically</li>
+  </ul>
+
+  <h2>Configuration</h2>
+  <pre><code class="language-yaml">{`proxy:
+  driver: caddy             # default — can be omitted
+
+  ssl:
+    provider: letsencrypt   # default
+    email: ops@example.com  # required for Let's Encrypt ACME account
+
+  headers:
+    X-Real-IP: "{remote_host}"
+    X-Forwarded-Proto: "{scheme}"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+`}</code></pre>
+
+  <h2>Let's Encrypt automatic certificates</h2>
+  <p>
+    When <code>proxy.ssl.provider</code> is <code>letsencrypt</code> (the default), Caddy
+    automatically obtains and renews TLS certificates via ACME. Requirements:
+  </p>
+  <ul>
+    <li>Your domain's DNS must point to the server's IP before provisioning.</li>
+    <li>Port 80 and 443 must be open (Shuttle's provisioning step configures UFW accordingly).</li>
+    <li>Provide an email address via <code>proxy.ssl.email</code> for ACME account registration and expiry notifications.</li>
+  </ul>
+  <p>
+    Certificates are stored in Caddy's data volume and automatically renewed 30 days before expiry.
+    No manual renewal is needed.
+  </p>
+
+  <h2>HTTP-to-HTTPS redirect</h2>
+  <p>
+    Caddy automatically redirects all HTTP traffic to HTTPS when a TLS certificate is present.
+    There is no configuration required. HTTP requests receive a <code>301 Moved Permanently</code>
+    response pointing to the <code>https://</code> equivalent URL.
+  </p>
+
+  <h2>Atomic upstream switching</h2>
+  <p>
+    At each deploy, Shuttle calls Caddy's admin API to update the upstream address in-place:
+  </p>
+  <pre><code class="language-bash">POST http://localhost:2019/config/
+</code></pre>
+  <p>
+    Caddy applies the new configuration without restarting. In-flight requests complete against
+    the old upstream; new requests are immediately routed to the new one. This is what enables
+    zero-downtime blue-green and rolling deploys.
+  </p>
+
+  <h2>Caddyfile location</h2>
+  <p>
+    The generated Caddyfile lives at <code>/opt/caddy/Caddyfile</code> on the server. You can
+    inspect it at any time via SSH:
+  </p>
+  <pre><code class="language-bash">ssh deploy@your-server "cat /opt/caddy/Caddyfile"
+</code></pre>
+
+  <h2>Custom response headers</h2>
+  <p>
+    The <code>proxy.headers</code> map adds response headers to all proxied requests. Common uses:
+  </p>
+  <pre><code class="language-yaml">proxy:
+  headers:
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: "SAMEORIGIN"
+    X-Content-Type-Options: "nosniff"
+    Referrer-Policy: "strict-origin-when-cross-origin"
+</code></pre>
+
+  <h2>Multiple domains</h2>
+  <p>
+    Shuttle supports multiple domains for the same app. List them under <code>domain:</code>:
+  </p>
+  <pre><code class="language-yaml">domain:
+  - my-app.example.com
+  - www.my-app.example.com
+
+proxy:
+  ssl:
+    email: ops@example.com
+</code></pre>
+  <p>
+    Caddy obtains a certificate for each domain. Both domains serve the same upstream.
+  </p>
+
+  <h2>Disabling the proxy</h2>
+  <p>
+    Set <code>proxy.driver: none</code> to skip proxy management entirely. Shuttle will still
+    manage containers and state, but will not configure or reload Caddy. Use this if you manage
+    your own proxy separately.
+  </p>
+</DocsLayout>

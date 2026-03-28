@@ -1,0 +1,167 @@
+---
+import DocsLayout from '@/layouts/DocsLayout.astro'
+---
+<DocsLayout
+  title="Docker Swarm"
+  description="Deploy to a Docker Swarm cluster with native rolling updates, convergence polling, and automatic rollback detection."
+  section="strategies"
+>
+  <p>
+    The swarm strategy delegates orchestration to Docker Swarm. Shuttle initializes the swarm if
+    needed, generates a <code>docker-compose.swarm.yml</code>, runs <code>docker stack deploy</code>,
+    and polls until all service tasks converge. Swarm handles replica scheduling, <code>start-first</code>
+    rolling updates, and rollback detection natively.
+  </p>
+  <p>
+    This strategy is ideal when you need multi-node horizontal scaling without an external registry
+    (using <code>local-registry</code>) or with one (GHCR, Docker Hub).
+  </p>
+
+  <h2>8-step deploy pipeline</h2>
+  <ol>
+    <li><strong>Ensure Swarm is initialized</strong> — runs <code>docker info</code> to check swarm state. If not active, runs <code>docker swarm init --advertise-addr &lt;host&gt;</code> automatically.</li>
+    <li><strong>Build &amp; distribute image</strong> — build locally and push to the configured registry. For single-node swarm use <code>local-transfer</code>. For multi-node use <code>local-registry</code> (ephemeral registry + SSH tunnel) or an external registry.</li>
+    <li><strong>Upload secrets</strong> — push AES-encrypted secrets as <code>.env</code> to <code>/opt/shuttle/&lt;app&gt;/&lt;app&gt;/.env</code>.</li>
+    <li><strong>Generate &amp; upload compose file</strong> — renders <code>docker-compose.swarm.yml</code> with replica count, update policy, and env_file path; uploads to <code>/opt/shuttle/&lt;app&gt;/&lt;app&gt;/docker-compose.swarm.yml</code>.</li>
+    <li><strong>Deploy stack</strong> — runs <code>docker stack deploy -c &lt;composePath&gt; --with-registry-auth &lt;app&gt;</code>.</li>
+    <li><strong>Wait for convergence</strong> — polls <code>docker service inspect</code> every 5 seconds. Detects: <code>completed</code> (success), <code>rollback_completed</code> / <code>rollback_paused</code> (Swarm auto-rolled back), <code>paused</code> (update paused due to failure). Throws on any failure state.</li>
+    <li><strong>Update proxy upstream</strong> — updates Caddy to point to the service's published port.</li>
+    <li><strong>Write state</strong> — persists <code>state.json</code> with tag, port, and version.</li>
+  </ol>
+
+  <h2>Configuration</h2>
+  <pre><code class="language-yaml">app: my-app
+domain: my-app.example.com
+
+server:
+  host: 203.0.113.10
+  user: deploy
+
+build:
+  dockerfile: Dockerfile
+
+services:
+  web:
+    command: node server.js
+    port: 3000
+
+# Swarm-specific block
+swarm:
+  replicas: 3                   # number of task replicas
+  update_parallelism: 1         # tasks to update at a time
+  update_delay: 10s             # pause between each replica update
+  update_order: start-first     # start new task before stopping old (zero-downtime)
+  monitor: 15s                  # time to monitor new tasks before marking update successful
+  convergence_timeout: 300      # seconds to wait for all tasks to converge
+
+deploy:
+  strategy: swarm
+
+# Use local-registry for multi-node without external registry
+registry:
+  driver: local-registry
+
+# Or GHCR for multi-node with external registry
+# registry:
+#   driver: ghcr
+</code></pre>
+
+  <h2>update_order: start-first</h2>
+  <p>
+    With <code>update_order: start-first</code> (the default), Swarm starts the new task and waits
+    for it to reach the <em>Running</em> state before stopping the old one. This ensures no service
+    interruption during rolling updates. The <code>monitor</code> window (default 15s) gives Swarm time
+    to confirm the new task is healthy before moving to the next replica.
+  </p>
+  <p>
+    <code>stop-first</code> is available but reduces availability: the old task stops before the new
+    one starts, creating a brief gap. Only use it when you can't run two copies of the task
+    simultaneously (e.g., due to port conflicts or exclusive resource locks).
+  </p>
+
+  <h2>Convergence polling and rollback detection</h2>
+  <p>
+    Shuttle polls <code>docker service inspect --format '&#123;&#123;.UpdateStatus.State&#125;&#125;'</code> every 5 seconds.
+    The following states are handled:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>State</th>
+        <th>Meaning</th>
+        <th>Shuttle action</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>completed</code> or empty</td>
+        <td>Update finished or no update in progress</td>
+        <td>Verify all tasks Running, succeed</td>
+      </tr>
+      <tr>
+        <td><code>rollback_completed</code></td>
+        <td>Swarm auto-rolled back to previous image</td>
+        <td>Throw DeployError</td>
+      </tr>
+      <tr>
+        <td><code>rollback_paused</code></td>
+        <td>Swarm rollback paused (manual intervention needed)</td>
+        <td>Throw DeployError</td>
+      </tr>
+      <tr>
+        <td><code>paused</code></td>
+        <td>Update paused due to task failure</td>
+        <td>Throw DeployError</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    If convergence doesn't complete within <code>convergence_timeout</code> (default: 300s), Shuttle
+    throws a timeout error. The Swarm stack is left in its current state for inspection.
+  </p>
+
+  <h2>HEALTHCHECK in Dockerfile is required</h2>
+  <p>
+    Swarm's <code>start-first</code> update order and monitor window rely on Docker's native
+    HEALTHCHECK instruction to determine task health. Without a HEALTHCHECK, Swarm considers tasks
+    healthy as soon as they start, which may allow a broken container to pass the monitor window.
+  </p>
+  <pre><code class="language-dockerfile">FROM node:20-alpine
+WORKDIR /app
+COPY . .
+RUN npm ci --production
+
+HEALTHCHECK --interval=10s --timeout=3s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+CMD ["node", "server.js"]
+</code></pre>
+
+  <h2>Single-node vs multi-node</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Setup</th>
+        <th>Registry driver</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Single node</td>
+        <td><code>local-transfer</code></td>
+        <td>Default. <code>docker save | ssh docker load</code>. No registry needed.</td>
+      </tr>
+      <tr>
+        <td>Multi-node (no external registry)</td>
+        <td><code>local-registry</code></td>
+        <td>Starts ephemeral registry on manager, SSH-tunnels from local to push, all nodes pull from manager's registry.</td>
+      </tr>
+      <tr>
+        <td>Multi-node (with external registry)</td>
+        <td><code>ghcr</code> or <code>docker-hub</code></td>
+        <td>Build and push to external registry; all Swarm nodes pull from there using <code>--with-registry-auth</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+</DocsLayout>
