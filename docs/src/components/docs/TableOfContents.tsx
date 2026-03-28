@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { useEffect, useState } from 'react'
 
 interface TocItem {
 	id: string
@@ -12,14 +12,12 @@ export function TableOfContents() {
 	const [activeId, setActiveId] = useState<string>('')
 
 	useEffect(() => {
-		const elements = Array.from(
-			document.querySelectorAll('h2, h3'),
-		) as HTMLElement[]
+		const elements = Array.from(document.querySelectorAll('h2, h3')) as HTMLElement[]
 
 		const items: TocItem[] = elements.map((el) => ({
 			id: el.id,
 			text: el.textContent ?? '',
-			level: parseInt(el.tagName[1], 10),
+			level: Number.parseInt(el.tagName[1], 10),
 		}))
 
 		setHeadings(items)

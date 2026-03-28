@@ -1,14 +1,14 @@
 ---
 import '../styles/global.css'
-import { Sidebar } from '@/components/docs/Sidebar'
-import { Header } from '@/components/docs/Header'
-import { TableOfContents } from '@/components/docs/TableOfContents'
 import CodeHighlight from '@/components/docs/CodeHighlight.astro'
+import { Header } from '@/components/docs/Header'
+import { Sidebar } from '@/components/docs/Sidebar'
+import { TableOfContents } from '@/components/docs/TableOfContents'
 
 interface Props {
-  title: string
-  description?: string
-  section?: string
+	title: string
+	description?: string
+	section?: string
 }
 
 const { title, description, section } = Astro.props

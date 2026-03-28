@@ -28,9 +28,7 @@ export class GHCRRegistry implements RegistryProvider {
 		if (username && passwordEnv) {
 			const password = process.env[passwordEnv]
 			if (!password) {
-				throw new Error(
-					`Environment variable ${passwordEnv} is not set (required for GHCR login)`,
-				)
+				throw new Error(`Environment variable ${passwordEnv} is not set (required for GHCR login)`)
 			}
 			const url = config.registry?.url ?? 'ghcr.io'
 			logger.debug(`Logging into ${url} on ${host}`)

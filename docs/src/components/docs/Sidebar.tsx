@@ -79,9 +79,7 @@ export function Sidebar({ section }: SidebarProps) {
 				<nav className="space-y-6">
 					{navigation.map((group) => (
 						<div key={group.title}>
-							<h4 className="mb-2 px-2 text-sm font-semibold tracking-tight">
-								{group.title}
-							</h4>
+							<h4 className="mb-2 px-2 text-sm font-semibold tracking-tight">{group.title}</h4>
 							<div className="space-y-1">
 								{group.items.map((item) => (
 									<a

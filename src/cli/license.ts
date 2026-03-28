@@ -1,5 +1,11 @@
 import { defineCommand } from 'citty'
-import { LICENSE_FILE, loadLicense, removeLicense, saveLicense, validateLicense } from '../license/validate.ts'
+import {
+	LICENSE_FILE,
+	loadLicense,
+	removeLicense,
+	saveLicense,
+	validateLicense,
+} from '../license/validate.ts'
 import { logger } from '../utils/logger.ts'
 
 // ---------------------------------------------------------------------------
