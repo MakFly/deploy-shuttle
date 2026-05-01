@@ -179,6 +179,12 @@ For CI/CD and automation.
 
 For GitHub issues, client handoff, docs.
 
+Current CLI target:
+
+```bash
+deploy-shuttle report --input doctor.json --format markdown --output report.md
+```
+
 ### HTML report
 
 For paid/agency use.
@@ -194,6 +200,23 @@ Should include:
 - ignored checks;
 - next commands;
 - branding placeholder.
+
+### PDF report
+
+Generated locally through the optional React PDF renderer in `report-pdf/`.
+
+Current CLI target:
+
+```bash
+deploy-shuttle report --input doctor.json --format pdf --output report.pdf
+```
+
+Notes:
+
+- PDF rendering uses `@react-pdf/renderer`;
+- the Go CLI remains the active core;
+- `report-pdf/` is an optional local renderer, not a cloud dashboard;
+- cloud-hosted reports remain a later product phase.
 
 ## 5. CI/CD Use Case
 

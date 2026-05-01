@@ -53,6 +53,8 @@ Current readiness flow:
 deploy-shuttle doctor
 deploy-shuttle doctor --format json
 deploy-shuttle doctor --fail-below 75
+deploy-shuttle report --input doctor.json --format markdown --output report.md
+deploy-shuttle report --input doctor.json --format pdf --output report.pdf
 ```
 
 Planned readiness flow:
@@ -101,6 +103,14 @@ Build release binaries from the repository root:
 
 ```bash
 sh scripts/build-go.sh
+```
+
+PDF reports use the optional React PDF renderer:
+
+```bash
+cd report-pdf
+bun install
+bun run check
 ```
 
 ## Product Plan

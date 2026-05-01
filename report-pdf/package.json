@@ -1,0 +1,17 @@
+{
+  "name": "@deployshuttle/report-pdf",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "bun run src/render.tsx",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-pdf/renderer": "^4.3.1",
+    "react": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.8.0"
+  }
+}
