@@ -62,14 +62,28 @@ func newReportCommand() *cobra.Command {
 
 func markdownReport(report readiness.Report) string {
 	var b strings.Builder
+	failed := openFindings(report.Checks)
+	ignored := ignoredChecks(report.Checks)
 	fmt.Fprintf(&b, "# DeployShuttle Production Readiness Report\n\n")
 	fmt.Fprintf(&b, "- Target: `%s`\n", report.Target)
 	fmt.Fprintf(&b, "- Score: `%d/100`\n", report.Score)
 	fmt.Fprintf(&b, "- Level: `%s`\n", readiness.LevelLabel(report.Level))
+	fmt.Fprintf(&b, "- Open findings: `%d`\n", len(failed))
+	fmt.Fprintf(&b, "- Accepted risks: `%d`\n", len(ignored))
 	if report.ConfigPath != "" {
 		fmt.Fprintf(&b, "- Config: `%s`\n", report.ConfigPath)
 	}
 	fmt.Fprintf(&b, "- Generated: `%s`\n\n", report.GeneratedAt)
+	fmt.Fprintf(&b, "## Executive Summary\n\n")
+	fmt.Fprintf(&b, "%s\n\n", executiveSummary(report))
+	next := nextActions(failed)
+	if len(next) > 0 {
+		fmt.Fprintf(&b, "## Next Actions\n\n")
+		for i, action := range next {
+			fmt.Fprintf(&b, "%d. %s\n", i+1, action)
+		}
+		b.WriteString("\n")
+	}
 
 	for _, severity := range []readiness.Severity{readiness.Critical, readiness.High, readiness.Medium, readiness.Low, readiness.Info} {
 		checks := filterChecks(report.Checks, severity, false)
@@ -82,19 +96,34 @@ func markdownReport(report readiness.Report) string {
 			if check.Remediation != "" {
 				fmt.Fprintf(&b, "  - Fix: %s\n", check.Remediation)
 			}
+			if evidence := evidenceSummary(check); evidence != "" {
+				fmt.Fprintf(&b, "  - Evidence: %s\n", evidence)
+			}
 		}
 		b.WriteString("\n")
 	}
 
-	ignored := ignoredChecks(report.Checks)
 	if len(ignored) > 0 {
-		b.WriteString("## Ignored\n\n")
+		b.WriteString("## Accepted Risks\n\n")
 		for _, check := range ignored {
 			fmt.Fprintf(&b, "- **%s** (`%s`): %s\n", check.Title, check.ID, check.IgnoreReason)
+			if evidence := evidenceSummary(check); evidence != "" {
+				fmt.Fprintf(&b, "  - Evidence: %s\n", evidence)
+			}
 		}
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func openFindings(checks []readiness.CheckResult) []readiness.CheckResult {
+	out := []readiness.CheckResult{}
+	for _, check := range checks {
+		if check.Status == readiness.Failed && !check.Ignored {
+			out = append(out, check)
+		}
+	}
+	return out
 }
 
 func filterChecks(checks []readiness.CheckResult, severity readiness.Severity, includeIgnored bool) []readiness.CheckResult {
@@ -122,6 +151,70 @@ func ignoredChecks(checks []readiness.CheckResult) []readiness.CheckResult {
 		}
 	}
 	return out
+}
+
+func executiveSummary(report readiness.Report) string {
+	switch report.Level {
+	case "production-ready":
+		return "This VPS is production-ready for the selected profile. Remaining findings should still be reviewed before client handoff."
+	case "almost-ready":
+		return "This VPS is close to production-ready. Fix or explicitly accept the high-priority findings before relying on it for critical workloads."
+	case "risky":
+		return "This VPS has meaningful production risks. Address the high and medium findings before treating the setup as client-ready."
+	default:
+		return "This VPS is not production-ready. Critical issues should be fixed before deploying production or client workloads."
+	}
+}
+
+func nextActions(checks []readiness.CheckResult) []string {
+	actions := []string{}
+	for _, check := range checks {
+		if check.Remediation == "" {
+			continue
+		}
+		actions = append(actions, fmt.Sprintf("%s: %s", check.Title, check.Remediation))
+		if len(actions) == 5 {
+			break
+		}
+	}
+	return actions
+}
+
+func evidenceSummary(check readiness.CheckResult) string {
+	if len(check.Evidence) == 0 {
+		return ""
+	}
+	parts := []string{}
+	for _, key := range []string{"runtimeMode", "publicPorts", "workloads", "ignoredWorkloads", "readWriteWorkloads", "firewallRestricted", "ipRestriction", "denyRule", "basicAuth"} {
+		value, ok := check.Evidence[key]
+		if !ok {
+			continue
+		}
+		compact := compactEvidenceValue(value)
+		if compact == "" {
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("%s=%s", key, compact))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func compactEvidenceValue(value any) string {
+	switch typed := value.(type) {
+	case []string:
+		return strings.Join(typed, ", ")
+	case []any:
+		if len(typed) == 0 {
+			return ""
+		}
+		values := []string{}
+		for _, item := range typed {
+			values = append(values, fmt.Sprint(item))
+		}
+		return strings.Join(values, ", ")
+	default:
+		return fmt.Sprint(typed)
+	}
 }
 
 func renderPDF(input string, output string) error {
