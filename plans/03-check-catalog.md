@@ -65,6 +65,12 @@ Ports:
 - 9200;
 - 27017.
 
+Implementation nuance:
+
+- critical if the listener is publicly reachable or explicitly allowed from `Anywhere`;
+- high if the database binds `0.0.0.0` / `[::]` but UFW is active, incoming policy is deny, and rules only allow localhost/private Docker/admin networks;
+- passed if sensitive database ports do not bind public interfaces.
+
 ### `firewall.docker_published_sensitive_ports`
 
 Detect Docker containers publishing sensitive ports to `0.0.0.0`.
@@ -196,6 +202,18 @@ Warn if origin IP is exposed through direct DNS records.
 ### `db.postgres_public`
 
 Critical.
+
+### `adminer.ip_restriction_missing`
+
+High if Adminer is detected without a reverse-proxy IP allowlist and deny-by-default rule.
+
+Expected model:
+
+- Adminer is not directly published with Docker ports;
+- Adminer is behind Caddy or equivalent reverse proxy;
+- access is restricted to the owner's home/admin IP;
+- unauthorized IPs receive a deny response before auth prompt;
+- basic auth is enabled as a second layer.
 
 ### `db.redis_public`
 
