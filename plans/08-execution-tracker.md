@@ -215,3 +215,30 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] Report includes `configPath`.
 - [x] Real VPS config test lifts score from `70` to `80` while keeping remaining risks visible.
 - [x] Unit tests cover config loading and allowlist application.
+
+## Current Slice - Local PDF Report Renderer
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- `plans/04-scoring-config-reports.md`
+- user decision: use React PDF
+
+### Scope
+
+- Add `deploy-shuttle report`.
+- Generate Markdown reports from doctor JSON.
+- Generate PDF reports from doctor JSON with `@react-pdf/renderer`.
+- Keep PDF rendering as an optional local renderer in `report-pdf/`.
+- Do not start the cloud dashboard yet.
+
+### Completion Checklist
+
+- [x] `report --format markdown --input doctor.json --output report.md` works.
+- [x] `report --format pdf --input doctor.json --output report.pdf` works.
+- [x] React PDF renderer lives outside the Go CLI core.
+- [x] Renderer typecheck passes with `bun run check`.
+- [x] Real VPS doctor JSON renders to Markdown and PDF.
+- [x] Cloud dashboard remains explicitly deferred.
