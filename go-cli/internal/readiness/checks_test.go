@@ -36,3 +36,36 @@ To                         Action      From
 		t.Fatal("expected public allow to be treated as unrestricted")
 	}
 }
+
+func TestSplitRuntimeOutput(t *testing.T) {
+	mode, body := splitRuntimeOutput("__deployshuttle_runtime=swarm\nservice-a\ton-failure\n__deployshuttle_runtime=classic\n/container\tunless-stopped\n")
+	if mode != "mixed" {
+		t.Fatalf("expected mixed mode, got %q", mode)
+	}
+	if body != "service-a\ton-failure\n/container\tunless-stopped\n" {
+		t.Fatalf("unexpected body %q", body)
+	}
+}
+
+func TestHealthMissing(t *testing.T) {
+	if !healthMissing("null") {
+		t.Fatal("expected null healthcheck to be missing")
+	}
+	if !healthMissing(`{"Test":["NONE"]}`) {
+		t.Fatal("expected NONE healthcheck to be missing")
+	}
+	if healthMissing(`{"Test":["CMD","curl","-f","http://localhost/health"]}`) {
+		t.Fatal("expected CMD healthcheck to be present")
+	}
+}
+
+func TestSplitTab2(t *testing.T) {
+	left, right := splitTab2("service\tvalue")
+	if left != "service" || right != "value" {
+		t.Fatalf("unexpected split: %q %q", left, right)
+	}
+	left, right = splitTab2("service-only")
+	if left != "service-only" || right != "" {
+		t.Fatalf("unexpected split without tab: %q %q", left, right)
+	}
+}

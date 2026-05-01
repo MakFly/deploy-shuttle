@@ -152,3 +152,35 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] Adminer check detects Caddy IP restriction + deny-by-default + basic auth.
 - [x] Real VPS scan returns `90/100` with Adminer passed and DB warning high.
 - [x] Unit tests cover firewall-restricted and publicly allowed DB port cases.
+
+## Current Slice - Docker Runtime Readiness
+
+**Status:** Implemented  
+**Started:** 2026-05-01  
+**Completed:** 2026-05-01  
+**Plan sources:**
+
+- `plans/03-check-catalog.md`
+- real VPS validation: single-node Docker Swarm plus Docker classic sidecar workloads
+
+### Scope
+
+- Support Docker classic containers and Docker Swarm services.
+- Support mixed single-VPS setups where Swarm services and classic containers coexist.
+- Add Docker service enabled/active check.
+- Add restart policy check.
+- Add healthcheck check.
+- Add root-user check.
+- Add Docker socket mount check.
+- Add Caddy admin API exposure check.
+
+### Completion Checklist
+
+- [x] Swarm service restart policies are read from `TaskTemplate.RestartPolicy`.
+- [x] Classic container restart policies are read from `HostConfig.RestartPolicy`.
+- [x] Swarm service healthchecks are read from `TaskTemplate.ContainerSpec.Healthcheck`.
+- [x] Classic container healthchecks are read from `Config.Healthcheck`.
+- [x] Runtime evidence reports `classic`, `swarm`, or `mixed`.
+- [x] Mixed VPS scan reports `runtimeMode: mixed`.
+- [x] Real VPS scan covers Swarm services and the classic `frontend-iautos` container.
+- [x] Unit tests cover runtime output parsing and healthcheck detection.

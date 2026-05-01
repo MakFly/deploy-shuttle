@@ -89,17 +89,42 @@ Docker not enabled on boot.
 
 High severity for app containers without restart policy.
 
+Docker runtime support:
+
+- Docker classic checks container restart policy;
+- Docker Swarm checks service `TaskTemplate.RestartPolicy`;
+- mixed single-VPS setups must check both Swarm services and non-Swarm containers.
+
 ### `docker.containers_without_healthcheck`
 
 Medium/high severity.
+
+Docker runtime support:
+
+- Docker classic checks container `Config.Healthcheck`;
+- Docker Swarm checks service `TaskTemplate.ContainerSpec.Healthcheck`;
+- `NONE` and `null` count as missing.
 
 ### `docker.containers_running_as_root`
 
 Medium/high depending on image.
 
+Docker runtime support:
+
+- Docker classic checks container `Config.User`;
+- Docker Swarm checks service `TaskTemplate.ContainerSpec.User`;
+- empty, `0`, and `root` count as root unless an ignore rule is added later.
+
 ### `docker.sock_exposed`
 
 Critical if Docker socket is mounted into a container without clear reason.
+
+Docker runtime support:
+
+- Docker classic checks container mounts;
+- Docker Swarm checks service mounts;
+- read-only Docker socket mounts are high severity;
+- read-write Docker socket mounts are critical.
 
 ### `docker.unused_images_large`
 

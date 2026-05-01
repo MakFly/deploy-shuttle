@@ -25,11 +25,17 @@ func Run(adapter execx.Adapter, target string, profile []string) Report {
 		checkOSSupported,
 		checkDiskSpace,
 		checkDockerInstalled,
+		checkDockerServiceEnabled,
+		checkDockerRestartPolicies,
+		checkDockerHealthchecks,
+		checkDockerRunningAsRoot,
+		checkDockerSockExposed,
 		checkUFWActive,
 		checkDatabasePorts,
 		checkEnvWorldReadable,
 		checkEnvTracked,
 		checkCaddyInstalled,
+		checkCaddyAdminExposed,
 		checkAdminerRestricted,
 	}
 	results := make([]CheckResult, 0, len(checks))
@@ -128,6 +134,171 @@ func checkDockerInstalled(adapter execx.Adapter) CheckResult {
 	return CheckResult{ID: "docker.not_installed", Title: "Docker is installed", Category: "docker", Severity: High, Status: status, Summary: summary, Remediation: "Install Docker Engine before running production Docker workloads."}
 }
 
+func checkDockerServiceEnabled(adapter execx.Adapter) CheckResult {
+	res := adapter.Run("systemctl is-enabled docker 2>/dev/null; systemctl is-active docker 2>/dev/null", 3*time.Second)
+	lines := nonEmptyLines(res.Stdout)
+	enabled := len(lines) > 0 && lines[0] == "enabled"
+	active := len(lines) > 1 && lines[1] == "active"
+	status := Passed
+	if !enabled || !active {
+		status = Failed
+	}
+	return CheckResult{
+		ID:          "docker.service_not_enabled",
+		Title:       "Docker service is enabled and active",
+		Category:    "docker",
+		Severity:    High,
+		Status:      status,
+		Summary:     ternary(status == Passed, "Docker service is enabled on boot and active.", "Docker service is not enabled on boot or not active."),
+		Remediation: "Run systemctl enable --now docker on systemd hosts.",
+		Evidence: map[string]any{
+			"enabled": enabled,
+			"active":  active,
+		},
+	}
+}
+
+func checkDockerRestartPolicies(adapter execx.Adapter) CheckResult {
+	res := adapter.Run(dockerRuntimeCommand(
+		"for id in $(docker service ls -q); do docker service inspect --format '{{.Spec.Name}}\t{{.Spec.TaskTemplate.RestartPolicy.Condition}}' \"$id\"; done",
+		"docker ps -q --filter label!=com.docker.swarm.service.name | xargs -r docker inspect --format '{{.Name}}\t{{.HostConfig.RestartPolicy.Name}}'",
+	), 5*time.Second)
+	mode, body := splitRuntimeOutput(res.Stdout)
+	missing := []string{}
+	for _, line := range nonEmptyLines(body) {
+		name, policy := splitTab2(line)
+		policy = strings.TrimSpace(policy)
+		if policy == "" || policy == "no" || policy == "none" {
+			missing = append(missing, strings.TrimPrefix(name, "/"))
+		}
+	}
+	status := Passed
+	if len(missing) > 0 {
+		status = Failed
+	}
+	return CheckResult{
+		ID:          "docker.containers_without_restart_policy",
+		Title:       "Docker workloads have restart policies",
+		Category:    "docker",
+		Severity:    High,
+		Status:      status,
+		Summary:     ternary(len(missing) == 0, "All Docker workloads have restart policies.", fmt.Sprintf("%d Docker workload(s) lack restart policy.", len(missing))),
+		Remediation: "For Docker classic, set restart: unless-stopped/always. For Swarm, set deploy.restart_policy.condition to on-failure or any.",
+		Evidence: map[string]any{
+			"runtimeMode": mode,
+			"workloads":   missing,
+		},
+	}
+}
+
+func checkDockerHealthchecks(adapter execx.Adapter) CheckResult {
+	res := adapter.Run(dockerRuntimeCommand(
+		"for id in $(docker service ls -q); do docker service inspect --format '{{.Spec.Name}}\t{{json .Spec.TaskTemplate.ContainerSpec.Healthcheck}}' \"$id\"; done",
+		"docker ps -q --filter label!=com.docker.swarm.service.name | xargs -r docker inspect --format '{{.Name}}\t{{json .Config.Healthcheck}}'",
+	), 5*time.Second)
+	mode, body := splitRuntimeOutput(res.Stdout)
+	missing := []string{}
+	for _, line := range nonEmptyLines(body) {
+		name, health := splitTab2(line)
+		if healthMissing(health) {
+			missing = append(missing, strings.TrimPrefix(name, "/"))
+		}
+	}
+	status := Passed
+	if len(missing) > 0 {
+		status = Failed
+	}
+	return CheckResult{
+		ID:          "docker.containers_without_healthcheck",
+		Title:       "Docker workloads have healthchecks",
+		Category:    "docker",
+		Severity:    Medium,
+		Status:      status,
+		Summary:     ternary(len(missing) == 0, "All Docker workloads have healthchecks.", fmt.Sprintf("%d Docker workload(s) lack healthchecks.", len(missing))),
+		Remediation: "Add Docker HEALTHCHECK instructions or compose/swarm healthcheck definitions for web apps and stateful services. Workers can use command-level health probes or be explicitly documented.",
+		Evidence: map[string]any{
+			"runtimeMode": mode,
+			"workloads":   missing,
+		},
+	}
+}
+
+func checkDockerRunningAsRoot(adapter execx.Adapter) CheckResult {
+	res := adapter.Run(dockerRuntimeCommand(
+		"for id in $(docker service ls -q); do docker service inspect --format '{{.Spec.Name}}\t{{.Spec.TaskTemplate.ContainerSpec.User}}' \"$id\"; done",
+		"docker ps -q --filter label!=com.docker.swarm.service.name | xargs -r docker inspect --format '{{.Name}}\t{{.Config.User}}'",
+	), 5*time.Second)
+	mode, body := splitRuntimeOutput(res.Stdout)
+	rootWorkloads := []string{}
+	for _, line := range nonEmptyLines(body) {
+		name, user := splitTab2(line)
+		user = strings.TrimSpace(user)
+		if user == "" || user == "0" || user == "root" {
+			rootWorkloads = append(rootWorkloads, strings.TrimPrefix(name, "/"))
+		}
+	}
+	status := Passed
+	if len(rootWorkloads) > 0 {
+		status = Failed
+	}
+	return CheckResult{
+		ID:          "docker.containers_running_as_root",
+		Title:       "Docker workloads do not run as root",
+		Category:    "docker",
+		Severity:    Medium,
+		Status:      status,
+		Summary:     ternary(len(rootWorkloads) == 0, "No Docker workload appears to run as root.", fmt.Sprintf("%d Docker workload(s) appear to run as root.", len(rootWorkloads))),
+		Remediation: "Set USER in Dockerfiles or service/container user fields for application workloads. Some trusted infrastructure images may need an explicit ignore later.",
+		Evidence: map[string]any{
+			"runtimeMode": mode,
+			"workloads":   rootWorkloads,
+		},
+	}
+}
+
+func checkDockerSockExposed(adapter execx.Adapter) CheckResult {
+	res := adapter.Run(dockerRuntimeCommand(
+		"for id in $(docker service ls -q); do docker service inspect --format '{{.Spec.Name}}\t{{json .Spec.TaskTemplate.ContainerSpec.Mounts}}' \"$id\"; done",
+		"docker ps -q --filter label!=com.docker.swarm.service.name | xargs -r docker inspect --format '{{.Name}}\t{{json .Mounts}}'",
+	), 5*time.Second)
+	mode, body := splitRuntimeOutput(res.Stdout)
+	exposed := []string{}
+	readWrite := []string{}
+	for _, line := range nonEmptyLines(body) {
+		name, mounts := splitTab2(line)
+		if !strings.Contains(mounts, "/var/run/docker.sock") {
+			continue
+		}
+		cleanName := strings.TrimPrefix(name, "/")
+		exposed = append(exposed, cleanName)
+		if !regexp.MustCompile(`(?i)"ReadOnly":true|"RW":false`).MatchString(mounts) {
+			readWrite = append(readWrite, cleanName)
+		}
+	}
+	status := Passed
+	severity := High
+	if len(exposed) > 0 {
+		status = Failed
+	}
+	if len(readWrite) > 0 {
+		severity = Critical
+	}
+	return CheckResult{
+		ID:          "docker.sock_exposed",
+		Title:       "Docker socket is not exposed to workloads",
+		Category:    "docker",
+		Severity:    severity,
+		Status:      status,
+		Summary:     ternary(len(exposed) == 0, "No Docker workload mounts /var/run/docker.sock.", fmt.Sprintf("%d Docker workload(s) mount /var/run/docker.sock.", len(exposed))),
+		Remediation: "Avoid mounting the Docker socket. If needed for tools like Dozzle/Uptime Kuma, keep it read-only, IP-restricted, and explicitly documented.",
+		Evidence: map[string]any{
+			"runtimeMode":        mode,
+			"workloads":          exposed,
+			"readWriteWorkloads": readWrite,
+		},
+	}
+}
+
 func checkUFWActive(adapter execx.Adapter) CheckResult {
 	res := adapter.Run("command -v ufw >/dev/null 2>&1 && ufw status", 3*time.Second)
 	active := res.ExitCode == 0 && regexp.MustCompile(`(?mi)^Status:\s+active$`).MatchString(res.Stdout)
@@ -208,6 +379,35 @@ func checkCaddyInstalled(adapter execx.Adapter) CheckResult {
 		status = Passed
 	}
 	return CheckResult{ID: "caddy.not_installed", Title: "Caddy or Caddy container is present", Category: "reverse-proxy", Severity: Medium, Status: status, Summary: ternary(installed, "Caddy was detected.", "No Caddy binary or running Caddy container detected."), Remediation: "Install/configure Caddy or another reverse proxy before exposing the app."}
+}
+
+func checkCaddyAdminExposed(adapter execx.Adapter) CheckResult {
+	res := adapter.Run("if command -v ss >/dev/null 2>&1; then ss -ltnp; elif command -v netstat >/dev/null 2>&1; then netstat -ltnp; else exit 127; fi", 3*time.Second)
+	exposed := []string{}
+	for _, line := range nonEmptyLines(res.Stdout) {
+		if !regexp.MustCompile(`(?::|\]:)2019\b`).MatchString(line) {
+			continue
+		}
+		if regexp.MustCompile(`(?:0\.0\.0\.0|\[::\]|\*:|::):2019\b|\*:2019\b`).MatchString(line) {
+			exposed = append(exposed, line)
+		}
+	}
+	status := Passed
+	if len(exposed) > 0 {
+		status = Failed
+	}
+	return CheckResult{
+		ID:          "caddy.admin_exposed",
+		Title:       "Caddy admin API is not publicly exposed",
+		Category:    "reverse-proxy",
+		Severity:    Critical,
+		Status:      status,
+		Summary:     ternary(len(exposed) == 0, "No public Caddy admin listener detected.", "Caddy admin API appears to listen on a public interface."),
+		Remediation: "Bind Caddy admin API to localhost, disable it when unused, or keep it on an internal-only network.",
+		Evidence: map[string]any{
+			"listeners": exposed,
+		},
+	}
 }
 
 func checkAdminerRestricted(adapter execx.Adapter) CheckResult {
@@ -302,6 +502,57 @@ func databasePortsFirewallRestricted(firewallText string, ports []string) bool {
 		}
 	}
 	return true
+}
+
+func dockerRuntimeCommand(swarmCommand string, classicCommand string) string {
+	return "if docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null | grep -q '^true$'; then echo __deployshuttle_runtime=swarm; " + swarmCommand + "; fi; echo __deployshuttle_runtime=classic; " + classicCommand
+}
+
+func splitRuntimeOutput(output string) (string, string) {
+	seen := map[string]bool{}
+	bodyLines := []string{}
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "__deployshuttle_runtime=") {
+			seen[strings.TrimPrefix(line, "__deployshuttle_runtime=")] = true
+			continue
+		}
+		bodyLines = append(bodyLines, line)
+	}
+	mode := "classic"
+	if seen["swarm"] && seen["classic"] {
+		mode = "mixed"
+	} else if seen["swarm"] {
+		mode = "swarm"
+	}
+	return mode, strings.Join(bodyLines, "\n")
+}
+
+func splitTab2(line string) (string, string) {
+	left, right, ok := strings.Cut(line, "\t")
+	if !ok {
+		return strings.TrimSpace(line), ""
+	}
+	return strings.TrimSpace(left), strings.TrimSpace(right)
+}
+
+func healthMissing(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "null" {
+		return true
+	}
+	return regexp.MustCompile(`(?i)"Test":\s*\[\s*"NONE"\s*\]`).MatchString(value)
+}
+
+func nonEmptyLines(value string) []string {
+	lines := []string{}
+	for _, line := range strings.Split(value, "\n") {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			lines = append(lines, line)
+		}
+	}
+	return lines
 }
 
 func capture(input string, pattern string) string {
