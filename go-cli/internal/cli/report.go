@@ -22,13 +22,16 @@ func newReportCommand() *cobra.Command {
 		Short: "Generate a readiness report from doctor JSON",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if input == "" {
-				return errors.New("--input is required; run doctor --format json first")
+				input = ".deployshuttle/latest-report.json"
 			}
 			if format == "" {
 				format = "markdown"
 			}
 			raw, err := os.ReadFile(input)
 			if err != nil {
+				if errors.Is(err, os.ErrNotExist) {
+					return fmt.Errorf("doctor report %q not found; run doctor --output %s first or pass --input", input, input)
+				}
 				return err
 			}
 			var report readiness.Report
@@ -51,7 +54,7 @@ func newReportCommand() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&input, "input", "", "doctor JSON report input path")
+	cmd.Flags().StringVar(&input, "input", "", "doctor JSON report input path (default .deployshuttle/latest-report.json)")
 	cmd.Flags().StringVar(&output, "output", "", "report output path")
 	cmd.Flags().StringVar(&format, "format", "markdown", "report format: markdown or pdf")
 	return cmd

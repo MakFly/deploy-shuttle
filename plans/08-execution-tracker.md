@@ -242,3 +242,27 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] Renderer typecheck passes with `bun run check`.
 - [x] Real VPS doctor JSON renders to Markdown and PDF.
 - [x] Cloud dashboard remains explicitly deferred.
+
+## Current Slice - Latest Report Workflow
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- `plans/04-scoring-config-reports.md`
+- report CLI ergonomics
+
+### Scope
+
+- Add `doctor --output <path>` to persist doctor JSON.
+- Let `report` default to `.deployshuttle/latest-report.json`.
+- Keep `report --input <path>` for explicit JSON input.
+- Create parent directories for doctor output.
+
+### Completion Checklist
+
+- [x] `doctor --output .deployshuttle/latest-report.json` writes JSON.
+- [x] `report --format pdf --output report.pdf` reads the default latest report.
+- [x] Missing default report returns an actionable error.
+- [x] Unit tests cover output directory creation.
