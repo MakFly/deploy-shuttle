@@ -69,3 +69,53 @@ func TestSplitTab2(t *testing.T) {
 		t.Fatalf("unexpected split without tab: %q %q", left, right)
 	}
 }
+
+func TestApplyConfigIgnoresCheckID(t *testing.T) {
+	result := applyConfig(CheckResult{
+		ID:       "docker.sock_exposed",
+		Severity: High,
+		Status:   Failed,
+		Evidence: map[string]any{"workloads": []string{"dozzle"}},
+	}, Config{Checks: CheckConfig{Ignore: []string{"docker.sock_exposed"}}})
+
+	if !result.Ignored {
+		t.Fatal("expected result to be ignored")
+	}
+	if result.Status != Skipped {
+		t.Fatalf("expected skipped status, got %s", result.Status)
+	}
+}
+
+func TestApplyConfigAllowsSomeDockerSocketWorkloads(t *testing.T) {
+	result := applyConfig(CheckResult{
+		ID:       "docker.sock_exposed",
+		Severity: High,
+		Status:   Failed,
+		Summary:  "2 Docker workload(s) mount /var/run/docker.sock.",
+		Evidence: map[string]any{"workloads": []string{"caddy_dozzle", "shared_uptime-kuma"}},
+	}, Config{Docker: DockerConfig{AllowDockerSocket: []string{"caddy_dozzle"}}})
+
+	if result.Ignored {
+		t.Fatal("expected one remaining workload, not full ignore")
+	}
+	workloads, ok := result.Evidence["workloads"].([]string)
+	if !ok {
+		t.Fatalf("expected workloads evidence as []string")
+	}
+	if len(workloads) != 1 || workloads[0] != "shared_uptime-kuma" {
+		t.Fatalf("unexpected remaining workloads %#v", workloads)
+	}
+}
+
+func TestApplyConfigAllowsAllWorkerHealthcheckFindings(t *testing.T) {
+	result := applyConfig(CheckResult{
+		ID:       "docker.containers_without_healthcheck",
+		Severity: Medium,
+		Status:   Failed,
+		Evidence: map[string]any{"workloads": []string{"prod_worker-high-priority", "prod_worker-low-priority"}},
+	}, Config{Docker: DockerConfig{WorkerServices: []string{"prod_worker-*"}}})
+
+	if !result.Ignored {
+		t.Fatal("expected worker healthcheck finding to be ignored")
+	}
+}

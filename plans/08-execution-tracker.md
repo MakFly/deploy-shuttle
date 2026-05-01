@@ -184,3 +184,34 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] Mixed VPS scan reports `runtimeMode: mixed`.
 - [x] Real VPS scan covers Swarm services and the classic `frontend-iautos` container.
 - [x] Unit tests cover runtime output parsing and healthcheck detection.
+
+## Current Slice - Readiness Config Allowlist
+
+**Status:** Implemented  
+**Started:** 2026-05-01  
+**Completed:** 2026-05-01  
+**Plan sources:**
+
+- `plans/04-scoring-config-reports.md`
+- real VPS validation: allow expected Docker socket tooling and worker services
+
+### Scope
+
+- Add `.deployshuttle.yml` readiness config loading.
+- Add `doctor --config <path>`.
+- Support `checks.profile`.
+- Support `checks.ignore`.
+- Support `docker.allowDockerSocket`.
+- Support `docker.allowRoot`.
+- Support `docker.workerServices`.
+- Support exact workload names and simple prefix/suffix wildcards.
+
+### Completion Checklist
+
+- [x] Ignored checks do not penalize score.
+- [x] Allowlisted Docker socket workloads are removed from findings.
+- [x] Worker services can be excluded from healthcheck findings.
+- [x] Root allowlist is separate from worker healthcheck allowlist.
+- [x] Report includes `configPath`.
+- [x] Real VPS config test lifts score from `70` to `80` while keeping remaining risks visible.
+- [x] Unit tests cover config loading and allowlist application.

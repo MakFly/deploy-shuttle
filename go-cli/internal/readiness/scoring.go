@@ -11,6 +11,9 @@ var penalties = map[Severity]int{
 func Score(checks []CheckResult) int {
 	total := 100
 	for _, check := range checks {
+		if check.Ignored {
+			continue
+		}
 		if check.Status == Failed {
 			total -= penalties[check.Severity]
 		}

@@ -93,6 +93,23 @@ checks:
   ignore:
     - ssh.port_default
 
+docker:
+  # Workloads allowed to mount /var/run/docker.sock. Use exact names or simple
+  # prefix/suffix wildcards such as caddy_* or *_agent.
+  allowDockerSocket:
+    - caddy_dozzle
+    - shared_uptime-kuma
+
+  # Workloads allowed to run as root because they are trusted infrastructure
+  # images or cannot safely be changed yet.
+  allowRoot:
+    - caddy_*
+    - shared_redis
+
+  # Worker services where no HTTP healthcheck is expected.
+  workerServices:
+    - prod_worker-*
+
 harden:
   allow:
     - firewall
