@@ -53,6 +53,8 @@ Current readiness flow:
 deploy-shuttle doctor
 deploy-shuttle doctor --format json
 deploy-shuttle doctor --fail-below 75
+deploy-shuttle doctor --target root@server --output .deployshuttle/latest-report.json
+deploy-shuttle report --format pdf --output report.pdf
 deploy-shuttle report --input doctor.json --format markdown --output report.md
 deploy-shuttle report --input doctor.json --format pdf --output report.pdf
 ```

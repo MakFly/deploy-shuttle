@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,7 @@ func newDoctorCommand() *cobra.Command {
 	var profile string
 	var failBelow string
 	var configPath string
+	var outputPath string
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Run a VPS production readiness audit",
@@ -51,14 +53,21 @@ func newDoctorCommand() *cobra.Command {
 				reportTarget = sshTarget.String()
 			}
 			report := readiness.RunWithConfig(adapter, reportTarget, splitCSV(profile, nil), readinessConfig, resolvedConfigPath)
+			rendered := ""
 			switch format {
 			case "", "console":
-				fmt.Print(readiness.Console(report))
+				rendered = readiness.Console(report)
 			case "json":
-				fmt.Println(readiness.JSON(report))
+				rendered = readiness.JSON(report) + "\n"
 			default:
 				return fmt.Errorf("unsupported format %q", format)
 			}
+			if outputPath != "" {
+				if err := writeDoctorOutput(outputPath, readiness.JSON(report)); err != nil {
+					return err
+				}
+			}
+			fmt.Print(rendered)
 			critical := false
 			for _, check := range report.Checks {
 				if check.Severity == readiness.Critical && check.Status == readiness.Failed {
@@ -76,7 +85,21 @@ func newDoctorCommand() *cobra.Command {
 	cmd.Flags().StringVar(&profile, "profile", "", "comma-separated profile labels")
 	cmd.Flags().StringVar(&failBelow, "fail-below", "", "exit with code 1 when score is below threshold")
 	cmd.Flags().StringVar(&configPath, "config", "", "path to .deployshuttle.yml readiness config")
+	cmd.Flags().StringVar(&outputPath, "output", "", "write doctor JSON report to a file")
 	return cmd
+}
+
+func writeDoctorOutput(path string, content string) error {
+	if path == "" {
+		return nil
+	}
+	dir := filepath.Dir(path)
+	if dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(path, []byte(content+"\n"), 0o644)
 }
 
 type sshTarget struct {

@@ -1,6 +1,10 @@
 package cli
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestParseSSHTarget(t *testing.T) {
 	tests := []struct {
@@ -46,5 +50,20 @@ func TestParseSSHTarget(t *testing.T) {
 func TestParseSSHTargetRejectsInvalidPort(t *testing.T) {
 	if _, err := parseSSHTarget("deploy@example.com:not-a-port"); err == nil {
 		t.Fatal("expected invalid port to fail")
+	}
+}
+
+func TestWriteDoctorOutputCreatesParentDirectory(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".deployshuttle", "latest-report.json")
+	if err := writeDoctorOutput(path, `{"score":100}`); err != nil {
+		t.Fatalf("write output: %v", err)
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	if string(raw) != "{\"score\":100}\n" {
+		t.Fatalf("unexpected output %q", string(raw))
 	}
 }
