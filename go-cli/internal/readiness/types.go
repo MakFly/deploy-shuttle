@@ -27,12 +27,15 @@ type CheckResult struct {
 	Details          string         `json:"details,omitempty"`
 	Remediation      string         `json:"remediation,omitempty"`
 	AutoFixAvailable bool           `json:"autoFixAvailable"`
+	Ignored          bool           `json:"ignored,omitempty"`
+	IgnoreReason     string         `json:"ignoreReason,omitempty"`
 	Evidence         map[string]any `json:"evidence,omitempty"`
 }
 
 type Report struct {
 	Target      string        `json:"target"`
 	Profile     []string      `json:"profile"`
+	ConfigPath  string        `json:"configPath,omitempty"`
 	Score       int           `json:"score"`
 	Level       Level         `json:"level"`
 	Checks      []CheckResult `json:"checks"`

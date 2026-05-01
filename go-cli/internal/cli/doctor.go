@@ -19,6 +19,7 @@ func newDoctorCommand() *cobra.Command {
 	var format string
 	var profile string
 	var failBelow string
+	var configPath string
 	cmd := &cobra.Command{
 		Use:   "doctor",
 		Short: "Run a VPS production readiness audit",
@@ -30,6 +31,10 @@ func newDoctorCommand() *cobra.Command {
 					return errors.New("--fail-below must be a number between 0 and 100")
 				}
 				threshold = value
+			}
+			readinessConfig, resolvedConfigPath, err := readiness.LoadConfig(configPath)
+			if err != nil {
+				return err
 			}
 			adapter := execx.Adapter(execx.Local{})
 			reportTarget := "local"
@@ -45,7 +50,7 @@ func newDoctorCommand() *cobra.Command {
 				adapter = execx.SSH{Client: client}
 				reportTarget = sshTarget.String()
 			}
-			report := readiness.Run(adapter, reportTarget, splitCSV(profile, []string{"docker", "caddy"}))
+			report := readiness.RunWithConfig(adapter, reportTarget, splitCSV(profile, nil), readinessConfig, resolvedConfigPath)
 			switch format {
 			case "", "console":
 				fmt.Print(readiness.Console(report))
@@ -70,6 +75,7 @@ func newDoctorCommand() *cobra.Command {
 	cmd.Flags().StringVar(&format, "format", "console", "output format: console or json")
 	cmd.Flags().StringVar(&profile, "profile", "", "comma-separated profile labels")
 	cmd.Flags().StringVar(&failBelow, "fail-below", "", "exit with code 1 when score is below threshold")
+	cmd.Flags().StringVar(&configPath, "config", "", "path to .deployshuttle.yml readiness config")
 	return cmd
 }
 

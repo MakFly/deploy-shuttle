@@ -14,8 +14,15 @@ import (
 type Check func(execx.Adapter) CheckResult
 
 func Run(adapter execx.Adapter, target string, profile []string) Report {
+	return RunWithConfig(adapter, target, profile, EmptyConfig(), "")
+}
+
+func RunWithConfig(adapter execx.Adapter, target string, profile []string, cfg Config, configPath string) Report {
 	if target == "" {
 		target = "local"
+	}
+	if len(profile) == 0 {
+		profile = cfg.Checks.Profile
 	}
 	if len(profile) == 0 {
 		profile = []string{"docker", "caddy"}
@@ -40,12 +47,13 @@ func Run(adapter execx.Adapter, target string, profile []string) Report {
 	}
 	results := make([]CheckResult, 0, len(checks))
 	for _, check := range checks {
-		results = append(results, check(adapter))
+		results = append(results, applyConfig(check(adapter), cfg))
 	}
 	score := Score(results)
 	return Report{
 		Target:      target,
 		Profile:     profile,
+		ConfigPath:  configPath,
 		Score:       score,
 		Level:       ReadinessLevel(score),
 		Checks:      results,
@@ -79,6 +87,9 @@ func Console(report Report) string {
 				marker = "[x]"
 			}
 			fmt.Fprintf(&b, "  %s %s - %s\n", marker, check.Title, check.Summary)
+			if check.Ignored {
+				fmt.Fprintf(&b, "      Ignored: %s\n", check.IgnoreReason)
+			}
 			if check.Status == Failed && check.Remediation != "" {
 				fmt.Fprintf(&b, "      Fix: %s\n", check.Remediation)
 			}
@@ -86,6 +97,62 @@ func Console(report Report) string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+func applyConfig(result CheckResult, cfg Config) CheckResult {
+	if listContains(cfg.Checks.Ignore, result.ID) {
+		return markIgnored(result, "ignored by checks.ignore")
+	}
+	switch result.ID {
+	case "docker.sock_exposed":
+		return ignoreAllowedWorkloads(result, cfg.Docker.AllowDockerSocket, "allowed by docker.allowDockerSocket")
+	case "docker.containers_running_as_root":
+		return ignoreAllowedWorkloads(result, cfg.Docker.AllowRoot, "allowed by docker.allowRoot")
+	case "docker.containers_without_healthcheck":
+		return ignoreAllowedWorkloads(result, cfg.Docker.WorkerServices, "allowed by docker.workerServices")
+	default:
+		return result
+	}
+}
+
+func ignoreAllowedWorkloads(result CheckResult, allow []string, reason string) CheckResult {
+	workloads, ok := evidenceStringSlice(result.Evidence["workloads"])
+	if !ok || len(workloads) == 0 {
+		return result
+	}
+	remaining := []string{}
+	ignored := []string{}
+	for _, workload := range workloads {
+		if matchesAnyWorkload(workload, allow) {
+			ignored = append(ignored, workload)
+			continue
+		}
+		remaining = append(remaining, workload)
+	}
+	if len(ignored) == 0 {
+		return result
+	}
+	if result.Evidence == nil {
+		result.Evidence = map[string]any{}
+	}
+	result.Evidence["workloads"] = remaining
+	result.Evidence["ignoredWorkloads"] = ignored
+	if len(remaining) == 0 {
+		return markIgnored(result, reason)
+	}
+	result.Summary = strings.Replace(result.Summary, fmt.Sprintf("%d Docker workload(s)", len(workloads)), fmt.Sprintf("%d Docker workload(s)", len(remaining)), 1)
+	return result
+}
+
+func markIgnored(result CheckResult, reason string) CheckResult {
+	result.Ignored = true
+	result.IgnoreReason = reason
+	result.Status = Skipped
+	if result.Evidence == nil {
+		result.Evidence = map[string]any{}
+	}
+	result.Evidence["ignored"] = true
+	return result
 }
 
 func JSON(report Report) string {
@@ -553,6 +620,60 @@ func nonEmptyLines(value string) []string {
 		}
 	}
 	return lines
+}
+
+func listContains(values []string, needle string) bool {
+	for _, value := range values {
+		if value == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func evidenceStringSlice(value any) ([]string, bool) {
+	switch typed := value.(type) {
+	case []string:
+		return typed, true
+	case []any:
+		values := []string{}
+		for _, item := range typed {
+			text, ok := item.(string)
+			if !ok {
+				return nil, false
+			}
+			values = append(values, text)
+		}
+		return values, true
+	default:
+		return nil, false
+	}
+}
+
+func matchesAnyWorkload(workload string, patterns []string) bool {
+	for _, pattern := range patterns {
+		if matchesWorkload(workload, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+func matchesWorkload(workload string, pattern string) bool {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return false
+	}
+	if pattern == workload {
+		return true
+	}
+	if strings.HasSuffix(pattern, "*") && strings.HasPrefix(workload, strings.TrimSuffix(pattern, "*")) {
+		return true
+	}
+	if strings.HasPrefix(pattern, "*") && strings.HasSuffix(workload, strings.TrimPrefix(pattern, "*")) {
+		return true
+	}
+	return false
 }
 
 func capture(input string, pattern string) string {
