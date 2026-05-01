@@ -75,11 +75,28 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontSize: 10,
   },
+  summaryTitle: {
+    fontSize: 11,
+    fontWeight: 700,
+    marginBottom: 6,
+  },
   summaryBox: {
     flex: 1,
     padding: 12,
     borderRadius: 4,
     backgroundColor: '#f0f4f8',
+  },
+  narrative: {
+    marginBottom: 12,
+    padding: 10,
+    borderRadius: 4,
+    backgroundColor: '#f8fafc',
+    border: '1 solid #d9e2ec',
+    lineHeight: 1.35,
+  },
+  nextAction: {
+    marginBottom: 5,
+    lineHeight: 1.35,
   },
   section: {
     marginTop: 14,
@@ -117,6 +134,12 @@ const styles = StyleSheet.create({
     marginTop: 5,
     color: '#7b8794',
   },
+  evidence: {
+    marginTop: 5,
+    color: '#627d98',
+    fontSize: 8,
+    lineHeight: 1.3,
+  },
   footer: {
     position: 'absolute',
     bottom: 18,
@@ -148,13 +171,64 @@ function ignoredChecks(report: Report): CheckResult[] {
   return report.checks.filter((check) => check.ignored)
 }
 
+function openFindings(report: Report): CheckResult[] {
+  return report.checks.filter((check) => check.status === 'failed' && !check.ignored)
+}
+
 function passedCount(report: Report): number {
   return report.checks.filter((check) => check.status === 'passed').length
 }
 
+function executiveSummary(report: Report): string {
+  if (report.level === 'production-ready') {
+    return 'This VPS is production-ready for the selected profile. Remaining findings should still be reviewed before client handoff.'
+  }
+  if (report.level === 'almost-ready') {
+    return 'This VPS is close to production-ready. Fix or explicitly accept the high-priority findings before relying on it for critical workloads.'
+  }
+  if (report.level === 'risky') {
+    return 'This VPS has meaningful production risks. Address the high and medium findings before treating the setup as client-ready.'
+  }
+  return 'This VPS is not production-ready. Critical issues should be fixed before deploying production or client workloads.'
+}
+
+function nextActions(checks: CheckResult[]): string[] {
+  return checks
+    .filter((check) => Boolean(check.remediation))
+    .slice(0, 5)
+    .map((check) => `${check.title}: ${check.remediation}`)
+}
+
+function compactEvidenceValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(', ')
+  return String(value)
+}
+
+function evidenceSummary(check: CheckResult): string {
+  if (!check.evidence) return ''
+  const keys = [
+    'runtimeMode',
+    'publicPorts',
+    'workloads',
+    'ignoredWorkloads',
+    'readWriteWorkloads',
+    'firewallRestricted',
+    'ipRestriction',
+    'denyRule',
+    'basicAuth',
+  ]
+  return keys
+    .filter((key) => Object.prototype.hasOwnProperty.call(check.evidence, key))
+    .map((key) => [key, compactEvidenceValue(check.evidence?.[key])] as const)
+    .filter(([, value]) => value.length > 0)
+    .map(([key, value]) => `${key}=${value}`)
+    .join('; ')
+}
+
 function ReportDocument({ report }: { report: Report }) {
-  const failed = report.checks.filter((check) => check.status === 'failed' && !check.ignored)
+  const failed = openFindings(report)
   const ignored = ignoredChecks(report)
+  const actions = nextActions(failed)
 
   return (
     <Document title="DeployShuttle Production Readiness Report">
@@ -173,12 +247,26 @@ function ReportDocument({ report }: { report: Report }) {
             <Text style={styles.scoreLabel}>/100 · {label(report.level)}</Text>
           </View>
           <View style={styles.summaryBox}>
+            <Text style={styles.summaryTitle}>Executive Summary</Text>
             <Text>Profile: {report.profile.join(', ')}</Text>
             <Text>Passed checks: {passedCount(report)}</Text>
             <Text>Open findings: {failed.length}</Text>
-            <Text>Ignored findings: {ignored.length}</Text>
+            <Text>Accepted risks: {ignored.length}</Text>
           </View>
         </View>
+
+        <Text style={styles.narrative}>{executiveSummary(report)}</Text>
+
+        {actions.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Next Actions</Text>
+            {actions.map((action, index) => (
+              <Text key={action} style={styles.nextAction}>
+                {index + 1}. {action}
+              </Text>
+            ))}
+          </View>
+        ) : null}
 
         {severityOrder.map((severity) => {
           const checks = failedChecks(report, severity)
@@ -196,6 +284,9 @@ function ReportDocument({ report }: { report: Report }) {
                   {check.remediation ? (
                     <Text style={styles.remediation}>Fix: {check.remediation}</Text>
                   ) : null}
+                  {evidenceSummary(check) ? (
+                    <Text style={styles.evidence}>Evidence: {evidenceSummary(check)}</Text>
+                  ) : null}
                 </View>
               ))}
             </View>
@@ -210,6 +301,9 @@ function ReportDocument({ report }: { report: Report }) {
                 <Text style={styles.checkTitle}>{check.title}</Text>
                 <Text style={styles.checkMeta}>{check.id}</Text>
                 <Text style={styles.ignored}>{check.ignoreReason}</Text>
+                {evidenceSummary(check) ? (
+                  <Text style={styles.evidence}>Evidence: {evidenceSummary(check)}</Text>
+                ) : null}
               </View>
             ))}
           </View>

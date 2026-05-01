@@ -266,3 +266,32 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] `report --format pdf --output report.pdf` reads the default latest report.
 - [x] Missing default report returns an actionable error.
 - [x] Unit tests cover output directory creation.
+
+## Current Slice - Report v1 Polish
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- `plans/04-scoring-config-reports.md`
+- product direction: shareable production readiness report
+
+### Scope
+
+- Add executive summary to Markdown and PDF reports.
+- Add next actions derived from remediation text.
+- Rename ignored findings to accepted risks in the report surface.
+- Add compact evidence summaries for key fields.
+- Keep raw evidence out of the client-facing report body.
+
+### Completion Checklist
+
+- [x] Markdown includes executive summary.
+- [x] Markdown includes next actions.
+- [x] Markdown includes accepted risks.
+- [x] Markdown includes compact evidence.
+- [x] PDF includes executive summary.
+- [x] PDF includes next actions.
+- [x] PDF includes accepted risks.
+- [x] Real VPS JSON renders to polished Markdown and PDF.
