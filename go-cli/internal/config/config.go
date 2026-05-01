@@ -1,0 +1,278 @@
+package config
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"gopkg.in/yaml.v3"
+)
+
+type Config struct {
+	App           string                 `yaml:"app" json:"app"`
+	Domain        any                    `yaml:"domain" json:"domain"`
+	Server        *ServerShorthand       `yaml:"server,omitempty" json:"server,omitempty"`
+	Servers       map[string]ServerGroup `yaml:"servers,omitempty" json:"servers"`
+	Build         Build                  `yaml:"build,omitempty" json:"build"`
+	Deploy        Deploy                 `yaml:"deploy,omitempty" json:"deploy"`
+	Services      map[string]Service     `yaml:"services,omitempty" json:"services,omitempty"`
+	Accessories   map[string]Accessory   `yaml:"accessories,omitempty" json:"accessories,omitempty"`
+	Secrets       Secrets                `yaml:"secrets,omitempty" json:"secrets"`
+	Env           Env                    `yaml:"env,omitempty" json:"env,omitempty"`
+	Proxy         Proxy                  `yaml:"proxy,omitempty" json:"proxy"`
+	Registry      Registry               `yaml:"registry,omitempty" json:"registry"`
+	Notifications Notifications          `yaml:"notifications,omitempty" json:"notifications"`
+	Dev           Dev                    `yaml:"dev,omitempty" json:"dev,omitempty"`
+}
+
+type ServerShorthand struct {
+	Host string `yaml:"host" json:"host"`
+	User string `yaml:"user" json:"user"`
+}
+
+type ServerGroup struct {
+	Hosts []string `yaml:"hosts" json:"hosts"`
+	User  string   `yaml:"user" json:"user"`
+}
+
+type Build struct {
+	Dockerfile string            `yaml:"dockerfile,omitempty" json:"dockerfile"`
+	Context    string            `yaml:"context,omitempty" json:"context"`
+	Target     string            `yaml:"target,omitempty" json:"target,omitempty"`
+	Platform   string            `yaml:"platform,omitempty" json:"platform,omitempty"`
+	Args       map[string]string `yaml:"args,omitempty" json:"args,omitempty"`
+}
+
+type Deploy struct {
+	Strategy     string   `yaml:"strategy,omitempty" json:"strategy"`
+	Timeout      int      `yaml:"timeout,omitempty" json:"timeout"`
+	Retain       int      `yaml:"retain,omitempty" json:"retain"`
+	AutoRollback bool     `yaml:"auto_rollback,omitempty" json:"auto_rollback"`
+	Hooks        Hooks    `yaml:"hooks,omitempty" json:"hooks"`
+	BlueGreen    Blue     `yaml:"blue_green,omitempty" json:"blue_green"`
+	Concurrency  int      `yaml:"concurrency,omitempty" json:"concurrency"`
+	Swarm        Swarm    `yaml:"swarm,omitempty" json:"swarm"`
+	Raw          []string `yaml:"-" json:"-"`
+}
+
+type Hooks struct {
+	PreDeploy  []string `yaml:"pre_deploy,omitempty" json:"pre_deploy"`
+	PostDeploy []string `yaml:"post_deploy,omitempty" json:"post_deploy"`
+}
+
+type Blue struct {
+	DrainTimeout   int `yaml:"drain_timeout,omitempty" json:"drain_timeout"`
+	ReadinessDelay int `yaml:"readiness_delay,omitempty" json:"readiness_delay"`
+}
+
+type Swarm struct {
+	Replicas int `yaml:"replicas,omitempty" json:"replicas"`
+}
+
+type Service struct {
+	Port        int         `yaml:"port,omitempty" json:"port,omitempty"`
+	Command     string      `yaml:"command,omitempty" json:"command"`
+	Replicas    int         `yaml:"replicas,omitempty" json:"replicas,omitempty"`
+	Healthcheck Healthcheck `yaml:"healthcheck,omitempty" json:"healthcheck"`
+}
+
+type Healthcheck struct {
+	Type     string `yaml:"type,omitempty" json:"type"`
+	Path     string `yaml:"path,omitempty" json:"path,omitempty"`
+	Command  string `yaml:"command,omitempty" json:"command,omitempty"`
+	Interval int    `yaml:"interval,omitempty" json:"interval"`
+	Timeout  int    `yaml:"timeout,omitempty" json:"timeout"`
+	Retries  int    `yaml:"retries,omitempty" json:"retries"`
+}
+
+type Accessory struct {
+	Preset  string            `yaml:"preset,omitempty" json:"preset,omitempty"`
+	Image   string            `yaml:"image,omitempty" json:"image,omitempty"`
+	Port    any               `yaml:"port,omitempty" json:"port,omitempty"`
+	Volumes []string          `yaml:"volumes,omitempty" json:"volumes,omitempty"`
+	Env     map[string]string `yaml:"env,omitempty" json:"env,omitempty"`
+}
+
+type Secrets struct {
+	File   string `yaml:"file,omitempty" json:"file"`
+	Driver string `yaml:"driver,omitempty" json:"driver"`
+}
+
+type Env struct {
+	Clear  map[string]string `yaml:"clear,omitempty" json:"clear,omitempty"`
+	Secret []string          `yaml:"secret,omitempty" json:"secret,omitempty"`
+}
+
+type Proxy struct {
+	Driver  string            `yaml:"driver,omitempty" json:"driver"`
+	SSL     ProxySSL          `yaml:"ssl,omitempty" json:"ssl"`
+	Headers map[string]string `yaml:"headers,omitempty" json:"headers,omitempty"`
+}
+
+type ProxySSL struct {
+	Provider string `yaml:"provider,omitempty" json:"provider"`
+	Email    string `yaml:"email,omitempty" json:"email,omitempty"`
+}
+
+type Registry struct {
+	Driver      string `yaml:"driver,omitempty" json:"driver"`
+	URL         string `yaml:"url,omitempty" json:"url,omitempty"`
+	Username    string `yaml:"username,omitempty" json:"username,omitempty"`
+	PasswordEnv string `yaml:"password_env,omitempty" json:"password_env,omitempty"`
+}
+
+type Notifications struct {
+	Webhooks []string `yaml:"webhooks,omitempty" json:"webhooks,omitempty"`
+}
+
+type Dev struct {
+	SSL    bool     `yaml:"ssl,omitempty" json:"ssl"`
+	Domain string   `yaml:"domain,omitempty" json:"domain,omitempty"`
+	Ports  DevPorts `yaml:"ports,omitempty" json:"ports,omitempty"`
+}
+
+type DevPorts struct {
+	HTTP  int `yaml:"http,omitempty" json:"http"`
+	HTTPS int `yaml:"https,omitempty" json:"https"`
+}
+
+func Load(path string, env string) (*Config, error) {
+	if path == "" {
+		found, err := Find("shuttle.yml")
+		if err != nil {
+			return nil, err
+		}
+		path = found
+	}
+
+	cfg, err := loadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	if env != "" {
+		overlay := filepath.Join(filepath.Dir(path), fmt.Sprintf("shuttle.%s.yml", env))
+		if _, err := os.Stat(overlay); err == nil {
+			other, err := loadFile(overlay)
+			if err != nil {
+				return nil, err
+			}
+			merge(cfg, other)
+		}
+	}
+	applyDefaults(cfg)
+	return cfg, validate(cfg)
+}
+
+func Find(name string) (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		candidate := filepath.Join(dir, name)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("%s not found", name)
+		}
+		dir = parent
+	}
+}
+
+func loadFile(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func applyDefaults(cfg *Config) {
+	if cfg.Server != nil && len(cfg.Servers) == 0 {
+		cfg.Servers = map[string]ServerGroup{
+			"default": {Hosts: []string{cfg.Server.Host}, User: cfg.Server.User},
+		}
+	}
+	if cfg.Build.Dockerfile == "" {
+		cfg.Build.Dockerfile = "Dockerfile"
+	}
+	if cfg.Build.Context == "" {
+		cfg.Build.Context = "."
+	}
+	if cfg.Deploy.Strategy == "" {
+		cfg.Deploy.Strategy = "blue-green"
+	}
+	if cfg.Deploy.Timeout == 0 {
+		cfg.Deploy.Timeout = 120
+	}
+	if cfg.Deploy.Retain == 0 {
+		cfg.Deploy.Retain = 5
+	}
+	if cfg.Deploy.Concurrency == 0 {
+		cfg.Deploy.Concurrency = 5
+	}
+	cfg.Deploy.AutoRollback = true
+	if cfg.Proxy.Driver == "" {
+		cfg.Proxy.Driver = "caddy"
+	}
+	if cfg.Secrets.Driver == "" {
+		cfg.Secrets.Driver = "aes"
+	}
+	if cfg.Secrets.File == "" {
+		cfg.Secrets.File = ".shuttle/secrets.enc"
+	}
+	if cfg.Dev.Ports.HTTP == 0 {
+		cfg.Dev.Ports.HTTP = 80
+	}
+	if cfg.Dev.Ports.HTTPS == 0 {
+		cfg.Dev.Ports.HTTPS = 443
+	}
+}
+
+func validate(cfg *Config) error {
+	if cfg.App == "" {
+		return errors.New("app is required")
+	}
+	if cfg.Domain == nil {
+		return errors.New("domain is required")
+	}
+	if len(cfg.Servers) == 0 {
+		return errors.New("server or servers is required")
+	}
+	if cfg.Deploy.Strategy != "blue-green" && cfg.Deploy.Strategy != "rolling" && cfg.Deploy.Strategy != "swarm" {
+		return fmt.Errorf("invalid deploy strategy %q", cfg.Deploy.Strategy)
+	}
+	return nil
+}
+
+func merge(dst *Config, src *Config) {
+	rawDst, _ := json.Marshal(dst)
+	rawSrc, _ := json.Marshal(src)
+	var dstMap map[string]any
+	var srcMap map[string]any
+	_ = json.Unmarshal(rawDst, &dstMap)
+	_ = json.Unmarshal(rawSrc, &srcMap)
+	deepMerge(dstMap, srcMap)
+	out, _ := json.Marshal(dstMap)
+	_ = json.Unmarshal(out, dst)
+}
+
+func deepMerge(dst map[string]any, src map[string]any) {
+	for key, srcVal := range src {
+		if srcNested, ok := srcVal.(map[string]any); ok {
+			if dstNested, ok := dst[key].(map[string]any); ok {
+				deepMerge(dstNested, srcNested)
+				continue
+			}
+		}
+		dst[key] = srcVal
+	}
+}
