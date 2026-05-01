@@ -30,6 +30,7 @@ func Run(adapter execx.Adapter, target string, profile []string) Report {
 		checkEnvWorldReadable,
 		checkEnvTracked,
 		checkCaddyInstalled,
+		checkAdminerRestricted,
 	}
 	results := make([]CheckResult, 0, len(checks))
 	for _, check := range checks {
@@ -138,18 +139,42 @@ func checkUFWActive(adapter execx.Adapter) CheckResult {
 }
 
 func checkDatabasePorts(adapter execx.Adapter) CheckResult {
-	res := adapter.Run("if command -v ss >/dev/null 2>&1; then ss -ltn; elif command -v netstat >/dev/null 2>&1; then netstat -ltn; else exit 127; fi", 3*time.Second)
-	ports := []string{}
-	for _, port := range []string{"5432", "3306", "6379", "7700", "9200", "27017"} {
-		if regexp.MustCompile(`(?:0\.0\.0\.0|\[::\]|::):` + port + `\b`).MatchString(res.Stdout) {
-			ports = append(ports, port)
-		}
-	}
+	res := adapter.Run("if command -v ss >/dev/null 2>&1; then ss -ltnp; elif command -v netstat >/dev/null 2>&1; then netstat -ltnp; else exit 127; fi; printf '\\n---UFW---\\n'; command -v ufw >/dev/null 2>&1 && ufw status verbose || true", 3*time.Second)
+	listenerText, firewallText, _ := strings.Cut(res.Stdout, "\n---UFW---\n")
+	listeners := publicDatabaseListeners(listenerText)
+	ports := uniqueListenerPorts(listeners)
 	status := Passed
+	severity := Critical
+	summary := "No public sensitive database listeners detected."
+	remediation := "Bind databases to localhost/private Docker networks and close public database ports."
+	firewallRestricted := databasePortsFirewallRestricted(firewallText, ports)
 	if len(ports) > 0 {
 		status = Failed
+		if firewallRestricted {
+			severity = High
+			summary = "Sensitive database listeners bind public interfaces, but UFW appears to restrict public access: " + strings.Join(ports, ", ") + "."
+			remediation = "Prefer binding databases to localhost or a private Docker bridge. Keep UFW allowing DB access only from the API/Adminer network or explicit admin IPs."
+		} else {
+			summary = "Public sensitive database listeners detected: " + strings.Join(ports, ", ") + "."
+			remediation = "Do not expose PostgreSQL/MySQL/Redis/Admin databases to the Internet. Bind to localhost/private Docker networks or restrict the port to trusted API/Adminer sources only."
+		}
 	}
-	return CheckResult{ID: "firewall.database_port_public", Title: "Sensitive database ports are not public", Category: "firewall", Severity: Critical, Status: status, Summary: ternary(len(ports) > 0, "Public sensitive ports detected: "+strings.Join(ports, ", ")+".", "No public sensitive database ports detected."), Remediation: "Bind databases to localhost/private Docker networks and close public database ports.", Evidence: map[string]any{"publicPorts": ports}}
+	return CheckResult{
+		ID:          "firewall.database_port_public",
+		Title:       "Sensitive database ports are not public",
+		Category:    "firewall",
+		Severity:    severity,
+		Status:      status,
+		Summary:     summary,
+		Remediation: remediation,
+		Evidence: map[string]any{
+			"publicPorts":          ports,
+			"listeners":            listeners,
+			"firewallRestricted":   firewallRestricted,
+			"expectedAccessModel":  "API/Adminer may access DB through localhost/private network or explicit allowlist; the DB port should not be reachable from the Internet.",
+			"firewallStatusSample": strings.TrimSpace(firewallText),
+		},
+	}
 }
 
 func checkEnvWorldReadable(adapter execx.Adapter) CheckResult {
@@ -183,6 +208,100 @@ func checkCaddyInstalled(adapter execx.Adapter) CheckResult {
 		status = Passed
 	}
 	return CheckResult{ID: "caddy.not_installed", Title: "Caddy or Caddy container is present", Category: "reverse-proxy", Severity: Medium, Status: status, Summary: ternary(installed, "Caddy was detected.", "No Caddy binary or running Caddy container detected."), Remediation: "Install/configure Caddy or another reverse proxy before exposing the app."}
+}
+
+func checkAdminerRestricted(adapter execx.Adapter) CheckResult {
+	detected := adapter.Run("docker ps --format '{{.Names}}\t{{.Image}}' 2>/dev/null | grep -i adminer", 3*time.Second)
+	if detected.ExitCode != 0 {
+		return CheckResult{ID: "adminer.ip_restriction_missing", Title: "Adminer is IP restricted", Category: "database", Severity: High, Status: Skipped, Summary: "No running Adminer container detected."}
+	}
+	config := adapter.Run("grep -Rih --include='*.caddy' --include='Caddyfile' 'adminer\\|Cf-Connecting-Ip\\|remote_ip\\|client_ip\\|basic_auth\\|respond .*403' /etc/caddy /opt/caddy 2>/dev/null | head -n 200", 3*time.Second)
+	text := config.Stdout
+	hasIPRestriction := regexp.MustCompile(`(?i)(Cf-Connecting-Ip|remote_ip|client_ip)`).MatchString(text)
+	hasDeny := regexp.MustCompile(`(?i)(respond\s+.*403|abort|deny)`).MatchString(text)
+	hasAuth := regexp.MustCompile(`(?i)basic_auth`).MatchString(text)
+	status := Passed
+	summary := "Adminer appears to be protected by an IP restriction."
+	if !hasIPRestriction || !hasDeny {
+		status = Failed
+		summary = "Adminer is running, but no clear IP restriction/deny rule was detected in Caddy config."
+	}
+	return CheckResult{
+		ID:          "adminer.ip_restriction_missing",
+		Title:       "Adminer is IP restricted",
+		Category:    "database",
+		Severity:    High,
+		Status:      status,
+		Summary:     summary,
+		Remediation: "Expose Adminer only behind the reverse proxy with an allowlist for your home IP, deny-by-default behavior, and basic auth. Do not publish Adminer directly with Docker ports.",
+		Evidence: map[string]any{
+			"adminerContainer": strings.TrimSpace(detected.Stdout),
+			"ipRestriction":    hasIPRestriction,
+			"denyRule":         hasDeny,
+			"basicAuth":        hasAuth,
+		},
+	}
+}
+
+func publicDatabaseListeners(output string) []map[string]string {
+	listeners := []map[string]string{}
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		for _, port := range []string{"5432", "3306", "6379", "7700", "9200", "27017"} {
+			if !regexp.MustCompile(`(?::|\]:)` + port + `\b`).MatchString(line) {
+				continue
+			}
+			if !regexp.MustCompile(`(?:0\.0\.0\.0|\[::\]|\*:|::):` + port + `\b|\*:` + port + `\b`).MatchString(line) {
+				continue
+			}
+			process := capture(line, `users:\(\("([^"]+)`)
+			if process == "" {
+				process = capture(line, `\b([a-zA-Z0-9._-]+)\s*$`)
+			}
+			listeners = append(listeners, map[string]string{
+				"port":    port,
+				"process": fallback(process, "unknown"),
+				"line":    line,
+			})
+		}
+	}
+	return listeners
+}
+
+func uniqueListenerPorts(listeners []map[string]string) []string {
+	seen := map[string]bool{}
+	ports := []string{}
+	for _, listener := range listeners {
+		port := listener["port"]
+		if port == "" || seen[port] {
+			continue
+		}
+		seen[port] = true
+		ports = append(ports, port)
+	}
+	return ports
+}
+
+func databasePortsFirewallRestricted(firewallText string, ports []string) bool {
+	if len(ports) == 0 {
+		return false
+	}
+	if !regexp.MustCompile(`(?mi)^Status:\s+active$`).MatchString(firewallText) {
+		return false
+	}
+	if !regexp.MustCompile(`(?mi)^Default:\s+deny\s+\(incoming\)`).MatchString(firewallText) {
+		return false
+	}
+	for _, port := range ports {
+		publicAllow := regexp.MustCompile(`(?mi)^` + regexp.QuoteMeta(port) + `(?:/tcp)?\s+ALLOW IN\s+Anywhere(?:\s|$)|^` + regexp.QuoteMeta(port) + `(?:/tcp)?\s+ALLOW IN\s+0\.0\.0\.0/0(?:\s|$)|^` + regexp.QuoteMeta(port) + `(?:/tcp)?\s+\(v6\)\s+ALLOW IN\s+Anywhere`)
+		if publicAllow.MatchString(firewallText) {
+			return false
+		}
+	}
+	return true
 }
 
 func capture(input string, pattern string) string {

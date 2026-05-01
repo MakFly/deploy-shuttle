@@ -95,4 +95,60 @@ Implement the first `deploy-shuttle doctor` foundation:
 - `doctor` is the active product hook and is implemented for local scans.
 - `secrets` uses passphrase-protected Argon2id + XChaCha20-Poly1305 encrypted local storage and can push `.env` to configured servers.
 - `rollback` remains guarded until the Go port has persisted blue/green deployment state parity.
-- `report`, `harden`, and remote `doctor --target` remain planned readiness work.
+- `report` and `harden` remain planned readiness work.
+
+## Current Slice - Remote Doctor SSH
+
+**Status:** Implemented  
+**Started:** 2026-05-01  
+**Completed:** 2026-05-01  
+**Plan sources:**
+
+- `plans/02-mvp-scope.md`
+- `plans/06-architecture-security.md`
+- product hook: `deploy-shuttle doctor --target root@server`
+
+### Scope
+
+- Parse `doctor --target user@host`.
+- Support optional SSH port with `user@host:port`.
+- Reuse the same readiness check runner over an SSH exec adapter.
+- Preserve console/JSON output and `--fail-below` behavior.
+- Keep local `doctor` behavior unchanged.
+
+### Completion Checklist
+
+- [x] SSH exec adapter implements the readiness `execx.Adapter`.
+- [x] `doctor --target user@host` runs checks over SSH.
+- [x] `doctor --target user@host:port` supports custom SSH ports.
+- [x] Console and JSON reports show the remote target.
+- [x] Failure semantics remain unchanged for critical findings and `--fail-below`.
+- [x] Unit tests cover target parsing.
+- [x] `gofmt`, `go test ./...`, `go vet ./...`, build, and `ig index .` pass.
+
+## Current Slice - Database/Adminer Exposure Semantics
+
+**Status:** Implemented  
+**Started:** 2026-05-01  
+**Completed:** 2026-05-01  
+**Plan sources:**
+
+- `plans/03-check-catalog.md`
+- real VPS validation: API/Adminer may reach DB, Adminer must be home-IP restricted
+
+### Scope
+
+- Keep `firewall.database_port_public` critical when a database port is publicly reachable or publicly allowed.
+- Downgrade to high severity when a database binds public interfaces but UFW is active, deny-by-default, and has no public allow for that DB port.
+- Include listener process evidence from `ss -ltnp`.
+- Add Adminer protection check for IP restriction, deny rule, and basic auth in Caddy config.
+- Validate against `root@185.158.107.49:7022`.
+
+### Completion Checklist
+
+- [x] Postgres `0.0.0.0:5432` includes process evidence.
+- [x] Firewall-restricted DB listener is no longer treated as critical Internet exposure.
+- [x] Remediation explains API/Adminer private-network or allowlist access.
+- [x] Adminer check detects Caddy IP restriction + deny-by-default + basic auth.
+- [x] Real VPS scan returns `90/100` with Adminer passed and DB warning high.
+- [x] Unit tests cover firewall-restricted and publicly allowed DB port cases.
