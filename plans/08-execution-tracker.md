@@ -442,6 +442,30 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] Smoke test from real VPS doctor report renders score, target, and findings.
 - [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
 
+## Current Slice - Sellable Surface (README + Install + Catalog)
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- `plans/02-mvp-scope.md` (acceptance: docs include quickstart and check catalog; install script works on macOS/Linux)
+- `plans/07-docs-and-implementation-prompt.md`
+
+### Scope
+
+- Rewrite `README.md` as the marketing surface: 30-second pitch, quickstart, doctor / report / harden flow, CI snippet, configuration, check catalog link, architecture diagram.
+- Add user-facing `docs/check-catalog.md` listing the 15 shipped checks with severity and intent.
+- Add `scripts/install.sh` for `curl | sh` installation (Linux x64, macOS x64, macOS arm64), with checksum verification when published.
+
+### Completion Checklist
+
+- [x] README pitches the product, shows the doctor → report → harden flow, and removes stale "planned" labels for shipped features.
+- [x] README references `docs/check-catalog.md` and links to the architecture plan.
+- [x] `docs/check-catalog.md` covers all 15 checks grouped by category with severity and what each verifies.
+- [x] `scripts/install.sh` detects OS/arch, supports DEPLOY_SHUTTLE_VERSION and DEPLOY_SHUTTLE_INSTALL_DIR, verifies checksums when present, and warns about $PATH.
+- [x] Install script passes `sh -n` syntax check.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.
