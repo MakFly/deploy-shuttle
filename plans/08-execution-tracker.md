@@ -386,6 +386,35 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
 - [x] Local smoke confirmed `.env` 644 → 600 unchanged after refactor.
 
+## Current Slice - Harden Allow-List UFW Deny
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- previous slice: `Harden Apply Over SSH`
+- real VPS dry-run validation: `firewall.database_port_public` exposes 5432/tcp publicly
+
+### Scope
+
+- Rename `Action.SafeLocalApply` to `SafeAutoApply` (same flag, used locally and over SSH).
+- Allow-list `ufw deny <port>/tcp` in `harden --apply` with strict validation.
+- Mark `firewall.lock-db-ports` actions as safe-auto-apply when at least one port is present.
+- Reject non-`deny` ufw verbs, non-`/tcp` specs, non-numeric ports, and propagate stderr.
+- No remote execution on the production VPS in this slice.
+
+### Completion Checklist
+
+- [x] `Action.SafeAutoApply` field replaces the old `SafeLocalApply` everywhere.
+- [x] `runUFWDeny` enforces deny-only, `/tcp`-only, numeric port.
+- [x] `firewall.lock-db-ports` is `SafeAutoApply: true` when commands exist.
+- [x] Existing chmod allow-list behavior unchanged.
+- [x] Unit tests cover ufw happy path and four rejection paths.
+- [x] Planner test asserts which actions are flagged safe.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+- [x] `harden --dry-run --format json` against real VPS shows `safeAutoApply: true` on the lock-db-ports action.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.

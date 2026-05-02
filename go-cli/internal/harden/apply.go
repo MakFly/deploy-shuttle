@@ -18,14 +18,14 @@ type ApplyResult struct {
 	Detail   string `json:"detail,omitempty"`
 }
 
-// Apply runs only actions flagged SafeLocalApply through the supplied
+// Apply runs only actions flagged SafeAutoApply through the supplied
 // execution adapter (local shell or SSH). Each command is mapped to a small
 // allow-listed operation; anything outside that list is rejected before any
 // shell call is issued.
 func Apply(adapter execx.Adapter, plan Plan) []ApplyResult {
 	results := []ApplyResult{}
 	for _, action := range plan.Actions {
-		if !action.SafeLocalApply {
+		if !action.SafeAutoApply {
 			results = append(results, ApplyResult{
 				ActionID: action.ID,
 				Title:    action.Title,
@@ -70,8 +70,41 @@ func runSafeCommand(adapter execx.Adapter, raw string) error {
 	switch parts[0] {
 	case "chmod":
 		return runChmod(adapter, parts[1:])
+	case "ufw":
+		return runUFWDeny(adapter, parts[1:])
 	}
 	return fmt.Errorf("command %q is not in the safe allow list", parts[0])
+}
+
+func runUFWDeny(adapter execx.Adapter, args []string) error {
+	if len(args) != 2 {
+		return fmt.Errorf("ufw safe form requires `deny <port>/tcp`, got %v", args)
+	}
+	if args[0] != "deny" {
+		return fmt.Errorf("only `ufw deny` is allow-listed, got %q", args[0])
+	}
+	spec := args[1]
+	port, proto, ok := strings.Cut(spec, "/")
+	if !ok || proto != "tcp" {
+		return fmt.Errorf("ufw target %q must be of the form <port>/tcp", spec)
+	}
+	if port == "" || len(port) > 5 {
+		return fmt.Errorf("ufw port %q is invalid", port)
+	}
+	for _, r := range port {
+		if r < '0' || r > '9' {
+			return fmt.Errorf("ufw port %q must be numeric", port)
+		}
+	}
+	res := adapter.Run("ufw deny "+shellQuote(spec), 10*time.Second)
+	if res.ExitCode != 0 {
+		stderr := strings.TrimSpace(res.Stderr)
+		if stderr == "" {
+			stderr = fmt.Sprintf("exit code %d", res.ExitCode)
+		}
+		return fmt.Errorf("ufw deny failed: %s", stderr)
+	}
+	return nil
 }
 
 func runChmod(adapter execx.Adapter, args []string) error {

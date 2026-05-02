@@ -86,6 +86,29 @@ func TestBuildPlanCoversKnownFindings(t *testing.T) {
 	}
 }
 
+func TestBuildPlanFlagsSafeAutoApplyActions(t *testing.T) {
+	report := readiness.Report{
+		Checks: []readiness.CheckResult{
+			failed("secrets.env_world_readable", readiness.Critical, nil),
+			failed("firewall.database_port_public", readiness.High, map[string]any{"publicPorts": []string{"5432"}}),
+			failed("docker.containers_running_as_root", readiness.Medium, nil),
+		},
+	}
+	plan := BuildPlan(report)
+	safe := map[string]bool{}
+	for _, action := range plan.Actions {
+		if action.SafeAutoApply {
+			safe[action.ID] = true
+		}
+	}
+	if !safe["secrets.tighten-env-perms"] || !safe["firewall.lock-db-ports"] {
+		t.Fatalf("expected env + db-port actions safe, got: %v", safe)
+	}
+	if safe["docker.drop-root"] {
+		t.Fatal("docker.drop-root must not be safe-auto-apply")
+	}
+}
+
 func TestBuildPlanEmbedsDatabasePortsInCommands(t *testing.T) {
 	report := readiness.Report{
 		Checks: []readiness.CheckResult{

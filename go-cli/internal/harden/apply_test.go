@@ -26,10 +26,10 @@ func TestApplyChmodEnvLocal(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 	plan := Plan{Actions: []Action{{
-		ID:             "secrets.tighten-env-perms",
-		Title:          "Tighten .env",
-		Commands:       []string{"chmod 600 .env"},
-		SafeLocalApply: true,
+		ID:            "secrets.tighten-env-perms",
+		Title:         "Tighten .env",
+		Commands:      []string{"chmod 600 .env"},
+		SafeAutoApply: true,
 	}}}
 	results := Apply(execx.Local{Dir: dir}, plan)
 	if len(results) != 1 || results[0].Status != "applied" {
@@ -63,10 +63,10 @@ func TestApplyOverFakeAdapter(t *testing.T) {
 		return execx.Result{ExitCode: 0}
 	}}
 	plan := Plan{Actions: []Action{{
-		ID:             "secrets.tighten-env-perms",
-		Title:          "Tighten .env",
-		Commands:       []string{"chmod 600 .env"},
-		SafeLocalApply: true,
+		ID:            "secrets.tighten-env-perms",
+		Title:         "Tighten .env",
+		Commands:      []string{"chmod 600 .env"},
+		SafeAutoApply: true,
 	}}}
 	results := Apply(adapter, plan)
 	if len(results) != 1 || results[0].Status != "applied" {
@@ -88,10 +88,10 @@ func TestApplyReportsAdapterFailure(t *testing.T) {
 		return execx.Result{ExitCode: 1, Stderr: "permission denied"}
 	}}
 	plan := Plan{Actions: []Action{{
-		ID:             "secrets.tighten-env-perms",
-		Title:          "Tighten .env",
-		Commands:       []string{"chmod 600 .env"},
-		SafeLocalApply: true,
+		ID:            "secrets.tighten-env-perms",
+		Title:         "Tighten .env",
+		Commands:      []string{"chmod 600 .env"},
+		SafeAutoApply: true,
 	}}}
 	results := Apply(adapter, plan)
 	if results[0].Status != "failed" || !strings.Contains(results[0].Detail, "permission denied") {
@@ -104,10 +104,10 @@ func TestApplyReportsMissingTarget(t *testing.T) {
 		return execx.Result{ExitCode: 1}
 	}}
 	plan := Plan{Actions: []Action{{
-		ID:             "secrets.tighten-env-perms",
-		Title:          "Tighten .env",
-		Commands:       []string{"chmod 600 .env"},
-		SafeLocalApply: true,
+		ID:            "secrets.tighten-env-perms",
+		Title:         "Tighten .env",
+		Commands:      []string{"chmod 600 .env"},
+		SafeAutoApply: true,
 	}}}
 	results := Apply(adapter, plan)
 	if results[0].Status != "failed" || !strings.Contains(results[0].Detail, "does not exist") {
@@ -147,6 +147,54 @@ func TestRunChmodRejectsOtherMode(t *testing.T) {
 	adapter := fakeAdapter{run: func(string) execx.Result { return execx.Result{} }}
 	if err := runChmod(adapter, []string{"777", ".env"}); err == nil {
 		t.Fatal("expected rejection of mode 777")
+	}
+}
+
+func TestRunUFWDenyHappyPath(t *testing.T) {
+	calls := []string{}
+	adapter := fakeAdapter{run: func(cmd string) execx.Result {
+		calls = append(calls, cmd)
+		return execx.Result{ExitCode: 0}
+	}}
+	if err := runUFWDeny(adapter, []string{"deny", "5432/tcp"}); err != nil {
+		t.Fatalf("expected ufw deny to succeed: %v", err)
+	}
+	if len(calls) != 1 || !strings.Contains(calls[0], "ufw deny") || !strings.Contains(calls[0], "5432/tcp") {
+		t.Fatalf("unexpected adapter call: %v", calls)
+	}
+}
+
+func TestRunUFWDenyRejectsAllow(t *testing.T) {
+	adapter := fakeAdapter{run: func(string) execx.Result { return execx.Result{} }}
+	if err := runUFWDeny(adapter, []string{"allow", "22/tcp"}); err == nil {
+		t.Fatal("expected rejection of ufw allow")
+	}
+}
+
+func TestRunUFWDenyRejectsNonTCP(t *testing.T) {
+	adapter := fakeAdapter{run: func(string) execx.Result { return execx.Result{} }}
+	if err := runUFWDeny(adapter, []string{"deny", "5432/udp"}); err == nil {
+		t.Fatal("expected rejection of non-tcp")
+	}
+	if err := runUFWDeny(adapter, []string{"deny", "5432"}); err == nil {
+		t.Fatal("expected rejection of missing /tcp")
+	}
+}
+
+func TestRunUFWDenyRejectsNonNumericPort(t *testing.T) {
+	adapter := fakeAdapter{run: func(string) execx.Result { return execx.Result{} }}
+	if err := runUFWDeny(adapter, []string{"deny", "ssh/tcp"}); err == nil {
+		t.Fatal("expected rejection of non-numeric port")
+	}
+}
+
+func TestRunUFWDenyPropagatesStderr(t *testing.T) {
+	adapter := fakeAdapter{run: func(string) execx.Result {
+		return execx.Result{ExitCode: 1, Stderr: "ufw not running"}
+	}}
+	err := runUFWDeny(adapter, []string{"deny", "5432/tcp"})
+	if err == nil || !strings.Contains(err.Error(), "ufw not running") {
+		t.Fatalf("expected stderr propagation, got: %v", err)
 	}
 }
 
