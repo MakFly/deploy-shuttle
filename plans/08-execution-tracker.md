@@ -415,6 +415,33 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
 - [x] `harden --dry-run --format json` against real VPS shows `safeAutoApply: true` on the lock-db-ports action.
 
+## Current Slice - HTML Report Format
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- `plans/02-mvp-scope.md` (acceptance: Markdown + HTML reports)
+- `plans/04-scoring-config-reports.md`
+
+### Scope
+
+- Add `--format html` to `report`.
+- Generate self-contained HTML (inline CSS, no external assets).
+- Reuse the same data shape as Markdown (exec summary, next actions, findings by severity, accepted risks, evidence).
+- Use Go `html/template` so user-supplied content (target, titles, summaries) is escaped.
+
+### Completion Checklist
+
+- [x] `report --format html --output deployshuttle-report.html` writes HTML.
+- [x] HTML defaults output path to `deployshuttle-report.html`.
+- [x] Template uses `html/template` and escapes injected content.
+- [x] Sections collapse cleanly when no findings or no accepted risks exist.
+- [x] Unit tests cover key metadata, escaping, and empty-section behavior.
+- [x] Smoke test from real VPS doctor report renders score, target, and findings.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.
