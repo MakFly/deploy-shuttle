@@ -3,12 +3,14 @@ package harden
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/execx"
 )
 
-// ApplyResult records the outcome of a single safe local action.
+// ApplyResult records the outcome of a single safe action.
 type ApplyResult struct {
 	ActionID string `json:"actionId"`
 	Title    string `json:"title"`
@@ -16,11 +18,11 @@ type ApplyResult struct {
 	Detail   string `json:"detail,omitempty"`
 }
 
-// ApplySafeLocal runs only actions flagged SafeLocalApply on the local
-// machine. It never opens an SSH session and never executes commands from
-// non-safe actions. Each command is mapped to a small set of allow-listed
-// operations; anything outside that list is rejected.
-func ApplySafeLocal(plan Plan) []ApplyResult {
+// Apply runs only actions flagged SafeLocalApply through the supplied
+// execution adapter (local shell or SSH). Each command is mapped to a small
+// allow-listed operation; anything outside that list is rejected before any
+// shell call is issued.
+func Apply(adapter execx.Adapter, plan Plan) []ApplyResult {
 	results := []ApplyResult{}
 	for _, action := range plan.Actions {
 		if !action.SafeLocalApply {
@@ -28,14 +30,14 @@ func ApplySafeLocal(plan Plan) []ApplyResult {
 				ActionID: action.ID,
 				Title:    action.Title,
 				Status:   "skipped",
-				Detail:   "action is not flagged as safe for local apply; run the proposed commands manually",
+				Detail:   "action is not flagged as safe for automatic apply; run the proposed commands manually",
 			})
 			continue
 		}
 		applied := []string{}
 		var failure error
 		for _, raw := range action.Commands {
-			if err := runSafeCommand(raw); err != nil {
+			if err := runSafeCommand(adapter, raw); err != nil {
 				failure = fmt.Errorf("%s: %w", raw, err)
 				break
 			}
@@ -60,26 +62,26 @@ func ApplySafeLocal(plan Plan) []ApplyResult {
 	return results
 }
 
-func runSafeCommand(raw string) error {
+func runSafeCommand(adapter execx.Adapter, raw string) error {
 	parts := strings.Fields(raw)
 	if len(parts) == 0 {
 		return errors.New("empty command")
 	}
 	switch parts[0] {
 	case "chmod":
-		return runChmod(parts[1:])
+		return runChmod(adapter, parts[1:])
 	}
-	return fmt.Errorf("command %q is not in the safe local allow list", parts[0])
+	return fmt.Errorf("command %q is not in the safe allow list", parts[0])
 }
 
-func runChmod(args []string) error {
+func runChmod(adapter execx.Adapter, args []string) error {
 	if len(args) != 2 {
 		return fmt.Errorf("chmod requires <mode> <path>, got %v", args)
 	}
 	mode := args[0]
 	path := args[1]
 	if mode != "600" {
-		return fmt.Errorf("chmod mode %q is not allowed in safe local apply (only 600)", mode)
+		return fmt.Errorf("chmod mode %q is not allowed in safe apply (only 600)", mode)
 	}
 	if filepath.IsAbs(path) {
 		return fmt.Errorf("chmod target %q must be a relative project-local path", path)
@@ -90,13 +92,23 @@ func runChmod(args []string) error {
 	if filepath.Base(path) != ".env" {
 		return fmt.Errorf("chmod target %q must be a .env file", path)
 	}
-	if _, err := os.Stat(path); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("chmod target %q does not exist", path)
-		}
-		return err
+	probe := adapter.Run("test -f "+shellQuote(path), 5*time.Second)
+	if probe.ExitCode != 0 {
+		return fmt.Errorf("chmod target %q does not exist on the target", path)
 	}
-	return os.Chmod(path, 0o600)
+	res := adapter.Run("chmod 600 "+shellQuote(path), 5*time.Second)
+	if res.ExitCode != 0 {
+		stderr := strings.TrimSpace(res.Stderr)
+		if stderr == "" {
+			stderr = fmt.Sprintf("exit code %d", res.ExitCode)
+		}
+		return fmt.Errorf("chmod failed: %s", stderr)
+	}
+	return nil
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 func RenderApplyResults(results []ApplyResult) string {

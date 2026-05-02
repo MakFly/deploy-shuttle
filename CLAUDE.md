@@ -101,11 +101,11 @@ Current commands include:
 - `monitor`
 - `doctor` (local readiness scan; remote `--target` is planned)
 - `report`
-- `harden` (dry-run plan + safe local apply)
+- `harden` (dry-run plan + safe apply, local or over SSH)
 
 Planned readiness commands from `plans/`:
 
-- `harden --apply` over SSH (remote execution still pending)
+- `harden` action coverage beyond `chmod 600 .env` (UFW baseline, Caddy admin, etc.)
 
 Do not mention these planned commands as implemented until corresponding CLI files,
 tests, and docs exist.
