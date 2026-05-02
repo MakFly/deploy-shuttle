@@ -26,6 +26,10 @@ jobs:
 
       - name: Build all targets
         run: sh scripts/build-go.sh
+        env:
+          DEPLOY_SHUTTLE_VERSION: ${{ github.ref_name }}
+          LICENSE_PUBKEY_B64: ${{ secrets.LICENSE_PUBKEY_B64 }}
+          LICENSE_SERVER: ${{ vars.LICENSE_SERVER }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
