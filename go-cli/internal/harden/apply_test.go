@@ -143,6 +143,40 @@ func TestRunChmodRejectsNonEnvTarget(t *testing.T) {
 	}
 }
 
+func TestRunChmodAcceptsEnvVariants(t *testing.T) {
+	for _, name := range []string{".env", ".env.production", ".env.local"} {
+		dir := t.TempDir()
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+			t.Fatalf("setup %s: %v", name, err)
+		}
+		if err := runChmod(execx.Local{Dir: dir}, []string{"600", name}); err != nil {
+			t.Fatalf("expected %s accepted, got %v", name, err)
+		}
+	}
+}
+
+func TestRunChmodAcceptsKeyFiles(t *testing.T) {
+	for _, name := range []string{"server.pem", "tls.key", "id_rsa", "id_ed25519"} {
+		dir := t.TempDir()
+		path := filepath.Join(dir, name)
+		if err := os.WriteFile(path, []byte("x"), 0o644); err != nil {
+			t.Fatalf("setup %s: %v", name, err)
+		}
+		if err := runChmod(execx.Local{Dir: dir}, []string{"600", name}); err != nil {
+			t.Fatalf("expected %s accepted, got %v", name, err)
+		}
+	}
+}
+
+func TestIsAllowedSecretPathRejectsArbitraryFiles(t *testing.T) {
+	for _, name := range []string{"random.txt", "config.yaml", "passwords"} {
+		if isAllowedSecretPath(name) {
+			t.Fatalf("expected %s rejected", name)
+		}
+	}
+}
+
 func TestRunChmodRejectsOtherMode(t *testing.T) {
 	adapter := fakeAdapter{run: func(string) execx.Result { return execx.Result{} }}
 	if err := runChmod(adapter, []string{"777", ".env"}); err == nil {

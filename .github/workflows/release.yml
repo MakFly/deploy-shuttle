@@ -36,6 +36,7 @@ jobs:
         with:
           files: |
             dist/deploy-shuttle-linux-x64
+            dist/deploy-shuttle-linux-arm64
             dist/deploy-shuttle-darwin-arm64
             dist/deploy-shuttle-darwin-x64
             dist/checksums.txt

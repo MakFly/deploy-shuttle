@@ -574,6 +574,288 @@ Implement the first `deploy-shuttle doctor` foundation:
 - `fly deploy` and put the public URL in `LICENSE_SERVER` of the release workflow.
 - Release workflow: add `LICENSE_PUBKEY_B64` secret so future tags ship a gated binary.
 
+## Current Slice - Public GitHub Action
+
+**Status:** Implemented (code only; awaits a `v1` tag and Marketplace publish)
+**Started:** 2026-05-02
+**Plan sources:**
+
+- `plans/09-critique-and-deltas.md` (livrable 4.1: GitHub Action publique)
+- distribution priority before any dashboard work
+
+### Scope
+
+- Composite `action.yml` at the repo root, installable as `MakFly/deploy-shuttle@v1`.
+- Inputs: `target`, `config`, `fail-below`, `output`, `ssh-private-key`, `ssh-known-hosts`, `version`.
+- Outputs: `score`, `level`, `report` (path).
+- Auto-installs the CLI via `scripts/install.sh`.
+- Configures SSH agent + known_hosts when a remote target is supplied.
+- Writes a job summary with score and level.
+- README documents the Action as the recommended CI integration.
+
+### Completion Checklist
+
+- [x] `action.yml` validates as YAML and exposes the documented inputs/outputs.
+- [x] JSON parsing uses `jq` (pre-installed on GitHub-hosted runners).
+- [x] README shows the `uses: MakFly/deploy-shuttle@v1` snippet.
+- [ ] Tag `v1` published once the install script URL is reachable on a tagged release.
+- [ ] Marketplace listing once Stripe + license server are live.
+
+## Current Slice - P0 Check Pack (21 -> 30)
+
+**Status:** Implemented
+**Started:** 2026-05-02
+**Plan sources:**
+
+- `plans/09-critique-and-deltas.md` (livrable 4.2: P0 pack lifts the credibility floor)
+- `plans/03-check-catalog.md` (catalog rows that were still planned)
+
+### Scope
+
+Add 10 new readiness checks plus an `app:` section in `.deployshuttle.yml`:
+
+- `system.updates_pending` (apt list --upgradable count, skipped on non-APT).
+- `system.memory_low` (`free -m` available vs total, fail < 10%, high < 5%).
+- `ssh.port_default` (sshd Port directive; default 22 -> low fail).
+- `firewall.docker_published_sensitive_ports` (docker ps mappings on 0.0.0.0).
+- `caddy.no_security_headers` (HSTS / X-Content-Type-Options / Referrer-Policy in Caddyfile).
+- `caddy.invalid_config` (`caddy validate`).
+- `tls.cert_missing` (openssl probe on `app.domain`, severity ramps with expiration).
+- `secrets.weak_file_permissions` (find world-readable env/key/pem files).
+- `monitoring.no_health_endpoint` (curl `https://<domain><healthcheckPath>`).
+
+`system.fail2ban_inactive` covers the catalog's `ssh.fail2ban_missing` row;
+treat them as the same check.
+
+### Completion Checklist
+
+- [x] `internal/readiness/extra_checks.go` implements the 10 checks with
+  Skipped behavior on missing tooling, config, or domain.
+- [x] `internal/readiness/extra_checks_test.go` covers happy / failed /
+  skipped / severity-escalation paths for each check.
+- [x] `Config` exposes `App.Domain` and `App.HealthcheckPath`; TLS and
+  health checks read from there.
+- [x] `doctor.go` runs the new checks (30 total, verified via local smoke).
+- [x] `docs/check-catalog.md` and `README.md` reflect 30 checks and the new
+  `app:` config block.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+- [x] Local `doctor --format json` enumerates 30 unique IDs.
+
+### Follow-ups (intentionally out of scope)
+
+- Cloudflare and compose checks (P1/P2 in `09-critique-and-deltas.md`).
+
+## Current Slice - Harden Planner Coverage for P0 Pack
+
+**Status:** Implemented
+**Started:** 2026-05-02
+**Plan sources:**
+
+- previous slice: `P0 Check Pack (21 -> 30)`
+- product direction: every doctor finding should map to a concrete action
+
+### Scope
+
+- Extend `harden/planner.go` with one Action per new P0 finding (9 actions;
+  `ssh.fail2ban_missing` is already covered by `system.fail2ban_inactive`).
+- Make `secrets.tighten-secret-perms` safe-auto-apply with one
+  `chmod 600 <file>` per file reported by `secrets.weak_file_permissions`.
+- Broaden `runChmod` allow-list from `.env` only to: `.env*`, `*.pem`,
+  `*.key`, `id_rsa`, `id_ed25519` (new helper `isAllowedSecretPath`).
+- Tolerate JSON-roundtripped evidence (`[]any` of `map[string]any`) for the
+  Docker exposures field (`exposurePairs` helper).
+
+### Completion Checklist
+
+- [x] 9 new cases in `actionsFor` covering the P0 findings.
+- [x] `secrets.tighten-secret-perms` is `SafeAutoApply: true` with chmod
+  commands per file.
+- [x] `isAllowedSecretPath` accepts env / pem / key / known SSH key names;
+  rejects arbitrary files.
+- [x] `exposurePairs` handles both in-memory and JSON-loaded evidence.
+- [x] Existing chmod / ufw allow-list semantics unchanged for prior actions.
+- [x] Planner tests cover the P0 pack mapping, the safe-auto-apply flag, and
+  the JSON-roundtrip path.
+- [x] Apply tests cover the broadened chmod allow-list (env variants, key
+  files) and still reject arbitrary filenames.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+
+## Current Slice - Init Stack Presets
+
+**Status:** Implemented
+**Started:** 2026-05-02
+**Plan sources:**
+
+- `plans/09-critique-and-deltas.md` (livrable 4.3: init --preset)
+- adoption signal: a fresh project should flag real issues, not stack noise
+
+### Scope
+
+- Add `--preset` flag to `deploy-shuttle init` covering `nextjs`, `laravel`,
+  `node-api`, and `docker-swarm`.
+- Generate an opinionated `.deployshuttle.yml` alongside the existing
+  `shuttle.yml` when `--preset` is provided.
+- Pre-fill `app.healthcheckPath`, `docker.workerServices`, and
+  per-stack `checks.ignore` (e.g. drop Adminer noise on Next.js/Node API).
+- Reuse the same `--force` flag to overwrite an existing `.deployshuttle.yml`.
+- Reject unknown presets with a clear error listing supported values.
+
+### Completion Checklist
+
+- [x] `templates.ReadinessPresets`, `IsReadinessPreset`, `DeployShuttleYML`
+  added; each preset parses as valid YAML with `version: 1`.
+- [x] `init --preset <name>` writes `.deployshuttle.yml` with the supplied
+  `--domain` (or a placeholder) baked in.
+- [x] Without `--preset`, `init` keeps its previous behavior (only
+  `shuttle.yml` written).
+- [x] `--force` overrides existing `.deployshuttle.yml`; absence of `--force`
+  refuses to clobber.
+- [x] Unknown preset raises an actionable error.
+- [x] Tests cover happy-path generation, force semantics, unknown preset, and
+  YAML validity for all four presets.
+- [x] README documents the four presets and their defaults.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+
+## Current Slice - P1 Check Pack (30 -> 38)
+
+**Status:** Implemented
+**Started:** 2026-05-02
+**Plan sources:**
+
+- `plans/09-critique-and-deltas.md` (P1 entries: compose suite + tls.hsts +
+  dns.domain_not_pointing_to_server + db.no_backup_detected)
+
+### Scope
+
+- Add 8 new readiness checks:
+  - `compose.missing_prod_file`, `compose.env_file_missing`,
+    `compose.latest_tag_used`, `compose.no_resource_limits`,
+    `compose.bind_mount_sensitive_paths` (single compose lookup,
+    `/opt/shuttle/<app>/` aware).
+  - `tls.hsts_missing` (HTTP HEAD probe on `app.domain`).
+  - `dns.domain_not_pointing_to_server` (dig vs ipify/ifconfig.me).
+  - `db.no_backup_detected` (artifact + cron heuristic, skipped without DB).
+- Map each new finding to an Action in `harden/planner.go` (no auto-apply;
+  every action is a notes-only human task).
+- Bump README + check catalog count from 30 to 38, add new categories
+  (DNS, Backups, Compose).
+
+### Completion Checklist
+
+- [x] `internal/readiness/compose_checks.go` implements compose lookup +
+  5 checks; tag parsing handles `registry.local:5000/team/api:1.2.3`.
+- [x] `internal/readiness/extra_checks.go` adds `checkHSTSHeader`,
+  `checkDNSPointsToServer`, `checkDatabaseBackup` with proper Skipped paths.
+- [x] `doctor.go` registers the 8 new checks (38 total, smoke test
+  enumerates 38 IDs and surfaces real findings on the dev box).
+- [x] `harden/planner.go` emits 8 new Action entries (compose.create-prod-file,
+  compose.fix-env-file-references, compose.pin-image-tags,
+  compose.add-resource-limits, compose.remove-sensitive-mounts,
+  tls.enforce-hsts, dns.point-to-server, db.add-backup-job); none are
+  SafeAutoApply.
+- [x] `compose_checks_test.go` covers find / parse / pass / fail / skip
+  per check, including the registry-with-port edge case.
+- [x] `extra_checks_test.go` covers HSTS, DNS, and backup checks.
+- [x] `planner_test.go` asserts the P1 mapping and that every P1 action is
+  notes-only.
+- [x] README + `docs/check-catalog.md` updated to 38 checks with new
+  categories DNS / Backups / Compose.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+
+## Current Slice - Cloudflare Pack (38 -> 43)
+
+**Status:** Implemented
+**Started:** 2026-05-02
+**Plan sources:**
+
+- `plans/09-critique-and-deltas.md` (P2 entries: cloudflare.* checks)
+- `plans/03-check-catalog.md` (cloudflare section)
+
+### Scope
+
+- Add a `Cloudflare` config block to `.deployshuttle.yml` (`enabled`, `zone`,
+  `tokenEnv`).
+- Implement a minimal Cloudflare REST client (`api.cloudflare.com/client/v4`)
+  with `zoneID`, `setting`, `dnsRecords` methods and base URL override for
+  tests.
+- Add 5 Cloudflare-aware checks: ssl_flexible, always_https_disabled,
+  waf_disabled (skipped on 404 plan-tier), dns_missing, proxy_disabled.
+  `origin_exposed` deferred until we have a reliable origin-IP comparison.
+- Resolve the API token from `CLOUDFLARE_API_TOKEN` by default with
+  `cloudflare.tokenEnv` override; never log the token.
+- Skip every Cloudflare check cleanly when disabled, missing zone, missing
+  token, or auth error (401/403). Skip-summaries explain the cause.
+- Map the 5 findings to notes-only Actions in `harden/planner.go`.
+
+### Completion Checklist
+
+- [x] `internal/readiness/cloudflare_checks.go` implements client + 5 checks.
+- [x] `internal/readiness/cloudflare_checks_test.go` covers happy path,
+  ssl_flexible failure, proxy_disabled flag, dns_missing fail, WAF 404
+  skip, auth-error skip, env-token resolution.
+- [x] `doctor.go` instantiates the client only when `cloudflare.enabled` and
+  a token is present; otherwise checks skip with a clear cause.
+- [x] `harden/planner.go` adds `cloudflare.upgrade-ssl-mode`,
+  `cloudflare.enable-always-https`, `cloudflare.enable-waf`,
+  `cloudflare.create-dns-record`, `cloudflare.enable-proxy` (all notes-only).
+- [x] README documents the opt-in config block and the token env var.
+- [x] `docs/check-catalog.md` has a Cloudflare section.
+- [x] Smoke test: `doctor --format json` enumerates 43 unique check IDs and
+  all Cloudflare checks skip with the disabled-by-config explanation.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+
+## Current Slice - Release Distribution Fixes
+
+**Status:** Implemented
+**Started:** 2026-05-02
+**Plan sources:**
+
+- previous slice: Cloudflare Pack
+- adoption blocker found while reviewing the v1 release path
+
+### Scope
+
+Two real bugs that would surface on day one of v1, hidden behind "we'll
+tag v1 later":
+
+1. `scripts/build-go.sh` and the release workflow did not produce a
+   `linux-arm64` binary. Hetzner CAX, AWS Graviton, Oracle Ampere, and
+   Raspberry Pi 4/5 are core targets; without arm64 the install script
+   errors out for them.
+2. `action.yml` ran `curl install.sh | bash` then immediately invoked
+   `deploy-shuttle --version`. The default install dir is
+   `~/.local/bin`, which is not guaranteed on the runner's `$PATH`,
+   especially on self-hosted runners. The next composite step would
+   fail with "command not found" the first time anyone used the Action.
+
+### Changes
+
+- `scripts/build-go.sh` builds 4 targets now: linux-x64 + linux-arm64 +
+  darwin-x64 + darwin-arm64.
+- `scripts/install.sh` accepts linux-arm64 (drop the explicit error).
+- `.github/workflows/release.yml` ships the new linux-arm64 binary in the
+  GitHub release.
+- `action.yml` installs into `/usr/local/bin` (using passwordless sudo on
+  GitHub-hosted runners, direct write when running as root). The binary is
+  always reachable in subsequent steps and from the caller's later workflow
+  steps.
+- README documents the four pre-built targets.
+
+### Completion Checklist
+
+- [x] `sh scripts/build-go.sh` produces 4 binaries; arm64 is verified as
+  ELF aarch64 statically linked.
+- [x] `sha256sum dist/* > dist/checksums.txt` covers all 4 binaries.
+- [x] `sh -n scripts/install.sh` and `sh -n scripts/build-go.sh` parse.
+- [x] `action.yml` and `release.yml` validate as YAML.
+- [x] README mentions linux-arm64 as a supported target.
+- [x] No regression on the existing Go test suite.
+
+### Pending (operational, not code)
+
+- Tag `v1` and let `release.yml` produce the first signed release.
+- Smoke the Action against a freshly-tagged release in a sandbox repo.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.

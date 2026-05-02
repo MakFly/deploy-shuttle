@@ -31,28 +31,57 @@ func RunWithConfig(adapter execx.Adapter, target string, profile []string, cfg C
 	checks := []Check{
 		checkOSSupported,
 		checkDiskSpace,
+		checkUpdatesPending,
+		checkMemoryLow,
 		checkDockerInstalled,
 		checkDockerServiceEnabled,
 		checkDockerRestartPolicies,
 		checkDockerHealthchecks,
 		checkDockerRunningAsRoot,
 		checkDockerSockExposed,
+		checkDockerPublishedSensitivePorts,
 		checkUFWActive,
 		checkDatabasePorts,
 		checkEnvWorldReadable,
 		checkEnvTracked,
+		checkSecretsWeakPermissions,
 		checkCaddyInstalled,
 		checkCaddyAdminExposed,
+		checkCaddySecurityHeaders,
+		checkCaddyConfigValid,
 		checkAdminerRestricted,
 		checkSSHRootLogin,
 		checkSSHPasswordAuth,
+		checkSSHPortDefault,
 		checkUnattendedUpgrades,
 		checkFail2ban,
 		checkSwap,
 		checkTimeSync,
+		checkTLSCertificate(cfg.App.Domain),
+		checkHSTSHeader(cfg.App.Domain),
+		checkDNSPointsToServer(cfg.App.Domain),
+		checkHealthEndpoint(cfg.App.Domain, cfg.App.HealthcheckPath),
+		checkDatabaseBackup,
 	}
 	results := make([]CheckResult, 0, len(checks))
 	for _, check := range checks {
+		results = append(results, applyConfig(check(adapter), cfg))
+	}
+	composeSnap := loadCompose(adapter)
+	results = append(results,
+		applyConfig(checkComposeMissingProdFile(composeSnap), cfg),
+		applyConfig(checkComposeEnvFileMissing(adapter, composeSnap), cfg),
+		applyConfig(checkComposeLatestTag(composeSnap), cfg),
+		applyConfig(checkComposeNoResourceLimits(composeSnap), cfg),
+		applyConfig(checkComposeBindMountSensitivePaths(composeSnap), cfg),
+	)
+	var cfClient *CloudflareClient
+	if cfg.Cloudflare.Enabled {
+		if token := ResolveCloudflareToken(cfg.Cloudflare); token != "" {
+			cfClient = newCloudflareClient(token)
+		}
+	}
+	for _, check := range cloudflareChecks(cfg.Cloudflare, cfg.App.Domain, cfClient) {
 		results = append(results, applyConfig(check(adapter), cfg))
 	}
 	score := Score(results)

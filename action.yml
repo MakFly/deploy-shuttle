@@ -1,0 +1,139 @@
+name: 'DeployShuttle Doctor'
+description: 'Run a VPS production-readiness audit and gate the workflow on a minimum score.'
+author: 'MakFly'
+branding:
+  icon: 'shield'
+  color: 'green'
+
+inputs:
+  target:
+    description: 'SSH target as user@host or user@host:port. Omit to scan the runner itself.'
+    required: false
+    default: ''
+  config:
+    description: 'Path to a .deployshuttle.yml readiness config.'
+    required: false
+    default: ''
+  fail-below:
+    description: 'Fail the job when the readiness score is strictly below this threshold (0-100).'
+    required: false
+    default: '75'
+  output:
+    description: 'Where to write the JSON report. Defaults to .deployshuttle/latest-report.json.'
+    required: false
+    default: '.deployshuttle/latest-report.json'
+  ssh-private-key:
+    description: 'Optional SSH private key (PEM) to use when scanning a remote target.'
+    required: false
+    default: ''
+  ssh-known-hosts:
+    description: 'Optional known_hosts content. When omitted and a target is set, the host key is appended via ssh-keyscan.'
+    required: false
+    default: ''
+  version:
+    description: 'deploy-shuttle version to install. Defaults to latest.'
+    required: false
+    default: 'latest'
+
+outputs:
+  score:
+    description: 'Readiness score from 0 to 100.'
+    value: ${{ steps.doctor.outputs.score }}
+  level:
+    description: 'Readiness level: production-ready | almost-ready | risky | not-ready.'
+    value: ${{ steps.doctor.outputs.level }}
+  report:
+    description: 'Path to the JSON report.'
+    value: ${{ steps.doctor.outputs.report }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install deploy-shuttle
+      shell: bash
+      env:
+        DEPLOY_SHUTTLE_VERSION: ${{ inputs.version }}
+        # Install into a directory we know is on the runner's PATH so the
+        # binary is reachable from subsequent composite steps (and from the
+        # caller's later workflow steps).
+        DEPLOY_SHUTTLE_INSTALL_DIR: /usr/local/bin
+      run: |
+        set -euo pipefail
+        # On GitHub-hosted runners the user is non-root but has passwordless
+        # sudo. Self-hosted runners may already be root.
+        if [ "$(id -u)" -eq 0 ]; then
+          curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | bash
+        else
+          curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh \
+            | DEPLOY_SHUTTLE_INSTALL_DIR=/tmp/deploy-shuttle-bin bash
+          sudo install -m 0755 /tmp/deploy-shuttle-bin/deploy-shuttle /usr/local/bin/deploy-shuttle
+        fi
+        deploy-shuttle --version
+
+    - name: Configure SSH
+      if: inputs.target != ''
+      shell: bash
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        SSH_KNOWN_HOSTS: ${{ inputs.ssh-known-hosts }}
+        TARGET: ${{ inputs.target }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$HOME/.ssh"
+        chmod 700 "$HOME/.ssh"
+        if [ -n "$SSH_PRIVATE_KEY" ]; then
+          umask 077
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/id_deployshuttle"
+          chmod 600 "$HOME/.ssh/id_deployshuttle"
+          eval "$(ssh-agent -s)"
+          ssh-add "$HOME/.ssh/id_deployshuttle"
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+        fi
+        if [ -n "$SSH_KNOWN_HOSTS" ]; then
+          printf '%s\n' "$SSH_KNOWN_HOSTS" >> "$HOME/.ssh/known_hosts"
+        else
+          host_with_port="${TARGET#*@}"
+          host="${host_with_port%%:*}"
+          port="22"
+          case "$host_with_port" in
+            *:*) port="${host_with_port##*:}" ;;
+          esac
+          ssh-keyscan -p "$port" -H "$host" >> "$HOME/.ssh/known_hosts" 2>/dev/null || true
+        fi
+        chmod 600 "$HOME/.ssh/known_hosts"
+
+    - name: Run doctor
+      id: doctor
+      shell: bash
+      env:
+        TARGET: ${{ inputs.target }}
+        CONFIG: ${{ inputs.config }}
+        FAIL_BELOW: ${{ inputs.fail-below }}
+        OUTPUT: ${{ inputs.output }}
+      run: |
+        set -euo pipefail
+        mkdir -p "$(dirname "$OUTPUT")"
+        args=(doctor --format json --output "$OUTPUT" --fail-below "$FAIL_BELOW")
+        if [ -n "$TARGET" ]; then args+=(--target "$TARGET"); fi
+        if [ -n "$CONFIG" ]; then args+=(--config "$CONFIG"); fi
+        # Capture exit code so we can still expose outputs on failure.
+        set +e
+        deploy-shuttle "${args[@]}"
+        rc=$?
+        set -e
+        if [ ! -s "$OUTPUT" ]; then
+          echo "::error::deploy-shuttle did not produce a report at $OUTPUT"
+          exit "${rc:-1}"
+        fi
+        score=$(jq -r '.score // 0' "$OUTPUT")
+        level=$(jq -r '.level // "unknown"' "$OUTPUT")
+        echo "score=${score:-0}" >> "$GITHUB_OUTPUT"
+        echo "level=${level:-unknown}" >> "$GITHUB_OUTPUT"
+        echo "report=$OUTPUT" >> "$GITHUB_OUTPUT"
+        echo "## DeployShuttle Doctor" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Score: **${score:-0}/100**" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Level: ${level:-unknown}" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Threshold: ${FAIL_BELOW}" >> "$GITHUB_STEP_SUMMARY"
+        exit "${rc:-0}"

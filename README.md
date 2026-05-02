@@ -35,8 +35,10 @@ curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/
 ```
 
 This downloads the latest binary for your OS and architecture into `~/.local/bin`.
-Or download manually from [Releases](https://github.com/MakFly/deploy-shuttle/releases)
-and put it on your `$PATH`.
+Pre-built targets: `linux-x64`, `linux-arm64` (Hetzner CAX, AWS Graviton,
+Raspberry Pi 4/5), `darwin-x64`, `darwin-arm64`. Or download manually from
+[Releases](https://github.com/MakFly/deploy-shuttle/releases) and put it on
+your `$PATH`.
 
 ### Audit a server
 
@@ -106,24 +108,43 @@ reversible. The current safe allow-list is `chmod 600 .env` and `ufw deny <port>
 
 ### CI integration
 
+Use the published GitHub Action:
+
 ```yaml
 # .github/workflows/readiness.yml
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: MakFly/deploy-shuttle@v1
+        with:
+          target: ${{ secrets.SSH_TARGET }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fail-below: '80'
+```
+
+Or call the CLI directly:
+
+```yaml
 - run: deploy-shuttle doctor --target ${{ secrets.SSH_TARGET }} --fail-below 80
 ```
 
 `doctor` exits non-zero on any critical finding, or whenever the score falls below
-the threshold passed to `--fail-below`.
+the threshold passed to `--fail-below`. The Action exposes `score`, `level`, and
+`report` outputs and writes a job summary with the readiness level.
 
 ## Configuration
 
 Drop a `.deployshuttle.yml` at the project root to ignore checks or allow-list workloads:
 
 ```yaml
+app:
+  domain: app.example.com
+  healthcheckPath: /health
 checks:
   profile: [docker, caddy]
   ignore:
-    - id: docker.containers_running_as_root
-      reason: legacy image, scheduled for rebuild
+    - docker.containers_running_as_root
 docker:
   allowRoot:
     - shared_redis
@@ -133,14 +154,48 @@ docker:
     - prod_worker-*
 ```
 
+`app.domain` and `app.healthcheckPath` unlock the TLS and health-endpoint
+checks; without them those probes are skipped cleanly.
+
+Cloudflare guardrails (`cloudflare.*` checks) are gated by an explicit
+opt-in plus an API token:
+
+```yaml
+cloudflare:
+  enabled: true
+  zone: example.com
+  # tokenEnv defaults to CLOUDFLARE_API_TOKEN; override only if needed.
+  tokenEnv: MY_CF_TOKEN
+```
+
+The token needs read scopes on `Zone`, `DNS`, and `Zone Settings`. When the
+token is missing, the zone does not match, or the token is rejected, every
+Cloudflare check skips with a clear explanation instead of failing the score.
+
 The config path lands in every report and JSON output so reviewers can verify which
 exceptions were granted.
 
+### Stack presets
+
+`init --preset` writes an opinionated `.deployshuttle.yml` for common stacks so
+`doctor` produces fewer false positives on day one:
+
+```bash
+deploy-shuttle init --preset nextjs       --domain app.example.com
+deploy-shuttle init --preset laravel      --domain shop.example.com
+deploy-shuttle init --preset node-api     --domain api.example.com
+deploy-shuttle init --preset docker-swarm --domain edge.example.com
+```
+
+Each preset pre-fills `app.healthcheckPath`, the relevant
+`docker.workerServices` patterns, and ignores checks that do not apply to the
+stack (e.g. `adminer.ip_restriction_missing` for Next.js / Node API).
+
 ## Check catalog
 
-21 checks ship today, grouped across system, SSH, Docker, firewall, secrets, and
-reverse-proxy/database categories. Full reference in
-[`docs/check-catalog.md`](docs/check-catalog.md).
+43 checks ship today across system, SSH, Docker, firewall, secrets,
+reverse proxy, TLS, DNS, monitoring, backups, compose, and Cloudflare
+categories. Full reference in [`docs/check-catalog.md`](docs/check-catalog.md).
 
 ## How it works
 

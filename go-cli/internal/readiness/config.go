@@ -9,9 +9,22 @@ import (
 )
 
 type Config struct {
-	Version int          `yaml:"version"`
-	Checks  CheckConfig  `yaml:"checks"`
-	Docker  DockerConfig `yaml:"docker"`
+	Version    int              `yaml:"version"`
+	App        AppConfig        `yaml:"app"`
+	Checks     CheckConfig      `yaml:"checks"`
+	Docker     DockerConfig     `yaml:"docker"`
+	Cloudflare CloudflareConfig `yaml:"cloudflare"`
+}
+
+type CloudflareConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Zone     string `yaml:"zone"`
+	TokenEnv string `yaml:"tokenEnv"`
+}
+
+type AppConfig struct {
+	Domain          string `yaml:"domain"`
+	HealthcheckPath string `yaml:"healthcheckPath"`
 }
 
 type CheckConfig struct {

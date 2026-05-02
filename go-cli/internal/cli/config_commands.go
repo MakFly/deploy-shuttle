@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/config"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/templates"
@@ -58,9 +59,14 @@ func newInitCommand() *cobra.Command {
 	var domain string
 	var host string
 	var user string
+	var preset string
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Generate a shuttle.yml configuration file",
+		Short: "Generate shuttle.yml (and optionally a readiness preset)",
+		Long: "Generate a shuttle.yml deploy config. With --preset <stack>, also " +
+			"emit an opinionated .deployshuttle.yml so 'doctor' produces fewer " +
+			"false positives on day one. Supported presets: " +
+			strings.Join(templates.ReadinessPresets, ", ") + ".",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if app == "" {
 				app = "myapp"
@@ -74,6 +80,9 @@ func newInitCommand() *cobra.Command {
 			if user == "" {
 				user = "deploy"
 			}
+			if preset != "" && !templates.IsReadinessPreset(preset) {
+				return fmt.Errorf("unknown preset %q; supported: %s", preset, strings.Join(templates.ReadinessPresets, ", "))
+			}
 			if _, err := os.Stat("shuttle.yml"); err == nil && !force {
 				return fmt.Errorf("shuttle.yml already exists; use --force to overwrite")
 			}
@@ -83,14 +92,28 @@ func newInitCommand() *cobra.Command {
 			if err := os.WriteFile(filepath.Join(".shuttle", ".gitkeep"), []byte{}, 0o644); err != nil {
 				return err
 			}
-			return os.WriteFile("shuttle.yml", []byte(templates.ShuttleYML(app, domain, host, user)), 0o644)
+			if err := os.WriteFile("shuttle.yml", []byte(templates.ShuttleYML(app, domain, host, user)), 0o644); err != nil {
+				return err
+			}
+			if preset == "" {
+				return nil
+			}
+			if _, err := os.Stat(".deployshuttle.yml"); err == nil && !force {
+				return fmt.Errorf(".deployshuttle.yml already exists; use --force to overwrite")
+			}
+			body := templates.DeployShuttleYML(preset, domain)
+			if body == "" {
+				return fmt.Errorf("preset %q produced an empty config", preset)
+			}
+			return os.WriteFile(".deployshuttle.yml", []byte(body), 0o644)
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing shuttle.yml")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing shuttle.yml or .deployshuttle.yml")
 	cmd.Flags().StringVar(&app, "app", "", "application name")
 	cmd.Flags().StringVar(&domain, "domain", "", "application domain")
 	cmd.Flags().StringVar(&host, "host", "", "server host")
 	cmd.Flags().StringVar(&user, "user", "", "server user")
+	cmd.Flags().StringVar(&preset, "preset", "", "also generate .deployshuttle.yml for the given stack ("+strings.Join(templates.ReadinessPresets, "|")+")")
 	return cmd
 }
 

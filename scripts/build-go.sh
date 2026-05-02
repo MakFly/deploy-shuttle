@@ -36,6 +36,7 @@ build() {
 }
 
 build linux  amd64 deploy-shuttle-linux-x64
+build linux  arm64 deploy-shuttle-linux-arm64
 build darwin arm64 deploy-shuttle-darwin-arm64
 build darwin amd64 deploy-shuttle-darwin-x64
 

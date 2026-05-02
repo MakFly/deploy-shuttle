@@ -55,13 +55,11 @@ esac
 
 # Available release artifacts (see scripts/build-go.sh):
 #   deploy-shuttle-linux-x64
+#   deploy-shuttle-linux-arm64
 #   deploy-shuttle-darwin-x64
 #   deploy-shuttle-darwin-arm64
 case "$os_tag-$arch_tag" in
-  linux-x64|darwin-x64|darwin-arm64) : ;;
-  linux-arm64)
-    err "linux-arm64 binary is not built yet; build from source: 'cd go-cli && go install ./cmd/deploy-shuttle'"
-    ;;
+  linux-x64|linux-arm64|darwin-x64|darwin-arm64) : ;;
   *) err "no prebuilt binary for $os_tag-$arch_tag" ;;
 esac
 

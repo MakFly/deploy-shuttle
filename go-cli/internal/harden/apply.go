@@ -122,8 +122,8 @@ func runChmod(adapter execx.Adapter, args []string) error {
 	if strings.Contains(path, "..") {
 		return fmt.Errorf("chmod target %q must not traverse parent directories", path)
 	}
-	if filepath.Base(path) != ".env" {
-		return fmt.Errorf("chmod target %q must be a .env file", path)
+	if !isAllowedSecretPath(path) {
+		return fmt.Errorf("chmod target %q is not in the allowed secret-file patterns (.env*, *.pem, *.key, id_rsa, id_ed25519)", path)
 	}
 	probe := adapter.Run("test -f "+shellQuote(path), 5*time.Second)
 	if probe.ExitCode != 0 {
@@ -138,6 +138,20 @@ func runChmod(adapter execx.Adapter, args []string) error {
 		return fmt.Errorf("chmod failed: %s", stderr)
 	}
 	return nil
+}
+
+func isAllowedSecretPath(path string) bool {
+	base := filepath.Base(path)
+	if base == ".env" || base == "id_rsa" || base == "id_ed25519" {
+		return true
+	}
+	if strings.HasPrefix(base, ".env") {
+		return true
+	}
+	if strings.HasSuffix(base, ".pem") || strings.HasSuffix(base, ".key") {
+		return true
+	}
+	return false
 }
 
 func shellQuote(value string) string {
