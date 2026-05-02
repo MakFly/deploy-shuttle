@@ -17,10 +17,10 @@ type Action struct {
 	Rationale   string   `json:"rationale"`
 	Commands    []string `json:"commands,omitempty"`
 	Notes       []string `json:"notes,omitempty"`
-	// SafeLocalApply is true when Commands are safe to run automatically on
-	// the local machine without further interaction (idempotent, scoped,
-	// non-destructive). Only these actions are eligible for `harden --apply`.
-	SafeLocalApply bool `json:"safeLocalApply,omitempty"`
+	// SafeAutoApply is true when Commands are safe to run automatically
+	// (idempotent, scoped, reversible). Only these actions are eligible
+	// for `harden --apply`. The same flag governs local and SSH execution.
+	SafeAutoApply bool `json:"safeAutoApply,omitempty"`
 }
 
 type Plan struct {
@@ -84,26 +84,28 @@ func actionsFor(check readiness.CheckResult) []Action {
 			"Prefer binding databases to 127.0.0.1 or a private Docker network instead of 0.0.0.0.",
 			"If remote DB access is required, allow only known admin IPs explicitly.",
 		}
+		safe := len(commands) > 0
 		return []Action{{
-			ID:          "firewall.lock-db-ports",
-			Title:       "Restrict public database ports",
-			Category:    "firewall",
-			SourceCheck: check.ID,
-			Severity:    string(check.Severity),
-			Rationale:   "Database ports are publicly reachable or publicly allowed; close them or restrict to trusted IPs.",
-			Commands:    commands,
-			Notes:       notes,
+			ID:            "firewall.lock-db-ports",
+			Title:         "Restrict public database ports",
+			Category:      "firewall",
+			SourceCheck:   check.ID,
+			Severity:      string(check.Severity),
+			Rationale:     "Database ports are publicly reachable or publicly allowed; close them or restrict to trusted IPs.",
+			Commands:      commands,
+			Notes:         notes,
+			SafeAutoApply: safe,
 		}}
 	case "secrets.env_world_readable":
 		return []Action{{
-			ID:             "secrets.tighten-env-perms",
-			Title:          "Tighten .env file permissions",
-			Category:       "secrets",
-			SourceCheck:    check.ID,
-			Severity:       string(check.Severity),
-			Rationale:      ".env contains production secrets and must not be world-readable.",
-			Commands:       []string{"chmod 600 .env"},
-			SafeLocalApply: true,
+			ID:            "secrets.tighten-env-perms",
+			Title:         "Tighten .env file permissions",
+			Category:      "secrets",
+			SourceCheck:   check.ID,
+			Severity:      string(check.Severity),
+			Rationale:     ".env contains production secrets and must not be world-readable.",
+			Commands:      []string{"chmod 600 .env"},
+			SafeAutoApply: true,
 		}}
 	case "caddy.admin_exposed":
 		return []Action{{

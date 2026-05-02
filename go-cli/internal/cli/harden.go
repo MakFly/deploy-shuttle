@@ -72,7 +72,7 @@ func newHardenCommand() *cobra.Command {
 			// Apply path.
 			safeCount := 0
 			for _, action := range plan.Actions {
-				if action.SafeLocalApply {
+				if action.SafeAutoApply {
 					safeCount++
 				}
 			}
