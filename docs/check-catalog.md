@@ -1,6 +1,6 @@
 # Check Catalog
 
-DeployShuttle ships **15 production-readiness checks** out of the box.
+DeployShuttle ships **21 production-readiness checks** out of the box.
 Every finding includes a severity, a one-line summary, and a remediation hint.
 Checks run identically over a local shell or an SSH session (`doctor --target user@host`).
 
@@ -22,6 +22,17 @@ Use [`.deployshuttle.yml`](../README.md#configuration) to ignore findings or all
 | --- | --- | --- |
 | `system.os_supported` | high | Host runs Ubuntu 22.04, Ubuntu 24.04, or Debian 12. |
 | `system.disk_space_low` | medium / high | Root filesystem free space is comfortable. Fails high above 90% usage. |
+| `system.unattended_upgrades_inactive` | medium | `unattended-upgrades` package is installed and the service is enabled. |
+| `system.fail2ban_inactive` | medium | `fail2ban` is installed and active to throttle SSH brute-force attempts. |
+| `system.swap_missing` | low | At least one swap device or file is configured. |
+| `system.time_sync_inactive` | medium | A time synchronization daemon (`systemd-timesyncd`, `chrony`, `ntp`) is active. |
+
+## SSH
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `ssh.root_login_enabled` | high | `PermitRootLogin` is `no` or `prohibit-password` in `/etc/ssh/sshd_config`. |
+| `ssh.password_auth_enabled` | high | `PasswordAuthentication` is `no` so only key-based logins are accepted. |
 
 ## Docker
 

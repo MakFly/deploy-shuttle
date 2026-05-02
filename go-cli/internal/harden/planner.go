@@ -191,6 +191,86 @@ func actionsFor(check readiness.CheckResult) []Action {
 			Rationale:   "Workloads without a restart policy will not recover from crashes or reboots.",
 			Notes:       notes,
 		}}
+	case "ssh.root_login_enabled":
+		return []Action{{
+			ID:          "ssh.disable-root-login",
+			Title:       "Disable SSH root password login",
+			Category:    "ssh",
+			SourceCheck: check.ID,
+			Severity:    string(check.Severity),
+			Rationale:   "PermitRootLogin yes accepts root password authentication, the most common credential-stuffing target.",
+			Notes: []string{
+				"Edit /etc/ssh/sshd_config to set 'PermitRootLogin prohibit-password' (or 'no' if you do not need root over SSH at all).",
+				"Validate the new config with 'sshd -t' before reloading: 'systemctl reload sshd'.",
+				"Make sure key-based admin access works in another terminal before disconnecting the current session.",
+			},
+		}}
+	case "ssh.password_auth_enabled":
+		return []Action{{
+			ID:          "ssh.disable-password-auth",
+			Title:       "Require SSH key authentication",
+			Category:    "ssh",
+			SourceCheck: check.ID,
+			Severity:    string(check.Severity),
+			Rationale:   "PasswordAuthentication yes lets attackers brute-force any account; key-based logins eliminate that surface.",
+			Notes: []string{
+				"Confirm every operator's authorized_keys entry works before disabling passwords.",
+				"Set 'PasswordAuthentication no' (and check 'KbdInteractiveAuthentication no') in /etc/ssh/sshd_config.",
+				"Run 'sshd -t' then 'systemctl reload sshd'.",
+			},
+		}}
+	case "system.unattended_upgrades_inactive":
+		return []Action{{
+			ID:          "system.enable-unattended-upgrades",
+			Title:       "Enable automatic security updates",
+			Category:    "system",
+			SourceCheck: check.ID,
+			Severity:    string(check.Severity),
+			Rationale:   "Without unattended-upgrades, the host accumulates known security CVEs between manual maintenance windows.",
+			Notes: []string{
+				"Debian/Ubuntu: 'apt install unattended-upgrades' then 'dpkg-reconfigure -plow unattended-upgrades'.",
+				"Verify '/etc/apt/apt.conf.d/20auto-upgrades' has 'Unattended-Upgrade::Allowed-Origins' covering the security suite.",
+			},
+		}}
+	case "system.fail2ban_inactive":
+		return []Action{{
+			ID:          "system.enable-fail2ban",
+			Title:       "Enable fail2ban",
+			Category:    "system",
+			SourceCheck: check.ID,
+			Severity:    string(check.Severity),
+			Rationale:   "fail2ban throttles SSH brute-force attacks and can be tuned to protect Caddy/Nginx logins as well.",
+			Notes: []string{
+				"Install and enable: 'apt install fail2ban && systemctl enable --now fail2ban'.",
+				"Confirm the sshd jail is active: 'fail2ban-client status sshd'.",
+			},
+		}}
+	case "system.swap_missing":
+		return []Action{{
+			ID:          "system.add-swap",
+			Title:       "Add a swap file",
+			Category:    "system",
+			SourceCheck: check.ID,
+			Severity:    string(check.Severity),
+			Rationale:   "On small VPS, a swap file lets the kernel reclaim memory before OOM-killing production workloads.",
+			Notes: []string{
+				"Create a 1-2 GB swap file: 'fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile'.",
+				"Persist by adding '/swapfile none swap sw 0 0' to /etc/fstab.",
+			},
+		}}
+	case "system.time_sync_inactive":
+		return []Action{{
+			ID:          "system.enable-time-sync",
+			Title:       "Enable time synchronization",
+			Category:    "system",
+			SourceCheck: check.ID,
+			Severity:    string(check.Severity),
+			Rationale:   "Drifting clocks break TLS handshakes, log correlation, and rate-limited APIs.",
+			Notes: []string{
+				"Easiest path on Debian/Ubuntu: 'systemctl enable --now systemd-timesyncd'.",
+				"Verify with 'timedatectl status' (System clock synchronized: yes).",
+			},
+		}}
 	case "adminer.ip_restriction_missing":
 		return []Action{{
 			ID:          "adminer.lock-down",
