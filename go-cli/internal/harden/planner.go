@@ -17,6 +17,10 @@ type Action struct {
 	Rationale   string   `json:"rationale"`
 	Commands    []string `json:"commands,omitempty"`
 	Notes       []string `json:"notes,omitempty"`
+	// SafeLocalApply is true when Commands are safe to run automatically on
+	// the local machine without further interaction (idempotent, scoped,
+	// non-destructive). Only these actions are eligible for `harden --apply`.
+	SafeLocalApply bool `json:"safeLocalApply,omitempty"`
 }
 
 type Plan struct {
@@ -92,13 +96,14 @@ func actionsFor(check readiness.CheckResult) []Action {
 		}}
 	case "secrets.env_world_readable":
 		return []Action{{
-			ID:          "secrets.tighten-env-perms",
-			Title:       "Tighten .env file permissions",
-			Category:    "secrets",
-			SourceCheck: check.ID,
-			Severity:    string(check.Severity),
-			Rationale:   ".env contains production secrets and must not be world-readable.",
-			Commands:    []string{"chmod 600 .env"},
+			ID:             "secrets.tighten-env-perms",
+			Title:          "Tighten .env file permissions",
+			Category:       "secrets",
+			SourceCheck:    check.ID,
+			Severity:       string(check.Severity),
+			Rationale:      ".env contains production secrets and must not be world-readable.",
+			Commands:       []string{"chmod 600 .env"},
+			SafeLocalApply: true,
 		}}
 	case "caddy.admin_exposed":
 		return []Action{{
