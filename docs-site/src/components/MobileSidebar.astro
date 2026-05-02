@@ -1,0 +1,29 @@
+---
+import Sidebar from "./Sidebar.astro";
+---
+<div
+  data-mobile-sidebar
+  hidden
+  class="fixed inset-0 z-50 md:hidden"
+>
+  <button
+    type="button"
+    data-mobile-overlay
+    aria-label="Close menu"
+    class="absolute inset-0 bg-background/70 backdrop-blur"
+  ></button>
+  <aside class="absolute left-0 top-0 h-full w-72 max-w-[80vw] overflow-y-auto border-r border-border bg-background p-6 shadow-xl">
+    <Sidebar />
+  </aside>
+</div>
+
+<script is:inline>
+  document.addEventListener("click", (e) => {
+    const open = e.target.closest("[data-mobile-toggle]");
+    const close = e.target.closest("[data-mobile-overlay]");
+    const sidebar = document.querySelector("[data-mobile-sidebar]");
+    if (!sidebar) return;
+    if (open) sidebar.hidden = false;
+    if (close) sidebar.hidden = true;
+  });
+</script>

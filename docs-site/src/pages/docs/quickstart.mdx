@@ -1,0 +1,95 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "Quickstart"
+description: "Scan a server, generate a report, preview a hardening plan in 90 seconds."
+---
+
+This walkthrough assumes you have SSH access to a VPS as `root` (or a
+sudo-enabled user) and `deploy-shuttle` installed locally. If not, see
+[Install](/docs/install).
+
+## 1. Scan your server
+
+```bash
+deploy-shuttle doctor --target root@your-server
+```
+
+The command opens an SSH session, runs the 43 checks, and prints a console
+report grouped by severity. Sample output:
+
+```text
+DeployShuttle Doctor Report
+
+Target: root@203.0.113.10
+Score: 62/100 - Risky
+
+Critical:
+  [x] Public sensitive database listeners detected: 5432
+High:
+  [x] UFW is missing or inactive
+  [x] No recent backup artifacts and no pg_dump cron entry detected
+Medium:
+  [x] sshd defaults to port 22
+
+Next:
+  deploy-shuttle harden --target root@203.0.113.10 --dry-run
+```
+
+`doctor` exits with code `0` for a clean run, `1` for any critical
+finding, or whatever you set with `--fail-below`. Use `--fail-below 80` in
+CI to block merges when the score drops.
+
+## 2. Persist the report
+
+```bash
+deploy-shuttle doctor --target root@your-server \
+  --output .deployshuttle/latest-report.json
+```
+
+Subsequent commands (`harden`, `report`) read this file by default.
+
+## 3. Preview a hardening plan
+
+```bash
+deploy-shuttle harden --target root@your-server --dry-run
+```
+
+Each finding becomes an action: a rationale, a few shell commands or
+notes, and a flag that says whether it can be auto-applied safely.
+Auto-apply is opt-in via `--apply --yes` and limited to:
+
+- `chmod 600` on env / pem / key files,
+- `ufw deny <port>/tcp` for sensitive database ports.
+
+Everything else stays as notes you copy yourself.
+
+## 4. Generate a client-facing report
+
+```bash
+deploy-shuttle report --format markdown --output report.md
+```
+
+Markdown is free. The HTML and PDF formats are part of the Pro tier;
+they include an executive summary, accepted-risk section, and (PDF) a
+white-label-ready cover. See [Pricing](/pricing).
+
+## 5. Wire it into CI
+
+```yaml
+- uses: MakFly/deploy-shuttle@v1
+  with:
+    target: ${{ secrets.SSH_TARGET }}
+    ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    fail-below: '80'
+```
+
+The Action exposes `score`, `level`, and `report` outputs and writes a
+job summary. See [GitHub Action](/docs/github-action) for the full
+input/output reference.
+
+## Next
+
+- Tune `.deployshuttle.yml` to mute stack-specific noise:
+  [Configuration](/docs/config).
+- Drill into individual commands in the [Commands](/docs/commands)
+  section.

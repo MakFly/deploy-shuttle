@@ -1,0 +1,33 @@
+---
+const year = new Date().getFullYear();
+---
+<footer class="mt-24 border-t border-border">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 grid gap-8 sm:grid-cols-3 text-sm">
+    <div>
+      <p class="font-semibold mb-3">DeployShuttle</p>
+      <p class="text-muted-foreground">VPS production-readiness CLI for Docker apps.</p>
+    </div>
+    <div>
+      <p class="font-semibold mb-3">Resources</p>
+      <ul class="space-y-2 text-muted-foreground">
+        <li><a href="/docs/quickstart" class="hover:text-foreground">Quickstart</a></li>
+        <li><a href="/docs/checks" class="hover:text-foreground">Check catalog</a></li>
+        <li><a href="/docs/github-action" class="hover:text-foreground">GitHub Action</a></li>
+      </ul>
+    </div>
+    <div>
+      <p class="font-semibold mb-3">Project</p>
+      <ul class="space-y-2 text-muted-foreground">
+        <li><a href="https://github.com/MakFly/deploy-shuttle" class="hover:text-foreground" target="_blank" rel="noreferrer">GitHub</a></li>
+        <li><a href="https://github.com/MakFly/deploy-shuttle/releases" class="hover:text-foreground" target="_blank" rel="noreferrer">Releases</a></li>
+        <li><a href="/pricing" class="hover:text-foreground">Pricing</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="border-t border-border">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between text-xs text-muted-foreground">
+      <span>© {year} MakFly. Open-core.</span>
+      <span>Made with Astro & shadcn.</span>
+    </div>
+  </div>
+</footer>

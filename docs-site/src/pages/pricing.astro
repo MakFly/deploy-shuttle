@@ -1,0 +1,185 @@
+---
+import Root from "@/layouts/Root.astro";
+
+type Tier = {
+  name: string;
+  price: string;
+  cadence?: string;
+  blurb: string;
+  cta: { label: string; href: string };
+  highlight?: boolean;
+  features: string[];
+};
+
+// Stripe Payment Links go here once created. Use placeholders meanwhile.
+const tiers: Tier[] = [
+  {
+    name: "Free",
+    price: "0 EUR",
+    blurb: "The CLI that scans, scores, and tells you what to fix. No account.",
+    cta: { label: "Install", href: "/docs/install" },
+    features: [
+      "doctor (local + --target over SSH)",
+      "All 43 production-readiness checks",
+      "harden --dry-run (review every fix)",
+      "Console + Markdown reports",
+      "init --preset (4 stacks)",
+      "GitHub Action integration",
+      "linux-x64 + arm64, macOS x64 + arm64",
+    ],
+  },
+  {
+    name: "Pro",
+    price: "29 EUR",
+    cadence: "/ month",
+    blurb: "For freelances who hand off to clients. Hosted reports + safe auto-apply.",
+    cta: { label: "Upgrade to Pro", href: "https://buy.stripe.com/PLACEHOLDER" },
+    highlight: true,
+    features: [
+      "Everything in Free",
+      "HTML report (executive summary, accepted-risk section)",
+      "harden --apply (chmod 600, ufw deny — allow-listed only)",
+      "Hosted shareable report links (coming with cloud)",
+      "Email support",
+    ],
+  },
+  {
+    name: "Agency",
+    price: "99 EUR",
+    cadence: "/ month",
+    blurb: "For agencies running client VPS at scale. White-label PDFs + workspaces.",
+    cta: { label: "Upgrade to Agency", href: "https://buy.stripe.com/PLACEHOLDER" },
+    features: [
+      "Everything in Pro",
+      "PDF report (white-label cover)",
+      "Multi-server inventory (coming)",
+      "Client workspaces (coming)",
+      "Scheduled scans + email alerts (coming)",
+      "Priority support",
+    ],
+  },
+];
+
+const earlyBird = {
+  title: "Lifetime Early Bird",
+  blurb:
+    "First 50 supporters get DeployShuttle Pro for life. Helps fund the cloud dashboard build.",
+  price: "199 EUR",
+  cadence: "one-time",
+  cta: { label: "Claim a slot", href: "https://buy.stripe.com/PLACEHOLDER-LIFETIME" },
+};
+
+const oneShot = {
+  title: "Production Readiness Audit",
+  blurb:
+    "I personally run doctor + harden against your VPS, write a 1-pager with the prioritized fixes, and send it back within 48 hours.",
+  price: "99 EUR",
+  cadence: "one-shot",
+  cta: { label: "Order an audit", href: "https://buy.stripe.com/PLACEHOLDER-AUDIT" },
+};
+---
+<Root title="Pricing - DeployShuttle">
+  <section class="border-b border-border">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center">
+      <h1 class="text-4xl sm:text-5xl font-bold tracking-tight">Free to scan. Pay for the deliverables.</h1>
+      <p class="mt-4 mx-auto max-w-2xl text-muted-foreground">
+        The CLI is free forever. The hosted reports and the auto-apply
+        on a remote server are how the project funds itself.
+      </p>
+    </div>
+  </section>
+
+  <section class="border-b border-border">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 grid gap-6 md:grid-cols-3">
+      {tiers.map((t) => (
+        <div class:list={[
+          "rounded-xl border p-6 flex flex-col",
+          t.highlight ? "border-foreground/30 ring-1 ring-foreground/10 bg-muted/30" : "border-border",
+        ]}>
+          <div class="flex items-baseline gap-2">
+            <h2 class="text-xl font-semibold">{t.name}</h2>
+            {t.highlight && (
+              <span class="text-xs text-muted-foreground rounded-full border border-border px-2 py-0.5">most popular</span>
+            )}
+          </div>
+          <div class="mt-3 flex items-baseline gap-1">
+            <span class="text-3xl font-bold">{t.price}</span>
+            {t.cadence && <span class="text-sm text-muted-foreground">{t.cadence}</span>}
+          </div>
+          <p class="mt-2 text-sm text-muted-foreground">{t.blurb}</p>
+          <ul class="mt-6 space-y-2 text-sm">
+            {t.features.map((f) => (
+              <li class="flex gap-2">
+                <svg class="h-4 w-4 mt-0.5 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                <span>{f}</span>
+              </li>
+            ))}
+          </ul>
+          <a
+            href={t.cta.href}
+            class:list={[
+              "mt-8 inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors",
+              t.highlight
+                ? "bg-foreground text-background hover:opacity-90"
+                : "border border-border bg-background hover:bg-muted",
+            ]}
+          >
+            {t.cta.label}
+          </a>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="border-b border-border bg-muted/20">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 grid gap-6 md:grid-cols-2">
+      <div class="rounded-xl border border-border p-6 flex flex-col">
+        <p class="text-xs uppercase tracking-wider text-muted-foreground">Limited offer</p>
+        <h3 class="mt-2 text-xl font-semibold">{earlyBird.title}</h3>
+        <p class="mt-1 text-sm text-muted-foreground">{earlyBird.blurb}</p>
+        <p class="mt-4 text-2xl font-bold">{earlyBird.price} <span class="text-sm font-normal text-muted-foreground">{earlyBird.cadence}</span></p>
+        <a href={earlyBird.cta.href} class="mt-6 inline-flex h-10 items-center justify-center rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90 transition-opacity">{earlyBird.cta.label}</a>
+      </div>
+      <div class="rounded-xl border border-border p-6 flex flex-col">
+        <p class="text-xs uppercase tracking-wider text-muted-foreground">Done-for-you</p>
+        <h3 class="mt-2 text-xl font-semibold">{oneShot.title}</h3>
+        <p class="mt-1 text-sm text-muted-foreground">{oneShot.blurb}</p>
+        <p class="mt-4 text-2xl font-bold">{oneShot.price} <span class="text-sm font-normal text-muted-foreground">{oneShot.cadence}</span></p>
+        <a href={oneShot.cta.href} class="mt-6 inline-flex h-10 items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium hover:bg-muted transition-colors">{oneShot.cta.label}</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16">
+      <h2 class="text-2xl font-bold tracking-tight">Frequently asked</h2>
+      <dl class="mt-8 space-y-6">
+        <div>
+          <dt class="font-medium">Is the CLI really free?</dt>
+          <dd class="mt-1 text-sm text-muted-foreground">
+            Yes. Local doctor, doctor --target over SSH, the harden dry-run,
+            init presets, the Markdown report, and the GitHub Action are all
+            free. Pro gates only the deliverables (HTML / PDF) and the
+            destructive remote auto-apply.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium">Can I run Pro on multiple machines?</dt>
+          <dd class="mt-1 text-sm text-muted-foreground">
+            Yes. A Pro license activates one machine fingerprint at a time;
+            you can deactivate and re-activate without limits.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium">Where are my secrets stored?</dt>
+          <dd class="mt-1 text-sm text-muted-foreground">
+            The license token lives at ~/.deployshuttle/license.json (mode
+            0600). The Cloudflare API token is read from an environment
+            variable and never touched by disk. doctor scans run over SSH
+            with your normal agent; we do not exfiltrate anything.
+          </dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+</Root>

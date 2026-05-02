@@ -1,0 +1,89 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "GitHub Action"
+description: "Use MakFly/deploy-shuttle@v1 to gate your pipeline on a readiness threshold."
+---
+
+The Action is a thin wrapper around the CLI: it installs the binary,
+sets up SSH if you target a remote host, runs `doctor`, and exposes the
+score / level / report path as outputs.
+
+## Minimal usage
+
+```yaml
+- uses: MakFly/deploy-shuttle@v1
+  with:
+    target: ${{ secrets.SSH_TARGET }}
+    ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+    fail-below: '80'
+```
+
+## Inputs
+
+| Input | Default | Description |
+| --- | --- | --- |
+| `target` | `''` (local) | SSH target as `user@host[:port]`. Omit to scan the runner itself. |
+| `config` | `''` | Path to a `.deployshuttle.yml`. |
+| `fail-below` | `'75'` | Fail the job when the score drops strictly below this. |
+| `output` | `.deployshuttle/latest-report.json` | Where to write the JSON report. |
+| `ssh-private-key` | `''` | PEM-encoded SSH private key. |
+| `ssh-known-hosts` | `''` | known_hosts content. When omitted with a target, the Action runs `ssh-keyscan` automatically. |
+| `version` | `latest` | deploy-shuttle version to install. Pin to `v1.0.1` for reproducible runs. |
+
+## Outputs
+
+| Output | Description |
+| --- | --- |
+| `score` | Readiness score from 0 to 100. |
+| `level` | One of `production-ready`, `almost-ready`, `risky`, `not-ready`. |
+| `report` | Path to the JSON report inside the runner. |
+
+## Full example with artifact upload
+
+```yaml
+name: Production readiness
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 7 * * 1' # Monday 07:00 UTC
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run DeployShuttle Doctor
+        id: doctor
+        uses: MakFly/deploy-shuttle@v1
+        with:
+          target: ${{ secrets.SSH_TARGET }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fail-below: '80'
+          version: 'v1.0.1'
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: readiness-report
+          path: ${{ steps.doctor.outputs.report }}
+```
+
+## Where the binary is installed
+
+The Action installs `/usr/local/bin/deploy-shuttle` (using passwordless
+`sudo` on GitHub-hosted runners). Subsequent steps in the same job can
+invoke `deploy-shuttle` directly without resolving its path.
+
+## Self-hosted runners
+
+The Action assumes:
+
+- `bash`, `curl`, `jq` available.
+- `sudo` (passwordless or root user).
+
+Both are true for stock GitHub-hosted runners. On self-hosted, install
+`jq` and ensure `sudo` is configured if running as a non-root user.

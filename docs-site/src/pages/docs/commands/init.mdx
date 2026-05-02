@@ -1,0 +1,55 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "init"
+description: "Generate a shuttle.yml deploy config and an opinionated readiness preset."
+---
+
+`init` produces the deploy config (`shuttle.yml`) and, when `--preset` is
+supplied, an opinionated `.deployshuttle.yml` so `doctor` does not flag
+stack-specific noise on day one.
+
+## Usage
+
+```bash
+deploy-shuttle init [flags]
+```
+
+## Flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--app <name>` | `myapp` | Application name written to `shuttle.yml`. |
+| `--domain <host>` | `myapp.example.com` | Public domain. Used by readiness checks (TLS, HSTS, health endpoint). |
+| `--host <ip>` | `203.0.113.10` | Default deploy host. |
+| `--user <name>` | `deploy` | SSH user. |
+| `--preset <name>` | unset | Generate a `.deployshuttle.yml` for the named stack. One of `nextjs`, `laravel`, `node-api`, `docker-swarm`. |
+| `--force` | unset | Overwrite an existing `shuttle.yml` or `.deployshuttle.yml`. |
+
+## Stack presets
+
+Each preset writes a curated readiness config:
+
+- **`nextjs`** — `app.healthcheckPath: /api/health`, ignores
+  `adminer.ip_restriction_missing`.
+- **`laravel`** — `healthcheckPath: /up`, marks `*-queue`, `*-horizon`,
+  `*-scheduler`, `*-worker` as worker services.
+- **`node-api`** — `healthcheckPath: /health`, ignores Adminer.
+- **`docker-swarm`** — Swarm-style worker patterns (`*_worker`,
+  `*_consumer`, `*_scheduler`, `*_cron`), allow-lists `dozzle*` and
+  `portainer_agent*` Docker socket mounts.
+
+## Examples
+
+```bash
+# Generate shuttle.yml only.
+deploy-shuttle init --app shop --domain shop.example.com
+
+# Generate both shuttle.yml and a Laravel-tuned .deployshuttle.yml.
+deploy-shuttle init --preset laravel --domain shop.example.com
+
+# Re-generate, overwriting both files.
+deploy-shuttle init --preset nextjs --force
+```
+
+The output `.deployshuttle.yml` is heavily commented so you can adjust the
+ignore list and worker patterns to your container naming.

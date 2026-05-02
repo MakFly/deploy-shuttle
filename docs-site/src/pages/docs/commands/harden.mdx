@@ -1,0 +1,88 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "harden"
+description: "Generate a remediation plan from doctor findings; optionally apply the safe ones."
+---
+
+`harden` reads a `doctor` JSON report and emits one Action per finding.
+Each Action ships with a rationale, a few shell commands or notes, and a
+`safeAutoApply` flag.
+
+`--dry-run` is the default; nothing is mutated. `--apply` runs only the
+allow-listed Actions and refuses anything else, even if you ask nicely.
+
+## Usage
+
+```bash
+deploy-shuttle harden [--dry-run | --apply [--yes]] [flags]
+```
+
+Exactly one of `--dry-run` and `--apply` must be set.
+
+## Flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--dry-run` | required (mutually exclusive with `--apply`) | Print the plan; mutate nothing. |
+| `--apply` | required (mutually exclusive with `--dry-run`) | Apply only safe-auto-apply Actions. |
+| `--yes` | unset | Confirm `--apply` non-interactively. Required in CI. |
+| `--input <path>` | `.deployshuttle/latest-report.json` | doctor JSON to read from. |
+| `--target <user@host[:port]>` | unset (local apply) | Remote target for `--apply`. Local-only without it. |
+| `--only <list>` | unset | Comma-separated category list, e.g. `firewall,secrets`. |
+| `--format console\|json` | `console` | `json` is meant for downstream tooling. |
+
+## Examples
+
+```bash
+# Preview the plan from the latest local doctor scan.
+deploy-shuttle harden --dry-run
+
+# Preview from a specific report.
+deploy-shuttle harden --dry-run --input report.json --format json
+
+# Apply the safe Actions over SSH.
+deploy-shuttle harden --apply --target root@server --yes
+```
+
+## Safe auto-apply allow-list
+
+In v1.0.1, exactly two Action families are runnable through `--apply`:
+
+1. **`secrets.tighten-secret-perms`** — `chmod 600 <file>` for files
+   matching `.env*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519` inside the
+   project tree.
+2. **`firewall.lock-db-ports`** — `ufw deny <port>/tcp` for sensitive DB
+   ports (5432, 3306, 6379, 7700, 9200, 27017, 2019).
+
+Anything else (compose edits, Caddyfile patches, ACME debugging, sshd
+config) is intentionally notes-only. The CLI will not silently rewrite a
+config file behind your back.
+
+## What a plan looks like
+
+```text
+DeployShuttle harden plan (dry-run)
+
+[secrets] secrets.tighten-secret-perms (high) [SAFE-AUTO-APPLY]
+  Tighten permissions on env / key / pem files.
+  Why: secret files must not be world-readable.
+  Commands:
+    chmod 600 .env.production
+    chmod 600 certs/server.key
+
+[firewall] firewall.lock-db-ports (high) [SAFE-AUTO-APPLY]
+  Restrict public database ports.
+  Commands:
+    ufw deny 5432/tcp
+
+[caddy] caddy.add-security-headers (medium)
+  Add baseline security headers to Caddyfile.
+  Notes:
+    - Add a global header block setting Strict-Transport-Security ...
+    - Reload: caddy reload --config /etc/caddy/Caddyfile.
+```
+
+## Tier
+
+`harden --dry-run` is **free**. `harden --apply` is **Pro** because it
+mutates the target server.

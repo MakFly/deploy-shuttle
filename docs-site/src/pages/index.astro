@@ -1,0 +1,128 @@
+---
+import Root from "@/layouts/Root.astro";
+const installCmd = "curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh";
+const features = [
+  {
+    title: "43 production-readiness checks",
+    body: "System, SSH, Docker, firewall, secrets, reverse proxy, TLS, DNS, monitoring, backups, compose and Cloudflare. Every finding ships with a remediation.",
+  },
+  {
+    title: "Deterministic 0-100 score",
+    body: "Critical / high / medium / low / info severities with a stable scoring model. --fail-below threshold makes doctor a CI gate, not just a console toy.",
+  },
+  {
+    title: "Safe harden plan, dry-run by default",
+    body: "Every fix is reviewable before it runs. Only chmod 600 .env and ufw deny <port>/tcp are auto-applied; everything else surfaces commands you copy yourself.",
+  },
+  {
+    title: "Stack presets",
+    body: "deploy-shuttle init --preset {nextjs,laravel,node-api,docker-swarm} writes a .deployshuttle.yml that mutes stack-specific noise on day one.",
+  },
+  {
+    title: "GitHub Action ready",
+    body: "Drop MakFly/deploy-shuttle@v1 into your workflow, point at a server, gate the pipeline on a readiness threshold.",
+  },
+  {
+    title: "Cross-platform binaries",
+    body: "linux-x64, linux-arm64 (Hetzner CAX, AWS Graviton), darwin-x64, darwin-arm64. One install script handles everything.",
+  },
+];
+---
+<Root>
+  <!-- Hero -->
+  <section class="relative overflow-hidden border-b border-border">
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10">
+      <div class="absolute left-1/2 top-0 -translate-x-1/2 h-[36rem] w-[64rem] bg-[radial-gradient(closest-side,rgba(120,120,120,.18),transparent)]"></div>
+    </div>
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-24 sm:py-28 text-center">
+      <p class="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
+        <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+        v1.0.1 - 43 checks shipped
+      </p>
+      <h1 class="mt-6 text-4xl sm:text-6xl font-bold tracking-tight">
+        Audit, harden and deploy<br class="hidden sm:block" />
+        <span class="text-muted-foreground">Docker apps on VPS.</span>
+      </h1>
+      <p class="mt-5 mx-auto max-w-2xl text-lg text-muted-foreground">
+        DeployShuttle is a CLI-first production-readiness tool. One command,
+        a deterministic score, and a clear remediation plan before your client
+        finds out the firewall was off.
+      </p>
+      <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <a href="/docs/quickstart" class="inline-flex h-11 items-center justify-center rounded-md bg-foreground px-5 text-sm font-medium text-background hover:opacity-90 transition-opacity">
+          Get started
+        </a>
+        <a href="https://github.com/MakFly/deploy-shuttle" target="_blank" rel="noreferrer" class="inline-flex h-11 items-center justify-center rounded-md border border-border bg-background px-5 text-sm font-medium hover:bg-muted transition-colors">
+          Star on GitHub
+        </a>
+      </div>
+      <div class="mt-10 mx-auto max-w-3xl">
+        <pre class="overflow-x-auto rounded-lg border border-border bg-muted/40 p-4 text-left text-sm text-muted-foreground"><code>{installCmd}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo strip -->
+  <section class="border-b border-border bg-muted/20">
+    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-12">
+      <p class="text-center text-sm text-muted-foreground mb-4">A real scan output</p>
+      <pre class="overflow-x-auto rounded-lg border border-border bg-background p-5 text-xs sm:text-sm leading-relaxed"><code>{`DeployShuttle Doctor Report
+
+Target: root@203.0.113.10
+Score: 0/100 - Not Production Ready
+
+Critical:
+  [x] Public sensitive database listeners detected: 5432, 7700, 6379
+High:
+  [x] 3 sensitive Docker port mapping(s) on 0.0.0.0
+  [x] UFW is missing or inactive
+  [x] No recent backup artifacts and no pg_dump cron entry detected
+Medium:
+  [x] 57 pending package update(s)
+  [x] sshd defaults to port 22
+
+Next:
+  deploy-shuttle harden --target root@203.0.113.10 --dry-run
+  deploy-shuttle report --format html --output report.html`}</code></pre>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="border-b border-border">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-20">
+      <div class="mb-12 max-w-2xl">
+        <h2 class="text-3xl font-bold tracking-tight">What you get out of the box</h2>
+        <p class="mt-2 text-muted-foreground">
+          The free CLI is enough to ship a client app safely. Pro adds hosted
+          reports and remote auto-fixes.
+        </p>
+      </div>
+      <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {features.map((f) => (
+          <div class="rounded-xl border border-border p-6 hover:bg-muted/30 transition-colors">
+            <h3 class="font-semibold">{f.title}</h3>
+            <p class="mt-2 text-sm text-muted-foreground">{f.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section>
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-20 text-center">
+      <h2 class="text-3xl font-bold tracking-tight">Run your first scan now</h2>
+      <p class="mt-3 text-muted-foreground">
+        Install in one command. Scan a remote VPS over SSH. Decide what to fix.
+      </p>
+      <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <a href="/docs/install" class="inline-flex h-11 items-center justify-center rounded-md bg-foreground px-5 text-sm font-medium text-background hover:opacity-90 transition-opacity">
+          Install guide
+        </a>
+        <a href="/docs/checks" class="inline-flex h-11 items-center justify-center rounded-md border border-border bg-background px-5 text-sm font-medium hover:bg-muted transition-colors">
+          Browse the 43 checks
+        </a>
+      </div>
+    </div>
+  </section>
+</Root>

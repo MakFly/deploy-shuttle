@@ -1,0 +1,78 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "license"
+description: "Manage your DeployShuttle Pro license activation."
+---
+
+The CLI is open-core. Pro features (HTML / PDF reports, `harden --apply`,
+future scheduled scans) require a license token issued by the
+DeployShuttle license server.
+
+## Subcommands
+
+```bash
+deploy-shuttle license activate <key>
+deploy-shuttle license status
+deploy-shuttle license refresh
+deploy-shuttle license deactivate
+```
+
+### activate
+
+```bash
+deploy-shuttle license activate DS-XXXXXX-XXXXXX-XXXXXX
+```
+
+Calls the license server, exchanges your key for an Ed25519-signed JWT,
+binds it to a machine fingerprint (`sha256(hostname|machine-id)`), and
+stores the token at `~/.deployshuttle/license.json` (mode `0600`).
+
+### status
+
+```bash
+deploy-shuttle license status
+```
+
+Prints tier, expiration, machine fingerprint, and whether the token is
+within the offline grace window.
+
+### refresh
+
+```bash
+deploy-shuttle license refresh
+```
+
+Re-issues the token before it expires. Run from a cron once per week if
+you are offline most of the time.
+
+### deactivate
+
+```bash
+deploy-shuttle license deactivate
+```
+
+Removes the local license file and frees the activation slot on the
+server side.
+
+## Token storage
+
+| Path | Purpose |
+| --- | --- |
+| `~/.deployshuttle/license.json` | Signed token + metadata. Mode `0600`. |
+| `$DEPLOY_SHUTTLE_HOME` | Override the parent directory. |
+
+## Bypass for development
+
+Builders and QA can bypass gates with the env var:
+
+```bash
+DEPLOY_SHUTTLE_DEV=1 deploy-shuttle report --format pdf --output report.pdf
+```
+
+This only works on builds that embed a license public key. Pure dev
+builds (no embedded key) are ungated by construction.
+
+## Where to get a license
+
+See [Pricing](/pricing) for current Pro / Agency plans and the early-bird
+offer.

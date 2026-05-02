@@ -1,0 +1,88 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "doctor"
+description: "Run the readiness checks locally or against a remote VPS over SSH."
+---
+
+The acquisition hook of the product. `doctor` collects facts about the
+target machine, runs every applicable check, scores the result, and emits
+a console or JSON report.
+
+## Usage
+
+```bash
+deploy-shuttle doctor [flags]
+```
+
+## Flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--target <user@host[:port]>` | unset (local scan) | SSH target. Reads your `~/.ssh/config` and agent. |
+| `--config <path>` | nearest `.deployshuttle.yml` | Readiness configuration with check ignores, allow-lists, app domain. |
+| `--format console\|json` | `console` | `json` is stable and meant for downstream tooling. |
+| `--output <path>` | unset | Persist the JSON report. `harden` and `report` read it by default. |
+| `--profile <list>` | from config or `docker,caddy` | Comma-separated check profile(s). |
+| `--fail-below <int>` | `0` | Exit non-zero when score falls strictly below this. |
+
+## Examples
+
+```bash
+# Local scan, console output.
+deploy-shuttle doctor
+
+# Remote scan, custom port.
+deploy-shuttle doctor --target deploy@app.example.com:7022
+
+# CI-friendly: persist the JSON, fail under 80, exit non-zero on critical.
+deploy-shuttle doctor --target $TARGET --format json \
+  --output .deployshuttle/latest-report.json --fail-below 80
+```
+
+## Report shape
+
+```json
+{
+  "target": "root@203.0.113.10",
+  "profile": ["docker", "caddy"],
+  "configPath": ".deployshuttle.yml",
+  "score": 62,
+  "level": "risky",
+  "checks": [
+    {
+      "id": "firewall.database_port_public",
+      "title": "Sensitive database ports are not public",
+      "category": "firewall",
+      "severity": "critical",
+      "status": "failed",
+      "summary": "Public sensitive database listeners detected: 5432.",
+      "remediation": "Bind databases to localhost or restrict the port to trusted IPs.",
+      "evidence": { "publicPorts": ["5432"], "listeners": [...] }
+    }
+  ],
+  "generatedAt": "2026-05-02T15:05:11Z"
+}
+```
+
+The `evidence` field is check-specific. It is **not** a stable API; treat
+the `id`, `severity`, and `status` fields as the contract.
+
+## Score model
+
+The score starts at 100 and deducts per failed check:
+
+| Severity | Deduction |
+| --- | --- |
+| `critical` | 30 |
+| `high` | 15 |
+| `medium` | 5 |
+| `low` | 1 |
+| `info` | 0 |
+
+Floor is `0`, ceiling `100`. A single critical finding always exits
+non-zero, regardless of `--fail-below`.
+
+## Tier
+
+`doctor` (local **and** `--target`) is **free** in v1.0.1+. It is the
+acquisition hook; gating it would kill the funnel.

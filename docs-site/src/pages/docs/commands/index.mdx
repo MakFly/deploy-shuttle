@@ -1,0 +1,36 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "Commands"
+description: "The five commands that make up the day-to-day workflow."
+---
+
+DeployShuttle exposes a small surface. Every command is documented in
+this section.
+
+| Command | What it does |
+| --- | --- |
+| [`doctor`](/docs/commands/doctor) | Run the 43 readiness checks locally or over SSH. Prints a report and exits non-zero when the score drops below the threshold. |
+| [`harden`](/docs/commands/harden) | Build a remediation plan from the latest doctor report. Dry-run by default. `--apply` runs only the safe-auto-apply actions. |
+| [`report`](/docs/commands/report) | Render the latest doctor report as Markdown, HTML, or PDF. HTML / PDF are Pro-tier. |
+| [`init`](/docs/commands/init) | Generate `shuttle.yml` (and optionally `.deployshuttle.yml` via `--preset`) for a new project. |
+| [`license`](/docs/commands/license) | Activate, refresh, or check the status of your DeployShuttle Pro license. |
+
+## Global flags
+
+Two flags are accepted by most commands:
+
+- `--format console|json` — output shape. `json` is what CI / scripts
+  consume.
+- `--config <path>` — point at an explicit `.deployshuttle.yml`. By
+  default the closest one in parent directories wins.
+
+## Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success / readiness threshold met. |
+| `1` | Threshold failure or critical finding. |
+| `2` | Connection or configuration error. |
+| `3` | Internal error (please file an issue). |
+
+Use these in CI gates rather than parsing stdout.

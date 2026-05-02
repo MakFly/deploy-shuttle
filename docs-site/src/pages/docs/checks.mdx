@@ -1,0 +1,127 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "Check catalog"
+description: "All 43 readiness checks shipped in v1.0.1, grouped by category."
+---
+
+Every finding has a stable `id`, a severity, a short summary, and a
+remediation hint. The list below is the contract for downstream tooling
+that reads doctor JSON output.
+
+## Severity & scoring
+
+| Severity | Deduction | Behavior |
+| --- | --- | --- |
+| `critical` | 30 | Causes `doctor` to exit non-zero regardless of `--fail-below`. |
+| `high` | 15 | Counted toward score; counts as an open finding. |
+| `medium` | 5 | Counted toward score. |
+| `low` | 1 | Counted toward score. |
+| `info` | 0 | Surfaced in reports, no score impact. |
+
+## System
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `system.os_supported` | high | Host runs Ubuntu 22.04, Ubuntu 24.04, or Debian 12. |
+| `system.disk_space_low` | medium / high | Root filesystem free space (high above 90%). |
+| `system.updates_pending` | medium / high | Pending APT upgrades (high above 50). |
+| `system.memory_low` | medium / high | Available memory ≥ 10% of total. |
+| `system.unattended_upgrades_inactive` | medium | unattended-upgrades package installed and enabled. |
+| `system.fail2ban_inactive` | medium | fail2ban active. |
+| `system.swap_missing` | low | At least one swap device or file. |
+| `system.time_sync_inactive` | medium | A time-sync daemon is active. |
+
+## SSH
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `ssh.root_login_enabled` | high | `PermitRootLogin` is `no` or `prohibit-password`. |
+| `ssh.password_auth_enabled` | high | `PasswordAuthentication` is `no`. |
+| `ssh.port_default` | low | sshd does not listen on port 22. |
+
+## Docker
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `docker.not_installed` | high | Docker Engine binary present. |
+| `docker.service_not_enabled` | high | `docker.service` enabled at boot and active. |
+| `docker.containers_without_restart_policy` | high | Every workload has a restart policy. |
+| `docker.containers_without_healthcheck` | medium | Every workload defines a healthcheck. |
+| `docker.containers_running_as_root` | medium | Workloads do not run as root unless allow-listed. |
+| `docker.sock_exposed` | high / critical | `/var/run/docker.sock` not mounted read-write into untrusted containers. |
+
+## Firewall
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `firewall.ufw_inactive` | high | UFW installed and active with deny-by-default. |
+| `firewall.database_port_public` | high / critical | DB ports (5432, 3306, 6379, 7700, 9200, 27017) not publicly reachable. |
+| `firewall.docker_published_sensitive_ports` | high | No Docker container publishes a sensitive port on `0.0.0.0`. |
+
+## Secrets
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `secrets.env_world_readable` | critical | `.env` not world-readable. Auto-fix via `harden --apply`. |
+| `secrets.env_in_git` | critical | `.env` not tracked by Git. |
+| `secrets.weak_file_permissions` | high | No `.env*`, `*.pem`, `*.key`, or SSH private key world-readable. |
+
+## Reverse proxy
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `caddy.not_installed` | medium | Caddy binary or container present. |
+| `caddy.admin_exposed` | critical | Caddy admin API (`:2019`) not on public network. |
+| `caddy.no_security_headers` | medium | Caddyfile sets HSTS, X-Content-Type-Options, Referrer-Policy. |
+| `caddy.invalid_config` | high | `caddy validate` succeeds. |
+| `adminer.ip_restriction_missing` | high | Adminer protected by IP allow-list + deny-by-default + basic auth. |
+
+## TLS
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `tls.cert_missing` | medium / high / critical | Certificate for `app.domain` reachable, valid, not expiring within 14 days. |
+| `tls.hsts_missing` | medium | `Strict-Transport-Security` header present on `https://app.domain`. |
+
+## DNS
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `dns.domain_not_pointing_to_server` | medium | A record for `app.domain` resolves to the server's public IP. |
+
+## Monitoring
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `monitoring.no_health_endpoint` | medium | `https://<app.domain><app.healthcheckPath>` returns 2xx. |
+
+## Backups
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `db.no_backup_detected` | high | Recent backup artifacts or pg_dump / mysqldump cron entry. |
+
+## Compose
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `compose.missing_prod_file` | medium | Production compose file in standard location. |
+| `compose.env_file_missing` | medium | Every `env_file:` reference resolves. |
+| `compose.latest_tag_used` | medium | No `image:` uses `:latest` or omits tag. |
+| `compose.no_resource_limits` | low | At least one of `mem_limit`, `cpus`, `deploy.resources.limits`. |
+| `compose.bind_mount_sensitive_paths` | high | No bind mount of `/var/run/docker.sock`, `/etc`, `/root`, `/proc`, `/sys`, `/`. |
+
+## Cloudflare
+
+Cloudflare checks are opt-in. Set `cloudflare.enabled: true`, your zone,
+and an API token (env var `CLOUDFLARE_API_TOKEN` by default) in
+`.deployshuttle.yml`. Without these, every Cloudflare check skips with a
+clear explanation.
+
+| ID | Severity | What it verifies |
+| --- | --- | --- |
+| `cloudflare.ssl_flexible` | critical | SSL/TLS mode is not Off or Flexible. |
+| `cloudflare.always_https_disabled` | medium | "Always Use HTTPS" enabled. |
+| `cloudflare.waf_disabled` | medium / info | Managed WAF enabled (skipped on Free plan). |
+| `cloudflare.dns_missing` | high | A / AAAA / CNAME record exists for `app.domain`. |
+| `cloudflare.proxy_disabled` | medium | Host records proxied (orange cloud). |
