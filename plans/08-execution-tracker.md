@@ -295,3 +295,68 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] PDF includes next actions.
 - [x] PDF includes accepted risks.
 - [x] Real VPS JSON renders to polished Markdown and PDF.
+
+## Stop Note - 2026-05-02
+
+Paused here intentionally.
+
+Current repository state:
+
+- Go CLI is the active implementation.
+- TypeScript CLI is archived under `legacy/ts-cli/`.
+- Dashboard and Astro docs were removed.
+- `doctor` supports local and remote SSH scans.
+- Remote SSH target tested against `root@185.158.107.49:7022`.
+- Docker classic, Docker Swarm, and mixed single-VPS runtime detection are implemented.
+- `.deployshuttle.yml` readiness config supports check ignores and Docker allowlists.
+- Markdown and PDF local reports are implemented.
+- React PDF renderer lives in `report-pdf/`.
+- Latest report workflow is implemented with `doctor --output` and default `report` input.
+- Report v1 polish is committed and pushed.
+
+Last pushed commit:
+
+```txt
+6905aaa Polish readiness reports
+```
+
+Validation before stopping:
+
+```bash
+go test ./...
+go vet ./...
+bun run check
+sh scripts/build-go.sh
+ig index .
+```
+
+Recommended next slice for tomorrow:
+
+```txt
+Harden Dry-Run Planner
+```
+
+Goal:
+
+- Add `deploy-shuttle harden --dry-run`.
+- Do not mutate the server.
+- Read latest doctor report by default from `.deployshuttle/latest-report.json`.
+- Accept `--input <doctor.json>` and `--target user@host`.
+- Convert findings into concrete proposed actions.
+
+Initial dry-run actions:
+
+- UFW proposals only when firewall findings exist.
+- `.env` permission proposal for `secrets.env_world_readable`.
+- Caddy admin localhost/internal-only proposal for `caddy.admin_exposed`.
+- Docker healthcheck suggestions per workload.
+- Docker non-root user suggestions per workload.
+- Docker socket risk review for workloads mounting `/var/run/docker.sock`.
+- Postgres/database bind localhost/private-network suggestion when DB binds public interfaces.
+
+Safety rules:
+
+- Default to dry-run.
+- No destructive mutation.
+- No automatic SSH changes in the first slice.
+- Print commands/suggestions clearly and explain which finding generated each action.
