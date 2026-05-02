@@ -2,12 +2,11 @@
 import Root from "./Root.astro";
 import Sidebar from "@/components/Sidebar.astro";
 import PrevNext from "@/components/PrevNext.astro";
+import TocAside from "@/components/TocAside.astro";
 
 interface Props {
   title: string;
   description?: string;
-  // headings is provided automatically by MDX pages via Astro.props
-  // but we keep it optional for plain .astro docs pages.
   headings?: { depth: number; slug: string; text: string }[];
 }
 const { title, description, headings = [] } = Astro.props;
@@ -15,7 +14,7 @@ const fullTitle = `${title} - DeployShuttle docs`;
 const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
 ---
 <Root title={fullTitle} description={description}>
-  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-[14rem_minmax(0,1fr)] lg:grid-cols-[14rem_minmax(0,1fr)_12rem] gap-10 py-10">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-[14rem_minmax(0,1fr)] lg:grid-cols-[14rem_minmax(0,1fr)_13rem] gap-10 py-10">
     <aside class="hidden md:block">
       <div class="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2">
         <Sidebar />
@@ -31,19 +30,6 @@ const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
       </article>
       <PrevNext />
     </main>
-    {tocItems.length > 0 && (
-      <aside class="hidden lg:block">
-        <div class="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pl-4 border-l border-border">
-          <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">On this page</p>
-          <ul class="space-y-2 text-sm">
-            {tocItems.map((h) => (
-              <li class:list={["text-muted-foreground hover:text-foreground", h.depth === 3 ? "pl-3" : ""]}>
-                <a href={`#${h.slug}`} class="block">{h.text}</a>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </aside>
-    )}
+    {tocItems.length > 0 && <TocAside items={tocItems} />}
   </div>
 </Root>

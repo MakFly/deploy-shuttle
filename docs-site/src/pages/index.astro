@@ -1,5 +1,6 @@
 ---
 import Root from "@/layouts/Root.astro";
+import CopyBlock from "@/components/CopyBlock.astro";
 const installCmd = "curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh";
 const features = [
   {
@@ -56,8 +57,8 @@ const features = [
           Star on GitHub
         </a>
       </div>
-      <div class="mt-10 mx-auto max-w-3xl">
-        <pre class="overflow-x-auto rounded-lg border border-border bg-muted/40 p-4 text-left text-sm text-muted-foreground"><code>{installCmd}</code></pre>
+      <div class="mt-10 mx-auto max-w-4xl">
+        <CopyBlock code={installCmd} label="install" />
       </div>
     </div>
   </section>

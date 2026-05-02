@@ -1,0 +1,100 @@
+---
+// Right-side TOC with IntersectionObserver-based scroll-spy.
+// We render plain links and let the inline script flip an `aria-current`
+// attribute on the active link as the user scrolls. CSS does the rest.
+interface Props {
+  items: { depth: number; slug: string; text: string }[];
+}
+const { items } = Astro.props;
+---
+<aside class="hidden lg:block">
+  <div class="sticky top-20 max-h-[calc(100vh-6rem)] overflow-y-auto pl-2">
+    <p class="mb-3 px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      On this page
+    </p>
+    <ul class="relative space-y-px text-sm border-l border-border" data-toc>
+      {items.map((h) => (
+        <li>
+          <a
+            href={`#${h.slug}`}
+            data-toc-link={h.slug}
+            class:list={[
+              // The aria-current variant doubles as scroll-spy state.
+              "relative -ml-px block border-l-2 border-transparent py-1.5 pr-2 text-muted-foreground transition-colors",
+              "hover:text-foreground",
+              "aria-[current=true]:text-foreground aria-[current=true]:font-medium aria-[current=true]:border-foreground",
+              h.depth === 3 ? "pl-7" : "pl-4",
+            ]}
+          >
+            {h.text}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </div>
+</aside>
+
+<script is:inline>
+  (() => {
+    const toc = document.querySelector("[data-toc]");
+    if (!toc) return;
+    const links = Array.from(toc.querySelectorAll("[data-toc-link]"));
+    if (!links.length) return;
+
+    // slug -> link map for O(1) lookup on intersection events.
+    const linkBySlug = new Map(links.map((a) => [a.dataset.tocLink, a]));
+    const slugs = links.map((a) => a.dataset.tocLink);
+
+    // Track which headings are intersecting; the first one in document order
+    // wins. This avoids the classic "two headings on screen → both highlighted"
+    // bug.
+    const visible = new Set();
+
+    const setActive = (slug) => {
+      links.forEach((a) =>
+        a.toggleAttribute("aria-current", a.dataset.tocLink === slug),
+      );
+    };
+
+    const onIntersect = (entries) => {
+      for (const entry of entries) {
+        const slug = entry.target.id;
+        if (!slug) continue;
+        if (entry.isIntersecting) visible.add(slug);
+        else visible.delete(slug);
+      }
+      // Pick the visible heading nearest the top of the viewport.
+      const ordered = slugs.filter((s) => visible.has(s));
+      if (ordered.length) {
+        setActive(ordered[0]);
+      } else {
+        // Nothing visible: fall back to whichever heading is just above the
+        // top of the viewport (so the TOC stays in sync when scrolling fast).
+        let last = slugs[0];
+        const top = window.scrollY + 120;
+        for (const slug of slugs) {
+          const el = document.getElementById(slug);
+          if (el && el.getBoundingClientRect().top + window.scrollY <= top) {
+            last = slug;
+          }
+        }
+        setActive(last);
+      }
+    };
+
+    const observer = new IntersectionObserver(onIntersect, {
+      // Top margin matches sticky nav height (~56px) + breathing room.
+      // Bottom margin pulls the active region up so we switch at ~40% from top.
+      rootMargin: "-80px 0px -55% 0px",
+      threshold: [0, 1],
+    });
+
+    for (const slug of slugs) {
+      const el = document.getElementById(slug);
+      if (el) observer.observe(el);
+    }
+
+    // Initial state in case the page loads scrolled.
+    onIntersect([]);
+  })();
+</script>

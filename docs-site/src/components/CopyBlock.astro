@@ -1,0 +1,58 @@
+---
+// Copyable code block. The text to copy comes from the `code` prop so we
+// don't have to scrape the rendered DOM.
+interface Props {
+  code: string;
+  label?: string;
+}
+const { code, label = "shell" } = Astro.props;
+---
+<div class="group relative">
+  <div class="rounded-lg border border-border bg-muted/30 overflow-hidden">
+    <div class="flex items-center justify-between border-b border-border bg-muted/50 px-3 py-1.5">
+      <span class="select-none text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</span>
+      <span class="flex gap-1.5">
+        <span class="h-2.5 w-2.5 rounded-full bg-foreground/10"></span>
+        <span class="h-2.5 w-2.5 rounded-full bg-foreground/10"></span>
+        <span class="h-2.5 w-2.5 rounded-full bg-foreground/10"></span>
+      </span>
+    </div>
+    <pre class="px-4 py-3 pr-12 text-left text-[12.5px] font-mono leading-relaxed text-foreground/80 whitespace-pre-wrap break-all sm:whitespace-nowrap sm:break-normal sm:overflow-x-auto"><code><span class="text-foreground/40 select-none">$ </span>{code}</code></pre>
+  </div>
+  <button
+    type="button"
+    data-copy={code}
+    aria-label="Copy to clipboard"
+    class="absolute right-2 bottom-2 inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background/80 backdrop-blur text-muted-foreground hover:text-foreground hover:bg-muted transition-colors data-[copied=true]:text-emerald-500"
+  >
+    <svg class="h-4 w-4 block data-[copied=true]:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+    <svg class="h-4 w-4 hidden data-[copied=true]:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+  </button>
+</div>
+
+<script is:inline>
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-copy]");
+    if (!btn) return;
+    const text = btn.getAttribute("data-copy") || "";
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.dataset.copied = "true";
+      // Toggle the inner SVGs since data-[copied] doesn't reach them
+      // through the click target lookup; do it imperatively.
+      btn.querySelectorAll("svg").forEach((s, i) => {
+        s.classList.toggle("hidden", i === 0);
+        s.classList.toggle("block", i === 1);
+      });
+      setTimeout(() => {
+        delete btn.dataset.copied;
+        btn.querySelectorAll("svg").forEach((s, i) => {
+          s.classList.toggle("hidden", i === 1);
+          s.classList.toggle("block", i === 0);
+        });
+      }, 1400);
+    } catch (_) {
+      // ignore (older browsers, denied permission)
+    }
+  });
+</script>
