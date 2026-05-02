@@ -100,11 +100,12 @@ Current commands include:
 - `ci`
 - `monitor`
 - `doctor` (local readiness scan; remote `--target` is planned)
+- `report`
+- `harden` (dry-run only)
 
 Planned readiness commands from `plans/`:
 
-- `report`
-- `harden`
+- `harden` mutating mode (apply / SSH execution)
 
 Do not mention these planned commands as implemented until corresponding CLI files,
 tests, and docs exist.
@@ -112,6 +113,7 @@ tests, and docs exist.
 ### Core Layer (`go-cli/internal/`)
 - `config/` — YAML loader, defaults, env overlays, `server` to `servers` normalization
 - `readiness/` — `doctor`, check results, scoring, console/JSON reports
+- `harden/` — dry-run planner mapping doctor findings to proposed actions
 - `ssh/` — SSH command execution
 - `execx/` — local shell adapter
 - `runtime/` — remote path helpers under `/opt/shuttle/<app>/`
