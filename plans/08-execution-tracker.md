@@ -856,6 +856,55 @@ tag v1 later":
 - Tag `v1` and let `release.yml` produce the first signed release.
 - Smoke the Action against a freshly-tagged release in a sandbox repo.
 
+## Current Slice - Re-gate Pro Features for Viral CLI
+
+**Status:** Implemented
+**Started:** 2026-05-02
+**Plan sources:**
+
+- `plans/09-critique-and-deltas.md` (pricing reframe in section 2.3)
+- monetization decision: keep `doctor --target` free (the acquisition hook),
+  monetize the deliverables (HTML/PDF reports) and the destructive
+  operation (`harden --apply`).
+
+### Scope
+
+- Remove license gates on `doctor --target` (remote SSH scan) and `--config`
+  (.deployshuttle.yml). These are the viral hook + the friction-reduction
+  tool; gating them killed the funnel before the product could prove value.
+- Keep license gates on:
+  - `report --format html` (hosted/shareable client deliverable),
+  - `report --format pdf` (white-labeled handoff for Agency tier),
+  - `harden --apply` (destructive operation; Pro = "I trust DeployShuttle
+    to write to my server").
+- No change to free local doctor + Markdown report.
+
+### New tier definition
+
+| Feature | Free | Pro 29 EUR/mo | Agency 99 EUR/mo |
+| --- | --- | --- | --- |
+| `doctor` (local + --target) | yes | yes | yes |
+| `--config .deployshuttle.yml` | yes | yes | yes |
+| Console + Markdown report | yes | yes | yes |
+| HTML report (hosted/shareable) | no | yes | yes |
+| PDF report (white-label) | no | no | yes |
+| `harden --apply` | no | yes | yes |
+| Scheduled scans + email alerts | no | future | future |
+| Multi-server + workspaces | no | no | future |
+
+### Completion Checklist
+
+- [x] Removed `license.Require` calls in doctor.go for --target and --config.
+- [x] Removed unused `license` import in doctor.go.
+- [x] Kept gates in report.go (html/pdf) and harden.go (--apply).
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+
+### Pending (operational)
+
+- Tag v1.0.1, force-rebuild release with the new gating.
+- Provision license server + Stripe to actually issue Pro tokens
+  (see plans/01-product-prd or the license-server README).
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.
