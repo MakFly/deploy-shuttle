@@ -101,11 +101,11 @@ Current commands include:
 - `monitor`
 - `doctor` (local readiness scan; remote `--target` is planned)
 - `report`
-- `harden` (dry-run only)
+- `harden` (dry-run plan + safe local apply)
 
 Planned readiness commands from `plans/`:
 
-- `harden` mutating mode (apply / SSH execution)
+- `harden --apply` over SSH (remote execution still pending)
 
 Do not mention these planned commands as implemented until corresponding CLI files,
 tests, and docs exist.

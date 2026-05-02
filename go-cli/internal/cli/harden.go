@@ -16,14 +16,21 @@ func newHardenCommand() *cobra.Command {
 	var format string
 	var target string
 	var dryRun bool
+	var apply bool
+	var yes bool
 	cmd := &cobra.Command{
 		Use:   "harden",
-		Short: "Plan hardening actions from a doctor readiness report (dry-run only)",
-		Long: "harden reads a doctor JSON report and prints concrete proposed actions for each finding. " +
-			"This release is dry-run only: no commands are executed and no remote changes are made.",
+		Short: "Plan or apply hardening actions from a doctor readiness report",
+		Long: "harden reads a doctor JSON report and prints concrete proposed actions for each finding.\n" +
+			"  --dry-run only prints the plan and never touches the system.\n" +
+			"  --apply runs the subset of actions flagged as safe-for-local-apply (currently only chmod 600 .env).\n" +
+			"Remote SSH execution is not implemented yet; pass --target only to annotate the plan.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if !dryRun {
-				return errors.New("harden currently supports --dry-run only; pass --dry-run to acknowledge")
+			if dryRun == apply {
+				return errors.New("pass exactly one of --dry-run or --apply")
+			}
+			if apply && target != "" {
+				return errors.New("--apply does not support --target yet; remote hardening is not implemented")
 			}
 			if input == "" {
 				input = ".deployshuttle/latest-report.json"
@@ -46,11 +53,44 @@ func newHardenCommand() *cobra.Command {
 				report.Target = target
 			}
 			plan := harden.BuildPlan(report)
+
+			if dryRun {
+				switch format {
+				case "", "console":
+					fmt.Print(harden.Console(plan))
+				case "json":
+					encoded, err := json.MarshalIndent(plan, "", "  ")
+					if err != nil {
+						return err
+					}
+					fmt.Println(string(encoded))
+				default:
+					return fmt.Errorf("unsupported format %q", format)
+				}
+				return nil
+			}
+
+			// Apply path.
+			safeCount := 0
+			for _, action := range plan.Actions {
+				if action.SafeLocalApply {
+					safeCount++
+				}
+			}
+			if safeCount == 0 {
+				fmt.Println("No safe-for-local-apply actions in this plan. Nothing to do.")
+				return nil
+			}
+			if !yes {
+				fmt.Printf("About to apply %d safe local action(s) on this machine. Re-run with --yes to confirm.\n", safeCount)
+				return nil
+			}
+			results := harden.ApplySafeLocal(plan)
 			switch format {
 			case "", "console":
-				fmt.Print(harden.Console(plan))
+				fmt.Print(harden.RenderApplyResults(results))
 			case "json":
-				encoded, err := json.MarshalIndent(plan, "", "  ")
+				encoded, err := json.MarshalIndent(results, "", "  ")
 				if err != nil {
 					return err
 				}
@@ -58,12 +98,19 @@ func newHardenCommand() *cobra.Command {
 			default:
 				return fmt.Errorf("unsupported format %q", format)
 			}
+			for _, r := range results {
+				if r.Status == "failed" {
+					os.Exit(1)
+				}
+			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&input, "input", "", "doctor JSON report path (default .deployshuttle/latest-report.json)")
 	cmd.Flags().StringVar(&format, "format", "console", "output format: console or json")
 	cmd.Flags().StringVar(&target, "target", "", "remote SSH target user@host annotated in the plan output (no SSH actions yet)")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "explicit acknowledgement that harden is dry-run only in this release")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print proposed actions without touching the system")
+	cmd.Flags().BoolVar(&apply, "apply", false, "execute safe local actions (currently chmod 600 .env only)")
+	cmd.Flags().BoolVar(&yes, "yes", false, "confirm execution when --apply is set")
 	return cmd
 }

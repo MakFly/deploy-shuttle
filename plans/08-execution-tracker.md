@@ -328,6 +328,36 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] Build via `scripts/build-go.sh` and CLI smoke test of `harden --help` and `harden --dry-run --input <sample>`.
 - [x] CLAUDE.md command surface updated.
 
+## Current Slice - Harden Safe Local Apply
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- previous slice: `Harden Dry-Run Planner`
+- product direction: convert dry-run plan to safe, scoped local execution
+
+### Scope
+
+- Add `--apply` and `--yes` flags to `harden`.
+- Make `--dry-run` and `--apply` mutually exclusive and required.
+- Tag actions with `SafeLocalApply`; only those run automatically.
+- First slice scope: `secrets.env_world_readable` → `chmod 600 .env` only.
+- Refuse `--apply` with `--target` (remote execution still pending).
+- Hard-allow only specific commands and target paths inside the project tree.
+
+### Completion Checklist
+
+- [x] `Action.SafeLocalApply` flag added; only `secrets.tighten-env-perms` is marked safe.
+- [x] `harden/apply.go` runs allow-listed commands (chmod 600 only on local `.env`).
+- [x] CLI requires confirmation via `--yes`; preview mode prints planned count.
+- [x] CLI rejects `--apply --target` until SSH execution exists.
+- [x] CLI rejects unsafe absolute paths, parent traversal, non-`.env` targets, modes other than 600.
+- [x] Unit tests cover apply success, skip-unsafe, allow-list rejection, path/mode rejection, summary rendering.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+- [x] End-to-end smoke confirmed `.env` mode flips from 644 to 600.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.
