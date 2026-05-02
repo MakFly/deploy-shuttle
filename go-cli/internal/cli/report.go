@@ -44,6 +44,15 @@ func newReportCommand() *cobra.Command {
 					output = "deployshuttle-report.md"
 				}
 				return os.WriteFile(output, []byte(markdownReport(report)), 0o644)
+			case "html":
+				if output == "" {
+					output = "deployshuttle-report.html"
+				}
+				rendered, err := htmlReport(report)
+				if err != nil {
+					return err
+				}
+				return os.WriteFile(output, []byte(rendered), 0o644)
 			case "pdf":
 				if output == "" {
 					output = "deployshuttle-report.pdf"
@@ -56,7 +65,7 @@ func newReportCommand() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&input, "input", "", "doctor JSON report input path (default .deployshuttle/latest-report.json)")
 	cmd.Flags().StringVar(&output, "output", "", "report output path")
-	cmd.Flags().StringVar(&format, "format", "markdown", "report format: markdown or pdf")
+	cmd.Flags().StringVar(&format, "format", "markdown", "report format: markdown, html, or pdf")
 	return cmd
 }
 
