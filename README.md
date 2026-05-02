@@ -138,7 +138,7 @@ exceptions were granted.
 
 ## Check catalog
 
-15 checks ship today, grouped across system, Docker, firewall, secrets, and
+21 checks ship today, grouped across system, SSH, Docker, firewall, secrets, and
 reverse-proxy/database categories. Full reference in
 [`docs/check-catalog.md`](docs/check-catalog.md).
 

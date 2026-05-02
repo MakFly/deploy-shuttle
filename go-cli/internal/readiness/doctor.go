@@ -44,6 +44,12 @@ func RunWithConfig(adapter execx.Adapter, target string, profile []string, cfg C
 		checkCaddyInstalled,
 		checkCaddyAdminExposed,
 		checkAdminerRestricted,
+		checkSSHRootLogin,
+		checkSSHPasswordAuth,
+		checkUnattendedUpgrades,
+		checkFail2ban,
+		checkSwap,
+		checkTimeSync,
 	}
 	results := make([]CheckResult, 0, len(checks))
 	for _, check := range checks {

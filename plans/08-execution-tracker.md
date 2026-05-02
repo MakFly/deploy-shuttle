@@ -466,6 +466,33 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] `scripts/install.sh` detects OS/arch, supports DEPLOY_SHUTTLE_VERSION and DEPLOY_SHUTTLE_INSTALL_DIR, verifies checksums when present, and warns about $PATH.
 - [x] Install script passes `sh -n` syntax check.
 
+## Current Slice - Credibility Checks
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- `plans/03-check-catalog.md` (roadmap entries: SSH hardening, automatic upgrades, fail2ban, swap, time sync)
+- product positioning: 15 checks is the MVP minimum; 21 is the credibility floor
+
+### Scope
+
+- Add 6 new checks: `ssh.root_login_enabled`, `ssh.password_auth_enabled`, `system.unattended_upgrades_inactive`, `system.fail2ban_inactive`, `system.swap_missing`, `system.time_sync_inactive`.
+- Skip gracefully on non-Linux dev hosts (no `systemctl`) or when sshd_config is not readable.
+- Map each new check to an actionable harden plan note (manual, not auto-apply).
+- Update the user-facing catalog and README count from 15 → 21.
+
+### Completion Checklist
+
+- [x] `system_checks.go` implements the six new checks with proper Skipped behavior.
+- [x] `doctor.go` registers the new checks in the slice (21 total).
+- [x] `system_checks_test.go` covers happy path, failure path, and skip path for each check.
+- [x] `harden/planner.go` emits actionable notes for every new finding.
+- [x] `docs/check-catalog.md` and `README.md` reference the 21-check count and the new SSH/system rows.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+- [x] Local doctor smoke shows the new checks running and contributing to the score.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.

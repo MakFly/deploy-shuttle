@@ -112,7 +112,7 @@ tests, and docs exist.
 
 ### Core Layer (`go-cli/internal/`)
 - `config/` — YAML loader, defaults, env overlays, `server` to `servers` normalization
-- `readiness/` — `doctor`, check results, scoring, console/JSON reports
+- `readiness/` — `doctor`, check results, scoring, console/JSON reports (21 checks: system, SSH, Docker, firewall, secrets, reverse-proxy/database)
 - `harden/` — dry-run planner mapping doctor findings to proposed actions
 - `ssh/` — SSH command execution
 - `execx/` — local shell adapter
