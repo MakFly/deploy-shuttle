@@ -358,6 +358,34 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
 - [x] End-to-end smoke confirmed `.env` mode flips from 644 to 600.
 
+## Current Slice - Harden Apply Over SSH
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- previous slice: `Harden Safe Local Apply`
+- product hook: `harden --apply --target user@host`
+
+### Scope
+
+- Refactor `harden.Apply(adapter, plan)` to take an `execx.Adapter`.
+- Reuse the existing SSH adapter when `--apply --target user@host` is set.
+- Keep the same allow-list and validation (chmod 600 only, project-local `.env`).
+- Drive existence check (`test -f`) and `chmod` through the adapter so the same code path applies locally and remotely.
+- Keep `--yes` confirmation requirement.
+
+### Completion Checklist
+
+- [x] `Apply` accepts an `execx.Adapter`.
+- [x] CLI builds an SSH adapter when `--target` is set with `--apply`.
+- [x] Allow-list rejections still occur before any shell call.
+- [x] Adapter shell calls use `shellQuote` to defuse path metacharacters.
+- [x] Tests cover local apply, fake-adapter probe + chmod, adapter failure, missing target, and shell-quote escaping.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+- [x] Local smoke confirmed `.env` 644 → 600 unchanged after refactor.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.

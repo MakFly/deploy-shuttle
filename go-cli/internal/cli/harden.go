@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/execx"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/harden"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/readiness"
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/ssh"
 	"github.com/spf13/cobra"
 )
 
@@ -23,14 +25,11 @@ func newHardenCommand() *cobra.Command {
 		Short: "Plan or apply hardening actions from a doctor readiness report",
 		Long: "harden reads a doctor JSON report and prints concrete proposed actions for each finding.\n" +
 			"  --dry-run only prints the plan and never touches the system.\n" +
-			"  --apply runs the subset of actions flagged as safe-for-local-apply (currently only chmod 600 .env).\n" +
-			"Remote SSH execution is not implemented yet; pass --target only to annotate the plan.",
+			"  --apply runs the subset of actions flagged as safe-for-apply (currently only chmod 600 on a project-local .env).\n" +
+			"  --apply --target user@host runs the same safe subset over SSH on the remote home directory.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if dryRun == apply {
 				return errors.New("pass exactly one of --dry-run or --apply")
-			}
-			if apply && target != "" {
-				return errors.New("--apply does not support --target yet; remote hardening is not implemented")
 			}
 			if input == "" {
 				input = ".deployshuttle/latest-report.json"
@@ -85,7 +84,19 @@ func newHardenCommand() *cobra.Command {
 				fmt.Printf("About to apply %d safe local action(s) on this machine. Re-run with --yes to confirm.\n", safeCount)
 				return nil
 			}
-			results := harden.ApplySafeLocal(plan)
+			adapter := execx.Adapter(execx.Local{})
+			if target != "" {
+				parsed, err := parseSSHTarget(target)
+				if err != nil {
+					return err
+				}
+				client, err := ssh.NewClient(parsed.Host, parsed.User, parsed.Port)
+				if err != nil {
+					return err
+				}
+				adapter = execx.SSH{Client: client}
+			}
+			results := harden.Apply(adapter, plan)
 			switch format {
 			case "", "console":
 				fmt.Print(harden.RenderApplyResults(results))
