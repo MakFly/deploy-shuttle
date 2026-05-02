@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -31,22 +30,5 @@ jobs:
 			return os.WriteFile(filepath.Join(dir, "deploy-shuttle.yml"), []byte(content), 0o644)
 		},
 	})
-	return root
-}
-
-func newLicenseCommand() *cobra.Command {
-	root := &cobra.Command{Use: "license", Short: "Manage DeployShuttle license"}
-	root.AddCommand(&cobra.Command{Use: "status", Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("DeployShuttle Pro licensing is not active in the Go port.")
-	}})
-	root.AddCommand(&cobra.Command{Use: "activate <key>", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
-		if err := os.MkdirAll(filepath.Join(os.Getenv("HOME"), ".shuttle"), 0o700); err != nil {
-			return err
-		}
-		return os.WriteFile(filepath.Join(os.Getenv("HOME"), ".shuttle", "license"), []byte(args[0]), 0o600)
-	}})
-	root.AddCommand(&cobra.Command{Use: "deactivate", RunE: func(cmd *cobra.Command, args []string) error {
-		return os.Remove(filepath.Join(os.Getenv("HOME"), ".shuttle", "license"))
-	}})
 	return root
 }

@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/execx"
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/license"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/readiness"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/ssh"
 	"github.com/spf13/cobra"
@@ -38,9 +39,17 @@ func newDoctorCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if resolvedConfigPath != "" || configPath != "" {
+				if err := license.Require("doctor --config / .deployshuttle.yml"); err != nil {
+					return err
+				}
+			}
 			adapter := execx.Adapter(execx.Local{})
 			reportTarget := "local"
 			if target != "" {
+				if err := license.Require("doctor --target (remote SSH scan)"); err != nil {
+					return err
+				}
 				sshTarget, err := parseSSHTarget(target)
 				if err != nil {
 					return err

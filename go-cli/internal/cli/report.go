@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/license"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/readiness"
 	"github.com/spf13/cobra"
 )
@@ -45,6 +46,9 @@ func newReportCommand() *cobra.Command {
 				}
 				return os.WriteFile(output, []byte(markdownReport(report)), 0o644)
 			case "html":
+				if err := license.Require("report --format html"); err != nil {
+					return err
+				}
 				if output == "" {
 					output = "deployshuttle-report.html"
 				}
@@ -54,6 +58,9 @@ func newReportCommand() *cobra.Command {
 				}
 				return os.WriteFile(output, []byte(rendered), 0o644)
 			case "pdf":
+				if err := license.Require("report --format pdf"); err != nil {
+					return err
+				}
 				if output == "" {
 					output = "deployshuttle-report.pdf"
 				}

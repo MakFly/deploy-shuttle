@@ -493,6 +493,44 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
 - [x] Local doctor smoke shows the new checks running and contributing to the score.
 
+## Current Slice - License Package + Pro Gates
+
+**Status:** Implemented (server pending - Phase 1a)  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02 (code complete, awaits license server)  
+**Plan sources:**
+
+- `~/.claude/plans/on-laisse-public-pour-stateful-oasis.md` (Phase 1b)
+
+### Scope
+
+- New `internal/version` package exposing `Version`, `LicensePubKeyB64`, `LicenseServer` injected via `-ldflags`.
+- New `internal/license` package: Ed25519 token format, store at `~/.deployshuttle/license.json` (0600), HTTP client for activate/refresh, machine fingerprint, `Require(feature)` helper.
+- Refactor `license` CLI command: `activate`, `status`, `refresh`, `deactivate` against the new client.
+- Gate Pro features: `doctor --target`, `doctor --config`, `report --format html|pdf`, `harden --apply`.
+- `scripts/build-go.sh` accepts `LICENSE_PUBKEY_B64`, `LICENSE_SERVER`, `DEPLOY_SHUTTLE_VERSION` and injects via ldflags.
+
+### Completion Checklist
+
+- [x] `internal/license/token.go` implements Ed25519-signed JWT-compatible tokens with sign/verify pair.
+- [x] `internal/license/store.go` reads/writes JSON license state under `DEPLOY_SHUTTLE_HOME` (defaults to `~/.deployshuttle`).
+- [x] `internal/license/client.go` issues `POST /activate` and `POST /refresh` against the license server.
+- [x] `internal/license/fingerprint.go` returns `sha256(hostname|machine-id)`.
+- [x] `internal/license/require.go` enforces tier=pro with offline grace; dev builds (no embedded key) and `DEPLOY_SHUTTLE_DEV=1` bypass.
+- [x] CLI `license` subcommands: activate / status / refresh / deactivate.
+- [x] Pro gates wired in doctor.go (target + config), report.go (html + pdf), harden.go (apply).
+- [x] Tests: token (happy/expired/fp/wrong-key/malformed), store (round-trip/missing/clear), require (no-op dev/no-license/valid/expired/dev-override).
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+- [x] Build with `LICENSE_PUBKEY_B64=...` produces a binary that refuses `doctor --target` with the correct UX message.
+- [x] `DEPLOY_SHUTTLE_DEV=1` bypasses gates on a binary with embedded key (intended for builders/QA).
+
+### Pending (Phase 1a, separate slice)
+
+- License server (Bun + Hono + Drizzle + Postgres + Stripe webhook).
+- Stripe product + prices + webhook signature.
+- Resend email on activation.
+- Release workflow secret `LICENSE_PUBKEY_B64` so prod binaries are gated.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.

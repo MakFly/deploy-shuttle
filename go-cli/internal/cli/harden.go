@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/execx"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/harden"
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/license"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/readiness"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/ssh"
 	"github.com/spf13/cobra"
@@ -70,6 +71,9 @@ func newHardenCommand() *cobra.Command {
 			}
 
 			// Apply path.
+			if err := license.Require("harden --apply"); err != nil {
+				return err
+			}
 			safeCount := 0
 			for _, action := range plan.Actions {
 				if action.SafeAutoApply {
