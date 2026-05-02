@@ -531,6 +531,49 @@ Implement the first `deploy-shuttle doctor` foundation:
 - Resend email on activation.
 - Release workflow secret `LICENSE_PUBKEY_B64` so prod binaries are gated.
 
+## Current Slice - License Server (Bun + Hono + Stripe)
+
+**Status:** Implemented (code only; awaits Stripe + Postgres + Fly.io provisioning)  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02 (code complete)  
+**Plan sources:**
+
+- `~/.claude/plans/on-laisse-public-pour-stateful-oasis.md` (Phase 1a)
+
+### Scope
+
+- Bun + Hono server in `license-server/` exposing `/activate`, `/refresh`, `/pubkey`, `/webhooks/stripe`, `/healthz`.
+- Postgres schema (licenses, activations, webhook_events) bootstrapped on cold-boot.
+- Ed25519 JWT signer using Web Crypto, byte-compatible with the Go CLI verifier.
+- Stripe webhook handler (`checkout.session.completed`, subscription updated/deleted) with idempotent storage.
+- Resend transactional email for license key delivery (no-op when API key absent).
+- License key generator: `DS-XXXXXX-XXXXXX-XXXXXX` Crockford base32, statistically unique.
+- Operational: Dockerfile, fly.toml, .env.example, README with deploy steps.
+- CI: GitHub Actions runs `bun typecheck` and `bun test` alongside the Go suite.
+
+### Completion Checklist
+
+- [x] `src/index.ts` Hono app with logger, healthz, schema bootstrap.
+- [x] `src/routes/{activate,refresh,pubkey,webhooks}.ts` cover the four required endpoints.
+- [x] `src/lib/{env,db,jwt,keys,email}.ts` strict env, postgres.js wrapper, Ed25519 sign/verify, key generator, Resend client.
+- [x] `tests/jwt.test.ts` covers sign + verify, signature tampering, malformed input.
+- [x] `tests/keys.test.ts` covers format and uniqueness over 1000 samples.
+- [x] **Cross-compat test**: `go-cli/internal/license/crosscompat_test.go` verifies a Bun-signed token using the matching Bun-generated public key. Locks the wire contract.
+- [x] Dockerfile + fly.toml + README deploy guide.
+- [x] CI runs both Go and Bun test suites.
+- [x] `bun typecheck` and `bun test` pass locally.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` still pass.
+
+### Pending (operational, not code)
+
+- Generate the production Ed25519 keypair, store privately.
+- Provision Postgres (Neon free tier) and set `DATABASE_URL`.
+- Create the Stripe product `DeployShuttle Pro` with monthly + annual prices.
+- Create the Stripe webhook → `https://<host>/webhooks/stripe`, store signing secret.
+- Configure Resend (or any SMTP-equivalent fronted by the same `sendLicenseKeyEmail` interface).
+- `fly deploy` and put the public URL in `LICENSE_SERVER` of the release workflow.
+- Release workflow: add `LICENSE_PUBKEY_B64` secret so future tags ship a gated binary.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.

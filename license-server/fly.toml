@@ -1,0 +1,32 @@
+# DeployShuttle license server — Fly.io app config.
+# Update `app` and `primary_region` for your account, then `fly deploy`.
+
+app = "deploy-shuttle-license"
+primary_region = "cdg"
+
+[build]
+
+[env]
+  PORT = "3000"
+  TOKEN_GRACE_DAYS = "14"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/healthz"
+    protocol = "http"
+    timeout = "5s"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
