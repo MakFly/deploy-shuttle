@@ -296,6 +296,38 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] PDF includes accepted risks.
 - [x] Real VPS JSON renders to polished Markdown and PDF.
 
+## Current Slice - Harden Dry-Run Planner
+
+**Status:** Implemented  
+**Started:** 2026-05-02  
+**Completed:** 2026-05-02  
+**Plan sources:**
+
+- `plans/02-mvp-scope.md`
+- `plans/06-architecture-security.md`
+- previous stop note: dry-run hardening planner
+
+### Scope
+
+- Add `deploy-shuttle harden --dry-run`.
+- Read latest doctor JSON from `.deployshuttle/latest-report.json` by default.
+- Accept `--input <doctor.json>`, `--target user@host`, and `--format console|json`.
+- Convert failed, non-ignored findings into concrete proposed actions.
+- Group actions by category and surface source check ID + severity.
+- Do not mutate any local or remote system in this slice.
+
+### Completion Checklist
+
+- [x] `harden/planner.go` maps known finding IDs to actions with rationale, commands, and notes.
+- [x] `harden/render.go` prints a grouped, dry-run-labelled console plan.
+- [x] CLI command requires `--dry-run` and refuses any execution path.
+- [x] Default input falls back to `.deployshuttle/latest-report.json`.
+- [x] JSON output is supported via `--format json`.
+- [x] Unit tests cover empty plans, ignored findings, all known mappings, port-specific commands, and console rendering.
+- [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
+- [x] Build via `scripts/build-go.sh` and CLI smoke test of `harden --help` and `harden --dry-run --input <sample>`.
+- [x] CLAUDE.md command surface updated.
+
 ## Stop Note - 2026-05-02
 
 Paused here intentionally.
