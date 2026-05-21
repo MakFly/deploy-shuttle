@@ -9,7 +9,4 @@ dist/
 !.env.example
 data/
 .claude/agent-memory/
-
-# instant-grep index
-.ig/
 .deployshuttle/

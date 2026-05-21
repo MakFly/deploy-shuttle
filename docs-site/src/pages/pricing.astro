@@ -6,12 +6,11 @@ type Tier = {
   price: string;
   cadence?: string;
   blurb: string;
-  cta: { label: string; href: string };
+  cta?: { label: string; href: string };
   highlight?: boolean;
   features: string[];
 };
 
-// Stripe Payment Links go here once created. Use placeholders meanwhile.
 const tiers: Tier[] = [
   {
     name: "Free",
@@ -33,7 +32,6 @@ const tiers: Tier[] = [
     price: "29 EUR",
     cadence: "/ month",
     blurb: "For freelances who hand off to clients. Hosted reports + safe auto-apply.",
-    cta: { label: "Upgrade to Pro", href: "https://buy.stripe.com/PLACEHOLDER" },
     highlight: true,
     features: [
       "Everything in Free",
@@ -48,7 +46,6 @@ const tiers: Tier[] = [
     price: "99 EUR",
     cadence: "/ month",
     blurb: "For agencies running client VPS at scale. White-label PDFs + workspaces.",
-    cta: { label: "Upgrade to Agency", href: "https://buy.stripe.com/PLACEHOLDER" },
     features: [
       "Everything in Pro",
       "PDF report (white-label cover)",
@@ -66,7 +63,6 @@ const earlyBird = {
     "First 50 supporters get DeployShuttle Pro for life. Helps fund the cloud dashboard build.",
   price: "199 EUR",
   cadence: "one-time",
-  cta: { label: "Claim a slot", href: "https://buy.stripe.com/PLACEHOLDER-LIFETIME" },
 };
 
 const oneShot = {
@@ -75,7 +71,6 @@ const oneShot = {
     "I personally run doctor + harden against your VPS, write a 1-pager with the prioritized fixes, and send it back within 48 hours.",
   price: "99 EUR",
   cadence: "one-shot",
-  cta: { label: "Order an audit", href: "https://buy.stripe.com/PLACEHOLDER-AUDIT" },
 };
 ---
 <Root title="Pricing - DeployShuttle">
@@ -115,17 +110,23 @@ const oneShot = {
               </li>
             ))}
           </ul>
-          <a
-            href={t.cta.href}
-            class:list={[
-              "mt-8 inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors",
-              t.highlight
-                ? "bg-foreground text-background hover:opacity-90"
-                : "border border-border bg-background hover:bg-muted",
-            ]}
-          >
-            {t.cta.label}
-          </a>
+          {t.cta ? (
+            <a
+              href={t.cta.href}
+              class:list={[
+                "mt-8 inline-flex h-10 items-center justify-center rounded-md px-4 text-sm font-medium transition-colors",
+                t.highlight
+                  ? "bg-foreground text-background hover:opacity-90"
+                  : "border border-border bg-background hover:bg-muted",
+              ]}
+            >
+              {t.cta.label}
+            </a>
+          ) : (
+            <span class="mt-8 inline-flex h-10 items-center justify-center rounded-md border border-border bg-muted px-4 text-sm font-medium text-muted-foreground">
+              Payment links coming soon
+            </span>
+          )}
         </div>
       ))}
     </div>
@@ -138,14 +139,14 @@ const oneShot = {
         <h3 class="mt-2 text-xl font-semibold">{earlyBird.title}</h3>
         <p class="mt-1 text-sm text-muted-foreground">{earlyBird.blurb}</p>
         <p class="mt-4 text-2xl font-bold">{earlyBird.price} <span class="text-sm font-normal text-muted-foreground">{earlyBird.cadence}</span></p>
-        <a href={earlyBird.cta.href} class="mt-6 inline-flex h-10 items-center justify-center rounded-md bg-foreground px-4 text-sm font-medium text-background hover:opacity-90 transition-opacity">{earlyBird.cta.label}</a>
+        <span class="mt-6 inline-flex h-10 items-center justify-center rounded-md border border-border bg-muted px-4 text-sm font-medium text-muted-foreground">Payment links coming soon</span>
       </div>
       <div class="rounded-xl border border-border p-6 flex flex-col">
         <p class="text-xs uppercase tracking-wider text-muted-foreground">Done-for-you</p>
         <h3 class="mt-2 text-xl font-semibold">{oneShot.title}</h3>
         <p class="mt-1 text-sm text-muted-foreground">{oneShot.blurb}</p>
         <p class="mt-4 text-2xl font-bold">{oneShot.price} <span class="text-sm font-normal text-muted-foreground">{oneShot.cadence}</span></p>
-        <a href={oneShot.cta.href} class="mt-6 inline-flex h-10 items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium hover:bg-muted transition-colors">{oneShot.cta.label}</a>
+        <span class="mt-6 inline-flex h-10 items-center justify-center rounded-md border border-border bg-muted px-4 text-sm font-medium text-muted-foreground">Payment links coming soon</span>
       </div>
     </div>
   </section>

@@ -8,10 +8,10 @@ Severities map to the score deduction model:
 
 | Severity | Default deduction | Behavior |
 | --- | --- | --- |
-| `critical` | 30 | Causes `doctor` to exit non-zero regardless of `--fail-below`. |
-| `high` | 15 | Counted toward score; counts as an "open finding". |
+| `critical` | 20 | Causes `doctor` to exit non-zero regardless of `--fail-below`. |
+| `high` | 10 | Counted toward score; counts as an "open finding". |
 | `medium` | 5 | Counted toward score. |
-| `low` | 1 | Counted toward score. |
+| `low` | 2 | Counted toward score. |
 | `info` | 0 | Surfaced in reports, no score impact. |
 
 Use [`.deployshuttle.yml`](../README.md#configuration) to ignore findings or allow-list workloads.

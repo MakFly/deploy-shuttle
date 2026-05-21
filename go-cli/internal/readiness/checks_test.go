@@ -2,6 +2,25 @@ package readiness
 
 import "testing"
 
+func TestProfileCategoriesExpandsCompatibilityPresets(t *testing.T) {
+	categories := profileCategories([]string{"docker", "caddy"})
+	for _, category := range []string{"system", "ssh", "docker", "firewall", "secrets", "database", "compose", "backups", "reverse-proxy", "tls", "dns", "monitoring", "cloudflare"} {
+		if !categories[category] {
+			t.Fatalf("expected category %q to be enabled by docker,caddy profile", category)
+		}
+	}
+}
+
+func TestProfileCategoriesAllowsExplicitCategoryFilter(t *testing.T) {
+	categories := profileCategories([]string{"tls"})
+	if !categoryEnabled("tls", categories) {
+		t.Fatal("expected tls to be enabled")
+	}
+	if categoryEnabled("docker", categories) {
+		t.Fatal("expected docker to be disabled")
+	}
+}
+
 func TestDatabaseListenersPublicButFirewallRestricted(t *testing.T) {
 	output := `LISTEN 0 200 0.0.0.0:5432 0.0.0.0:* users:(("postgres",pid=2701933,fd=7))
 LISTEN 0 200 [::]:5432 [::]:* users:(("postgres",pid=2701933,fd=8))`

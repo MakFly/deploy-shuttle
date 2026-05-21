@@ -13,6 +13,11 @@ import (
 
 type Check func(execx.Adapter) CheckResult
 
+type registeredCheck struct {
+	category string
+	check    Check
+}
+
 func Run(adapter execx.Adapter, target string, profile []string) Report {
 	return RunWithConfig(adapter, target, profile, EmptyConfig(), "")
 }
@@ -28,61 +33,69 @@ func RunWithConfig(adapter execx.Adapter, target string, profile []string, cfg C
 		profile = []string{"docker", "caddy"}
 	}
 
-	checks := []Check{
-		checkOSSupported,
-		checkDiskSpace,
-		checkUpdatesPending,
-		checkMemoryLow,
-		checkDockerInstalled,
-		checkDockerServiceEnabled,
-		checkDockerRestartPolicies,
-		checkDockerHealthchecks,
-		checkDockerRunningAsRoot,
-		checkDockerSockExposed,
-		checkDockerPublishedSensitivePorts,
-		checkUFWActive,
-		checkDatabasePorts,
-		checkEnvWorldReadable,
-		checkEnvTracked,
-		checkSecretsWeakPermissions,
-		checkCaddyInstalled,
-		checkCaddyAdminExposed,
-		checkCaddySecurityHeaders,
-		checkCaddyConfigValid,
-		checkAdminerRestricted,
-		checkSSHRootLogin,
-		checkSSHPasswordAuth,
-		checkSSHPortDefault,
-		checkUnattendedUpgrades,
-		checkFail2ban,
-		checkSwap,
-		checkTimeSync,
-		checkTLSCertificate(cfg.App.Domain),
-		checkHSTSHeader(cfg.App.Domain),
-		checkDNSPointsToServer(cfg.App.Domain),
-		checkHealthEndpoint(cfg.App.Domain, cfg.App.HealthcheckPath),
-		checkDatabaseBackup,
+	enabledCategories := profileCategories(profile)
+	checks := []registeredCheck{
+		{"system", checkOSSupported},
+		{"system", checkDiskSpace},
+		{"system", checkUpdatesPending},
+		{"system", checkMemoryLow},
+		{"docker", checkDockerInstalled},
+		{"docker", checkDockerServiceEnabled},
+		{"docker", checkDockerRestartPolicies},
+		{"docker", checkDockerHealthchecks},
+		{"docker", checkDockerRunningAsRoot},
+		{"docker", checkDockerSockExposed},
+		{"firewall", checkDockerPublishedSensitivePorts},
+		{"firewall", checkUFWActive},
+		{"firewall", checkDatabasePorts},
+		{"secrets", checkEnvWorldReadable},
+		{"secrets", checkEnvTracked},
+		{"secrets", checkSecretsWeakPermissions},
+		{"reverse-proxy", checkCaddyInstalled},
+		{"reverse-proxy", checkCaddyAdminExposed},
+		{"reverse-proxy", checkCaddySecurityHeaders},
+		{"reverse-proxy", checkCaddyConfigValid},
+		{"database", checkAdminerRestricted},
+		{"ssh", checkSSHRootLogin},
+		{"ssh", checkSSHPasswordAuth},
+		{"ssh", checkSSHPortDefault},
+		{"system", checkUnattendedUpgrades},
+		{"system", checkFail2ban},
+		{"system", checkSwap},
+		{"system", checkTimeSync},
+		{"tls", checkTLSCertificate(cfg.App.Domain)},
+		{"tls", checkHSTSHeader(cfg.App.Domain)},
+		{"dns", checkDNSPointsToServer(cfg.App.Domain)},
+		{"monitoring", checkHealthEndpoint(cfg.App.Domain, cfg.App.HealthcheckPath)},
+		{"backups", checkDatabaseBackup},
 	}
 	results := make([]CheckResult, 0, len(checks))
 	for _, check := range checks {
-		results = append(results, applyConfig(check(adapter), cfg))
+		if !categoryEnabled(check.category, enabledCategories) {
+			continue
+		}
+		results = append(results, applyConfig(check.check(adapter), cfg))
 	}
-	composeSnap := loadCompose(adapter)
-	results = append(results,
-		applyConfig(checkComposeMissingProdFile(composeSnap), cfg),
-		applyConfig(checkComposeEnvFileMissing(adapter, composeSnap), cfg),
-		applyConfig(checkComposeLatestTag(composeSnap), cfg),
-		applyConfig(checkComposeNoResourceLimits(composeSnap), cfg),
-		applyConfig(checkComposeBindMountSensitivePaths(composeSnap), cfg),
-	)
+	if categoryEnabled("compose", enabledCategories) {
+		composeSnap := loadCompose(adapter)
+		results = append(results,
+			applyConfig(checkComposeMissingProdFile(composeSnap), cfg),
+			applyConfig(checkComposeEnvFileMissing(adapter, composeSnap), cfg),
+			applyConfig(checkComposeLatestTag(composeSnap), cfg),
+			applyConfig(checkComposeNoResourceLimits(composeSnap), cfg),
+			applyConfig(checkComposeBindMountSensitivePaths(composeSnap), cfg),
+		)
+	}
 	var cfClient *CloudflareClient
 	if cfg.Cloudflare.Enabled {
 		if token := ResolveCloudflareToken(cfg.Cloudflare); token != "" {
 			cfClient = newCloudflareClient(token)
 		}
 	}
-	for _, check := range cloudflareChecks(cfg.Cloudflare, cfg.App.Domain, cfClient) {
-		results = append(results, applyConfig(check(adapter), cfg))
+	if categoryEnabled("cloudflare", enabledCategories) {
+		for _, check := range cloudflareChecks(cfg.Cloudflare, cfg.App.Domain, cfClient) {
+			results = append(results, applyConfig(check(adapter), cfg))
+		}
 	}
 	score := Score(results)
 	return Report{
@@ -94,6 +107,37 @@ func RunWithConfig(adapter execx.Adapter, target string, profile []string, cfg C
 		Checks:      results,
 		GeneratedAt: time.Now().UTC().Format(time.RFC3339),
 	}
+}
+
+func profileCategories(profile []string) map[string]bool {
+	out := map[string]bool{}
+	for _, item := range profile {
+		item = strings.ToLower(strings.TrimSpace(item))
+		switch item {
+		case "", "all":
+			return nil
+		case "docker":
+			addCategories(out, "system", "ssh", "docker", "firewall", "secrets", "database", "compose", "backups")
+		case "caddy":
+			addCategories(out, "reverse-proxy", "tls", "dns", "monitoring", "cloudflare")
+		default:
+			out[item] = true
+		}
+	}
+	return out
+}
+
+func addCategories(set map[string]bool, categories ...string) {
+	for _, category := range categories {
+		set[category] = true
+	}
+}
+
+func categoryEnabled(category string, enabled map[string]bool) bool {
+	if enabled == nil {
+		return true
+	}
+	return enabled[category]
 }
 
 func Console(report Report) string {

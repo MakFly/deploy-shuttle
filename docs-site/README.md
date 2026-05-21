@@ -79,9 +79,8 @@ the bottom of MDX pages is computed from the same list.
 
 ## Pricing CTAs
 
-`src/pages/pricing.astro` references three Stripe Payment Links as
-`https://buy.stripe.com/PLACEHOLDER*`. Replace them once the Stripe
-products are created. Locations:
+`src/pages/pricing.astro` intentionally does not publish paid checkout
+links until real Stripe Payment Links exist. Add links for:
 
 - Pro 29 EUR / month
 - Agency 99 EUR / month

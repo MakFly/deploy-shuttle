@@ -61,16 +61,64 @@ export async function findLicense(key: string): Promise<LicenseRow | null> {
 }
 
 export async function recordActivation(
-  licenseKey: string,
+  license: LicenseRow,
   fp: string,
   cliVersion: string | null,
-): Promise<void> {
-  await sql`
-    INSERT INTO activations (license_key, machine_fingerprint, cli_version)
-    VALUES (${licenseKey}, ${fp}, ${cliVersion})
-    ON CONFLICT (license_key, machine_fingerprint)
-    DO UPDATE SET last_seen_at = now(), cli_version = EXCLUDED.cli_version
+): Promise<"recorded" | "seat_limit"> {
+  return await sql.begin(async (tx) => {
+    const locked = await tx<{ seats: number }[]>`
+      SELECT seats FROM licenses WHERE key = ${license.key} FOR UPDATE
+    `;
+    const seats = locked[0]?.seats ?? license.seats;
+    const existing = await tx<{ id: number }[]>`
+      SELECT id FROM activations
+      WHERE license_key = ${license.key} AND machine_fingerprint = ${fp}
+      LIMIT 1
+    `;
+    if (existing.length > 0) {
+      await tx`
+        UPDATE activations
+        SET last_seen_at = now(), cli_version = ${cliVersion}
+        WHERE license_key = ${license.key} AND machine_fingerprint = ${fp}
+      `;
+      return "recorded";
+    }
+    const counts = await tx<{ count: string }[]>`
+      SELECT count(*)::text AS count FROM activations WHERE license_key = ${license.key}
+    `;
+    const count = Number(counts[0]?.count ?? "0");
+    if (count >= seats) return "seat_limit";
+    await tx`
+      INSERT INTO activations (license_key, machine_fingerprint, cli_version)
+      VALUES (${license.key}, ${fp}, ${cliVersion})
+    `;
+    return "recorded";
+  });
+}
+
+export async function touchActivation(
+  licenseKey: string,
+  fp: string,
+): Promise<boolean> {
+  const rows = await sql<{ id: number }[]>`
+    UPDATE activations
+    SET last_seen_at = now()
+    WHERE license_key = ${licenseKey} AND machine_fingerprint = ${fp}
+    RETURNING id
   `;
+  return rows.length > 0;
+}
+
+export async function deactivateActivation(
+  licenseKey: string,
+  fp: string,
+): Promise<boolean> {
+  const rows = await sql<{ id: number }[]>`
+    DELETE FROM activations
+    WHERE license_key = ${licenseKey} AND machine_fingerprint = ${fp}
+    RETURNING id
+  `;
+  return rows.length > 0;
 }
 
 export async function upsertLicense(row: {

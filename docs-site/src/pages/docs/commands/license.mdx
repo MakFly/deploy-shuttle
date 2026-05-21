@@ -52,7 +52,8 @@ deploy-shuttle license deactivate
 ```
 
 Removes the local license file and frees the activation slot on the
-server side.
+server side. If the server is unreachable and you only want to remove the
+local token, run `deploy-shuttle license deactivate --local-only`.
 
 ## Token storage
 

@@ -11,6 +11,13 @@ and a dry-run hardening plan before any client handoff.
 deploy-shuttle doctor --target root@server
 ```
 
+> [!TIP]
+> Copy the repository URL:
+>
+> ```text
+> https://github.com/MakFly/deploy-shuttle
+> ```
+
 ## Why
 
 You can ship a Docker app to a `$5` VPS in an afternoon — but the gap between

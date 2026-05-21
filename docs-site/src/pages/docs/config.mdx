@@ -52,11 +52,15 @@ Every key is optional. An empty file is valid (`version: 1` is implied).
 
 | Key | Type | What it does |
 | --- | --- | --- |
-| `profile` | string list | Categories to load. Default: `docker, caddy`. |
+| `profile` | string list | Profile presets or explicit categories to load. Default: `docker, caddy`. |
 | `ignore` | string list | Check IDs to mark as skipped (no score impact). |
 
 Ignored findings still appear in reports under "Accepted risks" so client
 reviewers can see them.
+
+`docker` and `caddy` are compatibility presets. Together they load the full
+local VPS readiness suite. To run a narrow suite, pass explicit categories
+such as `tls`, `dns`, `cloudflare`, `compose`, or `secrets`.
 
 ## `docker`
 

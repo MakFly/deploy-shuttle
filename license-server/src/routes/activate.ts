@@ -17,7 +17,10 @@ activateRoute.post("/", async (c) => {
   if (license.status !== "active") return c.json({ error: `license ${license.status}` }, 403);
   if (license.tier !== "pro") return c.json({ error: "unsupported tier" }, 403);
 
-  await recordActivation(license.key, body.machineFingerprint, cliVersion);
+  const activation = await recordActivation(license, body.machineFingerprint, cliVersion);
+  if (activation === "seat_limit") {
+    return c.json({ error: "license activation limit reached" }, 409);
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const grace = env.tokenGraceDays * 24 * 60 * 60;

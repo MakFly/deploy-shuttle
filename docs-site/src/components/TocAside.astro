@@ -41,8 +41,6 @@ const { items } = Astro.props;
     const links = Array.from(toc.querySelectorAll("[data-toc-link]"));
     if (!links.length) return;
 
-    // slug -> link map for O(1) lookup on intersection events.
-    const linkBySlug = new Map(links.map((a) => [a.dataset.tocLink, a]));
     const slugs = links.map((a) => a.dataset.tocLink);
 
     // Track which headings are intersecting; the first one in document order

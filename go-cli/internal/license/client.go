@@ -96,6 +96,31 @@ func (c *Client) Refresh(ctx context.Context, token string) (ActivateResponse, e
 	return out, nil
 }
 
+// DeactivateRequest removes the current machine activation on the server.
+type DeactivateRequest struct {
+	Token string `json:"token"`
+}
+
+// Deactivate removes a token's machine fingerprint from the license server.
+func (c *Client) Deactivate(ctx context.Context, token string) error {
+	if token == "" {
+		return errors.New("token is required")
+	}
+	body, err := json.Marshal(DeactivateRequest{Token: token})
+	if err != nil {
+		return err
+	}
+	resp, err := c.post(ctx, "/deactivate", body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return decodeServerError(resp, "deactivate")
+	}
+	return nil
+}
+
 func (c *Client) post(ctx context.Context, path string, body []byte) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+path, bytes.NewReader(body))
 	if err != nil {

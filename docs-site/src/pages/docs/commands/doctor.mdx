@@ -18,12 +18,12 @@ deploy-shuttle doctor [flags]
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--target <user@host[:port]>` | unset (local scan) | SSH target. Reads your `~/.ssh/config` and agent. |
+| `--target <user@host[:port]>` | unset (local scan) | SSH target. Reads `~/.ssh/config`, ssh-agent, common key files, and validates `known_hosts`. |
 | `--config <path>` | nearest `.deployshuttle.yml` | Readiness configuration with check ignores, allow-lists, app domain. |
 | `--format console\|json` | `console` | `json` is stable and meant for downstream tooling. |
 | `--output <path>` | unset | Persist the JSON report. `harden` and `report` read it by default. |
-| `--profile <list>` | from config or `docker,caddy` | Comma-separated check profile(s). |
-| `--fail-below <int>` | `0` | Exit non-zero when score falls strictly below this. |
+| `--profile <list>` | from config or `docker,caddy` | Comma-separated profile presets or explicit categories. |
+| `--fail-below <int>` | unset | Exit non-zero when score falls strictly below this. |
 
 ## Examples
 
@@ -73,10 +73,10 @@ The score starts at 100 and deducts per failed check:
 
 | Severity | Deduction |
 | --- | --- |
-| `critical` | 30 |
-| `high` | 15 |
+| `critical` | 20 |
+| `high` | 10 |
 | `medium` | 5 |
-| `low` | 1 |
+| `low` | 2 |
 | `info` | 0 |
 
 Floor is `0`, ceiling `100`. A single critical finding always exits

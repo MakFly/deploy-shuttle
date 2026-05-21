@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { findLicense, recordActivation } from "../lib/db";
+import { findLicense, touchActivation } from "../lib/db";
 import { signToken, verifyToken, type Claims } from "../lib/jwt";
 import { env } from "../lib/env";
 
@@ -17,7 +17,8 @@ refreshRoute.post("/", async (c) => {
   if (!license) return c.json({ error: "license revoked" }, 403);
   if (license.status !== "active") return c.json({ error: `license ${license.status}` }, 403);
 
-  await recordActivation(license.key, claims.fp, null);
+  const active = await touchActivation(license.key, claims.fp);
+  if (!active) return c.json({ error: "activation revoked" }, 403);
 
   const now = Math.floor(Date.now() / 1000);
   const grace = env.tokenGraceDays * 24 * 60 * 60;

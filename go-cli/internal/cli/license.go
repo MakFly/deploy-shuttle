@@ -133,10 +133,25 @@ func newLicenseRefreshCommand() *cobra.Command {
 }
 
 func newLicenseDeactivateCommand() *cobra.Command {
-	return &cobra.Command{
+	var localOnly bool
+	cmd := &cobra.Command{
 		Use:   "deactivate",
-		Short: "Remove the cached license token from this machine",
+		Short: "Deactivate this machine and remove the cached license token",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if !localOnly {
+				state, err := license.Load("")
+				if err != nil && !errors.Is(err, license.ErrNoLicense) {
+					return err
+				}
+				if err == nil {
+					client := license.NewClient(state.ServerURL)
+					ctx, cancel := context.WithTimeout(cmd.Context(), 15*time.Second)
+					defer cancel()
+					if err := client.Deactivate(ctx, state.Token); err != nil {
+						return fmt.Errorf("server deactivate failed: %w (use --local-only to remove the local token without contacting the server)", err)
+					}
+				}
+			}
 			if err := license.Clear(""); err != nil {
 				return err
 			}
@@ -144,6 +159,8 @@ func newLicenseDeactivateCommand() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&localOnly, "local-only", false, "remove only the local token without deactivating this machine on the server")
+	return cmd
 }
 
 func resolveServer(flag string) string {

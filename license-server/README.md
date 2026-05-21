@@ -6,6 +6,7 @@ Stripe-backed license issuer for the DeployShuttle CLI Pro tier.
 Stripe Checkout ── webhook ──▶ license-server ── Postgres
                                        │
                                        ├─▶ /activate  (CLI → JWT 14 d)
+                                       ├─▶ /deactivate (free machine slot)
                                        ├─▶ /refresh   (CLI → new JWT)
                                        └─▶ /pubkey    (verifying key)
 ```
@@ -100,6 +101,17 @@ Body:
 ```
 
 Returns the same shape as `/activate`.
+
+### POST `/deactivate`
+
+Body:
+
+```json
+{ "token": "<existing jwt>" }
+```
+
+Deletes the activation for the token's license key and machine
+fingerprint. Returns `{ "deactivated": true }` when a slot was freed.
 
 ### POST `/webhooks/stripe`
 
