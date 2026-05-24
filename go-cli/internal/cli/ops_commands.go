@@ -10,7 +10,6 @@ import (
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/config"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/runtime"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/shell"
-	"github.com/MakFly/deploy-shuttle/go-cli/internal/ssh"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/templates"
 	"github.com/spf13/cobra"
 )
@@ -33,10 +32,12 @@ func newProvisionCommand() *cobra.Command {
 				}
 				for _, host := range group.Hosts {
 					fmt.Printf("Provisioning %s@%s (group: %s)\n", user, host, name)
-					client, err := ssh.NewClient(host, "root", 22)
+					provisionGroup := config.ServerGroup{Hosts: group.Hosts, User: "root", Port: group.Port}
+					client, err := connectSSH(provisionGroup, host)
 					if err != nil {
 						return err
 					}
+					sshPort := group.Port
 					commands := []string{
 						"apt-get update -y",
 						"apt-get install -y ca-certificates curl gnupg ufw fail2ban",
@@ -44,7 +45,7 @@ func newProvisionCommand() *cobra.Command {
 						"curl -fsSL https://get.docker.com | sh",
 						fmt.Sprintf("usermod -aG docker %s", shell.Escape(user)),
 						fmt.Sprintf("mkdir -p %s && chown -R %s:%s %s", shell.Escape(runtime.AppDir(cfg.App)), shell.Escape(user), shell.Escape(user), shell.Escape(runtime.AppDir(cfg.App))),
-						"ufw allow 22/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable",
+						fmt.Sprintf("ufw allow %d/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable", sshPort),
 					}
 					for _, command := range commands {
 						res := client.Run(command)
@@ -74,6 +75,9 @@ func newDeployCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
+			if cfg.Deploy.Strategy == "compose" {
+				return deployCompose(cfg, skipBuild, dryRun)
+			}
 			image := fmt.Sprintf("shuttle/%s:latest", cfg.App)
 			if !skipBuild {
 				if dryRun {
@@ -89,7 +93,7 @@ func newDeployCommand() *cobra.Command {
 			}
 			for _, group := range cfg.Servers {
 				for _, host := range group.Hosts {
-					client, err := ssh.NewClient(host, group.User, 22)
+					client, err := connectSSH(group, host)
 					if err != nil {
 						return err
 					}
@@ -136,12 +140,18 @@ func newStatusCommand() *cobra.Command {
 			}
 			for _, group := range cfg.Servers {
 				for _, host := range group.Hosts {
-					client, err := ssh.NewClient(host, group.User, 22)
+					client, err := connectSSH(group, host)
 					if err != nil {
 						return err
 					}
-					res := client.Run("docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'")
-					fmt.Printf("%s\n%s\n", host, res.Stdout)
+					if cfg.Deploy.Strategy == "compose" {
+						remoteDir := runtime.AppDir(cfg.App)
+						res := client.Run(fmt.Sprintf("cd %s && docker compose ps", shell.Escape(remoteDir)))
+						fmt.Printf("%s\n%s\n", host, res.Stdout)
+					} else {
+						res := client.Run("docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'")
+						fmt.Printf("%s\n%s\n", host, res.Stdout)
+					}
 				}
 			}
 			return nil
@@ -168,14 +178,23 @@ func newLogsCommand() *cobra.Command {
 			}
 			for _, group := range cfg.Servers {
 				for _, host := range group.Hosts {
-					client, err := ssh.NewClient(host, group.User, 22)
+					client, err := connectSSH(group, host)
 					if err != nil {
 						return err
 					}
-					res := client.Run(fmt.Sprintf("docker logs --tail %d %s", lines, shell.Escape(fmt.Sprintf("%s_%s_0", cfg.App, service))))
-					fmt.Print(res.Stdout)
-					if res.Code != 0 {
-						return fmt.Errorf(res.Stderr)
+					if cfg.Deploy.Strategy == "compose" {
+						remoteDir := runtime.AppDir(cfg.App)
+						res := client.Run(fmt.Sprintf("cd %s && docker compose logs --tail %d %s", shell.Escape(remoteDir), lines, shell.Escape(service)))
+						fmt.Print(res.Stdout)
+						if res.Stderr != "" {
+							fmt.Fprint(os.Stderr, res.Stderr)
+						}
+					} else {
+						res := client.Run(fmt.Sprintf("docker logs --tail %d %s", lines, shell.Escape(fmt.Sprintf("%s_%s_0", cfg.App, service))))
+						fmt.Print(res.Stdout)
+						if res.Code != 0 {
+							return fmt.Errorf(res.Stderr)
+						}
 					}
 					return nil
 				}
@@ -209,15 +228,24 @@ func newExecCommand() *cobra.Command {
 			}
 			for _, group := range cfg.Servers {
 				for _, host := range group.Hosts {
-					client, err := ssh.NewClient(host, group.User, 22)
+					client, err := connectSSH(group, host)
 					if err != nil {
 						return err
 					}
-					container := fmt.Sprintf("%s_%s_0", cfg.App, service)
-					res := client.Run(fmt.Sprintf("docker exec %s sh -lc %s", shell.Escape(container), shell.Escape(remote)))
-					fmt.Print(res.Stdout)
-					if res.Code != 0 {
-						return fmt.Errorf(res.Stderr)
+					if cfg.Deploy.Strategy == "compose" {
+						remoteDir := runtime.AppDir(cfg.App)
+						res := client.Run(fmt.Sprintf("cd %s && docker compose exec %s %s", shell.Escape(remoteDir), shell.Escape(service), remote))
+						fmt.Print(res.Stdout)
+						if res.Code != 0 {
+							return fmt.Errorf(res.Stderr)
+						}
+					} else {
+						container := fmt.Sprintf("%s_%s_0", cfg.App, service)
+						res := client.Run(fmt.Sprintf("docker exec %s sh -lc %s", shell.Escape(container), shell.Escape(remote)))
+						fmt.Print(res.Stdout)
+						if res.Code != 0 {
+							return fmt.Errorf(res.Stderr)
+						}
 					}
 					return nil
 				}
@@ -252,7 +280,7 @@ func newDestroyCommand() *cobra.Command {
 			}
 			for _, group := range cfg.Servers {
 				for _, host := range group.Hosts {
-					client, err := ssh.NewClient(host, group.User, 22)
+					client, err := connectSSH(group, host)
 					if err != nil {
 						return err
 					}
@@ -286,7 +314,7 @@ func lockRun(flags configFlags, action string) error {
 	}
 	for _, group := range cfg.Servers {
 		for _, host := range group.Hosts {
-			client, err := ssh.NewClient(host, group.User, 22)
+			client, err := connectSSH(group, host)
 			if err != nil {
 				return err
 			}
@@ -332,7 +360,7 @@ func newMonitorCommand() *cobra.Command {
 	return simpleConfigCommand("monitor", "Live Docker resource usage across all servers", func(cfg *config.Config) error {
 		for _, group := range cfg.Servers {
 			for _, host := range group.Hosts {
-				client, err := ssh.NewClient(host, group.User, 22)
+				client, err := connectSSH(group, host)
 				if err != nil {
 					return err
 				}

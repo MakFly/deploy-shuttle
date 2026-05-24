@@ -34,6 +34,7 @@ func NewRootCommand() *cobra.Command {
 		newMonitorCommand(),
 		newCICommand(),
 		newLicenseCommand(),
+		newUpdateCommand(),
 	)
 	return root
 }

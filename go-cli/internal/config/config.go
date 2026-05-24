@@ -24,17 +24,20 @@ type Config struct {
 	Proxy         Proxy                  `yaml:"proxy,omitempty" json:"proxy"`
 	Registry      Registry               `yaml:"registry,omitempty" json:"registry"`
 	Notifications Notifications          `yaml:"notifications,omitempty" json:"notifications"`
+	Caddy         Caddy                  `yaml:"caddy,omitempty" json:"caddy,omitempty"`
 	Dev           Dev                    `yaml:"dev,omitempty" json:"dev,omitempty"`
 }
 
 type ServerShorthand struct {
 	Host string `yaml:"host" json:"host"`
 	User string `yaml:"user" json:"user"`
+	Port int    `yaml:"port,omitempty" json:"port,omitempty"`
 }
 
 type ServerGroup struct {
 	Hosts []string `yaml:"hosts" json:"hosts"`
 	User  string   `yaml:"user" json:"user"`
+	Port  int      `yaml:"port,omitempty" json:"port,omitempty"`
 }
 
 type Build struct {
@@ -55,6 +58,8 @@ type Deploy struct {
 	Concurrency  int      `yaml:"concurrency,omitempty" json:"concurrency"`
 	Swarm        Swarm    `yaml:"swarm,omitempty" json:"swarm"`
 	Raw          []string `yaml:"-" json:"-"`
+	ComposeFiles []string `yaml:"compose_files,omitempty" json:"compose_files,omitempty"`
+	EnvFile      string   `yaml:"env_file,omitempty" json:"env_file,omitempty"`
 }
 
 type Hooks struct {
@@ -125,6 +130,13 @@ type Registry struct {
 
 type Notifications struct {
 	Webhooks []string `yaml:"webhooks,omitempty" json:"webhooks,omitempty"`
+}
+
+type Caddy struct {
+	ConfDir       string            `yaml:"conf_dir,omitempty" json:"conf_dir,omitempty"`
+	ReloadCommand string            `yaml:"reload_command,omitempty" json:"reload_command,omitempty"`
+	TLSSnippet    string            `yaml:"tls_snippet,omitempty" json:"tls_snippet,omitempty"`
+	Routes        map[string]string `yaml:"routes,omitempty" json:"routes,omitempty"`
 }
 
 type Dev struct {
@@ -198,7 +210,13 @@ func loadFile(path string) (*Config, error) {
 func applyDefaults(cfg *Config) {
 	if cfg.Server != nil && len(cfg.Servers) == 0 {
 		cfg.Servers = map[string]ServerGroup{
-			"default": {Hosts: []string{cfg.Server.Host}, User: cfg.Server.User},
+			"default": {Hosts: []string{cfg.Server.Host}, User: cfg.Server.User, Port: cfg.Server.Port},
+		}
+	}
+	for name, group := range cfg.Servers {
+		if group.Port == 0 {
+			group.Port = 22
+			cfg.Servers[name] = group
 		}
 	}
 	if cfg.Build.Dockerfile == "" {
@@ -220,6 +238,9 @@ func applyDefaults(cfg *Config) {
 		cfg.Deploy.Concurrency = 5
 	}
 	cfg.Deploy.AutoRollback = true
+	if cfg.Deploy.Strategy == "compose" && len(cfg.Deploy.ComposeFiles) == 0 {
+		cfg.Deploy.ComposeFiles = []string{"docker-compose.yml"}
+	}
 	if cfg.Proxy.Driver == "" {
 		cfg.Proxy.Driver = "caddy"
 	}
@@ -228,6 +249,12 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Secrets.File == "" {
 		cfg.Secrets.File = ".shuttle/secrets.enc"
+	}
+	if cfg.Caddy.ConfDir == "" {
+		cfg.Caddy.ConfDir = "/opt/caddy/conf.d"
+	}
+	if cfg.Caddy.ReloadCommand == "" {
+		cfg.Caddy.ReloadCommand = "docker service update --force caddy_caddy"
 	}
 	if cfg.Dev.Ports.HTTP == 0 {
 		cfg.Dev.Ports.HTTP = 80
@@ -247,7 +274,7 @@ func validate(cfg *Config) error {
 	if len(cfg.Servers) == 0 {
 		return errors.New("server or servers is required")
 	}
-	if cfg.Deploy.Strategy != "blue-green" && cfg.Deploy.Strategy != "rolling" && cfg.Deploy.Strategy != "swarm" {
+	if cfg.Deploy.Strategy != "blue-green" && cfg.Deploy.Strategy != "rolling" && cfg.Deploy.Strategy != "swarm" && cfg.Deploy.Strategy != "compose" {
 		return fmt.Errorf("invalid deploy strategy %q", cfg.Deploy.Strategy)
 	}
 	return nil

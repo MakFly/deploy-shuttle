@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/spf13/cobra"
 )
@@ -28,7 +29,8 @@ func newSSHCommand() *cobra.Command {
 					if group.User != "" {
 						target = fmt.Sprintf("%s@%s", group.User, host)
 					}
-					sshCmd := exec.Command("ssh", target)
+					sshArgs := []string{"-p", strconv.Itoa(group.Port), target}
+					sshCmd := exec.Command("ssh", sshArgs...)
 					sshCmd.Stdin = os.Stdin
 					sshCmd.Stdout = os.Stdout
 					sshCmd.Stderr = os.Stderr

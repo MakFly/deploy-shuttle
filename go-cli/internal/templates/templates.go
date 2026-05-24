@@ -121,18 +121,24 @@ docker:
 	return ""
 }
 
-func ShuttleYML(app string, domain string, host string, user string) string {
+func ShuttleYML(app string, domain string, host string, user string, port int) string {
+	if port == 0 {
+		port = 22
+	}
 	return fmt.Sprintf(`app: %s
 domain: %s
 server:
   host: %s
   user: %s
+  port: %d
+
+deploy:
+  strategy: compose
 
 services:
   web:
     port: 3000
-    command: bun run start
-`, app, domain, host, user)
+`, app, domain, host, user, port)
 }
 
 func Caddyfile(cfg *config.Config, upstream string) string {

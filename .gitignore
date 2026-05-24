@@ -10,3 +10,9 @@ dist/
 data/
 .claude/agent-memory/
 .deployshuttle/
+
+# instant-grep index
+.ig/
+
+# build artifacts
+go-cli/deploy-shuttle

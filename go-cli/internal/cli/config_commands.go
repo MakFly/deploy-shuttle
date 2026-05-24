@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/config"
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/detect"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/templates"
 	"github.com/spf13/cobra"
 )
@@ -59,20 +60,49 @@ func newInitCommand() *cobra.Command {
 	var domain string
 	var host string
 	var user string
+	var port int
 	var preset string
+	var skipDetect bool
+	var withCI bool
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Generate shuttle.yml (and optionally a readiness preset)",
-		Long: "Generate a shuttle.yml deploy config. With --preset <stack>, also " +
-			"emit an opinionated .deployshuttle.yml so 'doctor' produces fewer " +
-			"false positives on day one. Supported presets: " +
+		Short: "Detect your stack and generate configuration",
+		Long: "Analyze the current project to detect the technology stack, then generate:\n" +
+			"  - shuttle.yml (deploy config)\n" +
+			"  - .deployshuttle.yml (readiness config with the right preset)\n" +
+			"  - optionally, a GitHub Actions workflow (--ci)\n\n" +
+			"Use --preset to override auto-detection. Supported presets: " +
 			strings.Join(templates.ReadinessPresets, ", ") + ".",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			dir, _ := os.Getwd()
+
+			// --- Stack detection ---
+			var stack detect.Stack
+			if preset != "" {
+				if !templates.IsReadinessPreset(preset) {
+					return fmt.Errorf("unknown preset %q; supported: %s", preset, strings.Join(templates.ReadinessPresets, ", "))
+				}
+				stack = detect.Stack{Preset: preset, Framework: preset}
+			} else if !skipDetect {
+				stack = detect.Analyze(dir)
+				if stack.Preset != "" {
+					fmt.Printf("Detected stack: %s\n", stack.Framework)
+					for _, sig := range stack.Signals {
+						fmt.Printf("  • %s\n", sig)
+					}
+					fmt.Printf("  → preset: %s\n\n", stack.Preset)
+				} else {
+					fmt.Println("Could not auto-detect stack. Using generic config.")
+					fmt.Println("Tip: use --preset to specify manually.")
+				}
+			}
+
+			// --- Defaults ---
 			if app == "" {
-				app = "myapp"
+				app = filepath.Base(dir)
 			}
 			if domain == "" {
-				domain = "myapp.example.com"
+				domain = app + ".example.com"
 			}
 			if host == "" {
 				host = "203.0.113.10"
@@ -80,41 +110,107 @@ func newInitCommand() *cobra.Command {
 			if user == "" {
 				user = "deploy"
 			}
-			if preset != "" && !templates.IsReadinessPreset(preset) {
-				return fmt.Errorf("unknown preset %q; supported: %s", preset, strings.Join(templates.ReadinessPresets, ", "))
+			if stack.HealthPath != "" && domain == app+".example.com" {
+				// keep domain placeholder
 			}
+
+			// --- shuttle.yml ---
 			if _, err := os.Stat("shuttle.yml"); err == nil && !force {
-				return fmt.Errorf("shuttle.yml already exists; use --force to overwrite")
+				fmt.Println("shuttle.yml already exists (use --force to overwrite)")
+			} else {
+				if err := os.MkdirAll(".shuttle", 0o755); err != nil {
+					return err
+				}
+				_ = os.WriteFile(filepath.Join(".shuttle", ".gitkeep"), []byte{}, 0o644)
+				if err := os.WriteFile("shuttle.yml", []byte(templates.ShuttleYML(app, domain, host, user, port)), 0o644); err != nil {
+					return err
+				}
+				fmt.Println("✓ shuttle.yml created")
 			}
-			if err := os.MkdirAll(".shuttle", 0o755); err != nil {
-				return err
+
+			// --- .deployshuttle.yml ---
+			effectivePreset := stack.Preset
+			if effectivePreset != "" {
+				if _, err := os.Stat(".deployshuttle.yml"); err == nil && !force {
+					if preset != "" {
+						return fmt.Errorf(".deployshuttle.yml already exists; use --force to overwrite")
+					}
+					fmt.Println(".deployshuttle.yml already exists (use --force to overwrite)")
+				} else {
+					body := templates.DeployShuttleYML(effectivePreset, domain)
+					if body != "" {
+						if err := os.WriteFile(".deployshuttle.yml", []byte(body), 0o644); err != nil {
+							return err
+						}
+						fmt.Printf("✓ .deployshuttle.yml created (preset: %s)\n", effectivePreset)
+					}
+				}
 			}
-			if err := os.WriteFile(filepath.Join(".shuttle", ".gitkeep"), []byte{}, 0o644); err != nil {
-				return err
+
+			// --- CI workflow ---
+			if withCI {
+				ciDir := filepath.Join(".github", "workflows")
+				ciFile := filepath.Join(ciDir, "deploy-shuttle.yml")
+				if _, err := os.Stat(ciFile); err == nil && !force {
+					fmt.Println("CI workflow already exists (use --force to overwrite)")
+				} else {
+					if err := os.MkdirAll(ciDir, 0o755); err != nil {
+						return err
+					}
+					workflow := generateCIWorkflow()
+					if err := os.WriteFile(ciFile, []byte(workflow), 0o644); err != nil {
+						return err
+					}
+					fmt.Println("✓ .github/workflows/deploy-shuttle.yml created")
+				}
 			}
-			if err := os.WriteFile("shuttle.yml", []byte(templates.ShuttleYML(app, domain, host, user)), 0o644); err != nil {
-				return err
+
+			// --- Summary ---
+			fmt.Println("\nNext steps:")
+			fmt.Println("  1. Edit shuttle.yml with your server details")
+			if effectivePreset != "" {
+				fmt.Println("  2. Review .deployshuttle.yml (adjust ignore rules if needed)")
+				fmt.Println("  3. Run: deploy-shuttle doctor")
+			} else {
+				fmt.Println("  2. Run: deploy-shuttle doctor")
 			}
-			if preset == "" {
-				return nil
-			}
-			if _, err := os.Stat(".deployshuttle.yml"); err == nil && !force {
-				return fmt.Errorf(".deployshuttle.yml already exists; use --force to overwrite")
-			}
-			body := templates.DeployShuttleYML(preset, domain)
-			if body == "" {
-				return fmt.Errorf("preset %q produced an empty config", preset)
-			}
-			return os.WriteFile(".deployshuttle.yml", []byte(body), 0o644)
+			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing shuttle.yml or .deployshuttle.yml")
-	cmd.Flags().StringVar(&app, "app", "", "application name")
+	cmd.Flags().BoolVar(&force, "force", false, "overwrite existing files")
+	cmd.Flags().StringVar(&app, "app", "", "application name (default: directory name)")
 	cmd.Flags().StringVar(&domain, "domain", "", "application domain")
 	cmd.Flags().StringVar(&host, "host", "", "server host")
 	cmd.Flags().StringVar(&user, "user", "", "server user")
-	cmd.Flags().StringVar(&preset, "preset", "", "also generate .deployshuttle.yml for the given stack ("+strings.Join(templates.ReadinessPresets, "|")+")")
+	cmd.Flags().IntVar(&port, "port", 22, "server SSH port")
+	cmd.Flags().StringVar(&preset, "preset", "", "override auto-detection with a specific preset ("+strings.Join(templates.ReadinessPresets, "|")+")")
+	cmd.Flags().BoolVar(&skipDetect, "no-detect", false, "skip stack detection")
+	cmd.Flags().BoolVar(&withCI, "ci", false, "also generate a GitHub Actions workflow")
 	return cmd
+}
+
+func generateCIWorkflow() string {
+	return `name: DeployShuttle Readiness
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install deploy-shuttle
+        run: curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
+
+      - name: Run readiness scan
+        run: deploy-shuttle doctor --fail-below 75
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+`
 }
 
 func newNewCommand() *cobra.Command {
@@ -131,7 +227,7 @@ func newNewCommand() *cobra.Command {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return err
 			}
-			if err := os.WriteFile(filepath.Join(dir, "shuttle.yml"), []byte(templates.ShuttleYML(filepath.Base(dir), filepath.Base(dir)+".example.com", "203.0.113.10", "deploy")), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, "shuttle.yml"), []byte(templates.ShuttleYML(filepath.Base(dir), filepath.Base(dir)+".example.com", "203.0.113.10", "deploy", 22)), 0o644); err != nil {
 				return err
 			}
 			dockerfile := "FROM oven/bun:1\nWORKDIR /app\nCOPY . .\nCMD [\"bun\", \"run\", \"start\"]\n"

@@ -9,7 +9,6 @@ import (
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/runtime"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/secrets"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/shell"
-	"github.com/MakFly/deploy-shuttle/go-cli/internal/ssh"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -118,7 +117,7 @@ func newSecretsCommand() *cobra.Command {
 			content := formatEnv(values)
 			for _, group := range cfg.Servers {
 				for _, host := range group.Hosts {
-					client, err := ssh.NewClient(host, group.User, 22)
+					client, err := connectSSH(group, host)
 					if err != nil {
 						return err
 					}
