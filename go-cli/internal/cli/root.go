@@ -35,6 +35,7 @@ func NewRootCommand() *cobra.Command {
 		newCICommand(),
 		newLicenseCommand(),
 		newUpdateCommand(),
+		newUninstallCommand(),
 	)
 	return root
 }
