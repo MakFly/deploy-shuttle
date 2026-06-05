@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
@@ -290,7 +291,30 @@ func startRegistry() error {
 	)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return waitForRegistry()
+}
+
+func waitForRegistry() error {
+	url := fmt.Sprintf("http://127.0.0.1:%d/v2/", registryPort)
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+	var lastErr error
+	for range 40 {
+		resp, err := client.Get(url)
+		if err == nil {
+			resp.Body.Close()
+			if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+				return nil
+			}
+			lastErr = fmt.Errorf("registry returned HTTP %d", resp.StatusCode)
+		} else {
+			lastErr = err
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	return fmt.Errorf("registry did not become ready: %w", lastErr)
 }
 
 func stopRegistry() {
