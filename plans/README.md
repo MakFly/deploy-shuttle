@@ -11,7 +11,7 @@ Audit, harden and deploy Docker apps on VPS.
 Main hook:
 
 ```bash
-deploy-shuttle doctor --target root@server
+shuttle doctor --target root@server
 ```
 
 ## Documents
@@ -31,7 +31,7 @@ Do not start with the dashboard.
 Recommended order:
 
 1. Align docs and README around the PRD.
-2. Implement `deploy-shuttle doctor`.
+2. Implement `shuttle doctor`.
 3. Add report output formats.
 4. Add conservative `harden --dry-run`.
 5. Treat `deploy` as the continuation after readiness checks.

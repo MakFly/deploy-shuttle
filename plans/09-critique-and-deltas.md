@@ -80,7 +80,7 @@ Déjà fait : allow-list stricte (chmod 600 .env, ufw deny `<port>/tcp`).
 ### 2.5 Faux positifs non gérés systématiquement
 
 Un check qui flag à tort un setup volontaire (Postgres exposé pour réplication
-cross-region) détruit la crédibilité. Acquis : `.deployshuttle.yml` supporte
+cross-region) détruit la crédibilité. Acquis : `.shuttle.yml` supporte
 `checks.ignore` + `docker.allowDockerSocket` + `workerServices`.
 
 Manque encore :
@@ -198,14 +198,14 @@ compose, ssh.port_default, firewall.docker_published_sensitive_ports.
 
 ### 4.3 `init --preset`
 
-Génération de `.deployshuttle.yml` opinionné par stack, qui pré-ignore les
+Génération de `.shuttle.yml` opinionné par stack, qui pré-ignore les
 checks non pertinents :
 
 ```
-deploy-shuttle init --preset nextjs
-deploy-shuttle init --preset laravel
-deploy-shuttle init --preset node-api
-deploy-shuttle init --preset docker-swarm
+shuttle init --preset nextjs
+shuttle init --preset laravel
+shuttle init --preset node-api
+shuttle init --preset docker-swarm
 ```
 
 C'est ce qui fait passer un nouveau projet de "ça flag 15 trucs faux" à
@@ -224,7 +224,7 @@ distraction de 4 à 6 semaines pendant lesquelles le CLI ne progresse pas.
 
 Quand on le construit, ordre minimal :
 
-1. Auth + upload de rapport JSON depuis CLI (`deploy-shuttle report --push`).
+1. Auth + upload de rapport JSON depuis CLI (`shuttle report --push`).
 2. Vue rapport hosté + lien partageable (la seule feature qui justifie un compte).
 3. Historique multi-scan d'un même serveur.
 4. Scheduled scans (cron côté serveur qui SSH vers les VPS).

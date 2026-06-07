@@ -33,12 +33,12 @@ func newHardenCommand() *cobra.Command {
 				return errors.New("pass exactly one of --dry-run or --apply")
 			}
 			if input == "" {
-				input = ".deployshuttle/latest-report.json"
+				input = ".shuttle/latest-report.json"
 			}
 			raw, err := os.ReadFile(input)
 			if err != nil {
 				if errors.Is(err, os.ErrNotExist) {
-					return fmt.Errorf("doctor report %q not found; run `deploy-shuttle doctor --output %s` first or pass --input", input, input)
+					return fmt.Errorf("doctor report %q not found; run `shuttle doctor --output %s` first or pass --input", input, input)
 				}
 				return err
 			}
@@ -121,7 +121,7 @@ func newHardenCommand() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&input, "input", "", "doctor JSON report path (default .deployshuttle/latest-report.json)")
+	cmd.Flags().StringVar(&input, "input", "", "doctor JSON report path (default .shuttle/latest-report.json)")
 	cmd.Flags().StringVar(&format, "format", "console", "output format: console or json")
 	cmd.Flags().StringVar(&target, "target", "", "remote SSH target user@host annotated in the plan output (no SSH actions yet)")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print proposed actions without touching the system")

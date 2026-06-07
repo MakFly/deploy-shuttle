@@ -26,7 +26,7 @@ DeployShuttle is the answer: one command, 43 checks, deterministic 0–100
 score, exits non-zero on critical findings so you can wire it into CI.
 
   curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
-  deploy-shuttle doctor --target root@server
+  shuttle doctor --target root@server
 
 Covers system, ssh, docker, firewall, secrets, reverse-proxy, TLS, DNS,
 monitoring, backups, compose, cloudflare. Each finding maps to a
@@ -140,7 +140,7 @@ au client, et tu sais quoi expliquer.
 Une commande, pas de cloud, pas de compte :
 
 curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
-deploy-shuttle doctor --target root@ton-serveur
+shuttle doctor --target root@ton-serveur
 
 Open-source pour le CLI. Les rapports HTML/PDF brandes pour les
 livrables client arrivent en payant (early-bird en cours).
@@ -178,7 +178,7 @@ CLI that audits a VPS for production-readiness in 30s.
 43 checks. Deterministic score. Exits non-zero in CI on critical findings.
 
   curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
-  deploy-shuttle doctor --target root@server
+  shuttle doctor --target root@server
 
 https://github.com/MakFly/deploy-shuttle
 ```

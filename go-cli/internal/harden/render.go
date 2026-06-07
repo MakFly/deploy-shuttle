@@ -53,6 +53,6 @@ func Console(plan Plan) string {
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("Run each command manually after reviewing it. Re-run `deploy-shuttle doctor` to verify the score.\n")
+	b.WriteString("Run each command manually after reviewing it. Re-run `shuttle doctor` to verify the score.\n")
 	return b.String()
 }

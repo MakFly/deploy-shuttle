@@ -25,7 +25,7 @@ DeployShuttle starts as a CLI that audits a server, detects production risks, ge
 Deployment remains part of the roadmap, but the acquisition hook is now:
 
 ```bash
-deploy-shuttle doctor --target root@server
+shuttle doctor --target root@server
 ```
 
 ## 2. Product Positioning

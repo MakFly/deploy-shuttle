@@ -15,7 +15,7 @@ This file tracks which parts of the product plan are being implemented.
 
 ### Scope
 
-Implement the first `deploy-shuttle doctor` foundation:
+Implement the first `shuttle doctor` foundation:
 
 - local execution adapter;
 - check types and result model;
@@ -36,7 +36,7 @@ Implement the first `deploy-shuttle doctor` foundation:
 ### Explicitly Not In This Slice
 
 - remote SSH `doctor --target user@host`;
-- `.deployshuttle.yml` support;
+- `.shuttle.yml` support;
 - standalone `report` command;
 - `harden` command;
 - Cloudflare checks;
@@ -106,7 +106,7 @@ Implement the first `deploy-shuttle doctor` foundation:
 
 - `plans/02-mvp-scope.md`
 - `plans/06-architecture-security.md`
-- product hook: `deploy-shuttle doctor --target root@server`
+- product hook: `shuttle doctor --target root@server`
 
 ### Scope
 
@@ -197,7 +197,7 @@ Implement the first `deploy-shuttle doctor` foundation:
 
 ### Scope
 
-- Add `.deployshuttle.yml` readiness config loading.
+- Add `.shuttle.yml` readiness config loading.
 - Add `doctor --config <path>`.
 - Support `checks.profile`.
 - Support `checks.ignore`.
@@ -228,7 +228,7 @@ Implement the first `deploy-shuttle doctor` foundation:
 
 ### Scope
 
-- Add `deploy-shuttle report`.
+- Add `shuttle report`.
 - Generate Markdown reports from doctor JSON.
 - Generate PDF reports from doctor JSON with `@react-pdf/renderer`.
 - Keep PDF rendering as an optional local renderer in `report-pdf/`.
@@ -256,13 +256,13 @@ Implement the first `deploy-shuttle doctor` foundation:
 ### Scope
 
 - Add `doctor --output <path>` to persist doctor JSON.
-- Let `report` default to `.deployshuttle/latest-report.json`.
+- Let `report` default to `.shuttle/latest-report.json`.
 - Keep `report --input <path>` for explicit JSON input.
 - Create parent directories for doctor output.
 
 ### Completion Checklist
 
-- [x] `doctor --output .deployshuttle/latest-report.json` writes JSON.
+- [x] `doctor --output .shuttle/latest-report.json` writes JSON.
 - [x] `report --format pdf --output report.pdf` reads the default latest report.
 - [x] Missing default report returns an actionable error.
 - [x] Unit tests cover output directory creation.
@@ -309,8 +309,8 @@ Implement the first `deploy-shuttle doctor` foundation:
 
 ### Scope
 
-- Add `deploy-shuttle harden --dry-run`.
-- Read latest doctor JSON from `.deployshuttle/latest-report.json` by default.
+- Add `shuttle harden --dry-run`.
+- Read latest doctor JSON from `.shuttle/latest-report.json` by default.
 - Accept `--input <doctor.json>`, `--target user@host`, and `--format console|json`.
 - Convert failed, non-ignored findings into concrete proposed actions.
 - Group actions by category and surface source check ID + severity.
@@ -321,7 +321,7 @@ Implement the first `deploy-shuttle doctor` foundation:
 - [x] `harden/planner.go` maps known finding IDs to actions with rationale, commands, and notes.
 - [x] `harden/render.go` prints a grouped, dry-run-labelled console plan.
 - [x] CLI command requires `--dry-run` and refuses any execution path.
-- [x] Default input falls back to `.deployshuttle/latest-report.json`.
+- [x] Default input falls back to `.shuttle/latest-report.json`.
 - [x] JSON output is supported via `--format json`.
 - [x] Unit tests cover empty plans, ignored findings, all known mappings, port-specific commands, and console rendering.
 - [x] `gofmt`, `go vet ./...`, `go test ./...` pass.
@@ -434,8 +434,8 @@ Implement the first `deploy-shuttle doctor` foundation:
 
 ### Completion Checklist
 
-- [x] `report --format html --output deployshuttle-report.html` writes HTML.
-- [x] HTML defaults output path to `deployshuttle-report.html`.
+- [x] `report --format html --output shuttle-report.html` writes HTML.
+- [x] HTML defaults output path to `shuttle-report.html`.
 - [x] Template uses `html/template` and escapes injected content.
 - [x] Sections collapse cleanly when no findings or no accepted risks exist.
 - [x] Unit tests cover key metadata, escaping, and empty-section behavior.
@@ -505,7 +505,7 @@ Implement the first `deploy-shuttle doctor` foundation:
 ### Scope
 
 - New `internal/version` package exposing `Version`, `LicensePubKeyB64`, `LicenseServer` injected via `-ldflags`.
-- New `internal/license` package: Ed25519 token format, store at `~/.deployshuttle/license.json` (0600), HTTP client for activate/refresh, machine fingerprint, `Require(feature)` helper.
+- New `internal/license` package: Ed25519 token format, store at `~/.shuttle/license.json` (0600), HTTP client for activate/refresh, machine fingerprint, `Require(feature)` helper.
 - Refactor `license` CLI command: `activate`, `status`, `refresh`, `deactivate` against the new client.
 - Gate Pro features: `doctor --target`, `doctor --config`, `report --format html|pdf`, `harden --apply`.
 - `scripts/build-go.sh` accepts `LICENSE_PUBKEY_B64`, `LICENSE_SERVER`, `DEPLOY_SHUTTLE_VERSION` and injects via ldflags.
@@ -513,7 +513,7 @@ Implement the first `deploy-shuttle doctor` foundation:
 ### Completion Checklist
 
 - [x] `internal/license/token.go` implements Ed25519-signed JWT-compatible tokens with sign/verify pair.
-- [x] `internal/license/store.go` reads/writes JSON license state under `DEPLOY_SHUTTLE_HOME` (defaults to `~/.deployshuttle`).
+- [x] `internal/license/store.go` reads/writes JSON license state under `DEPLOY_SHUTTLE_HOME` (defaults to `~/.shuttle`).
 - [x] `internal/license/client.go` issues `POST /activate` and `POST /refresh` against the license server.
 - [x] `internal/license/fingerprint.go` returns `sha256(hostname|machine-id)`.
 - [x] `internal/license/require.go` enforces tier=pro with offline grace; dev builds (no embedded key) and `DEPLOY_SHUTTLE_DEV=1` bypass.
@@ -612,7 +612,7 @@ Implement the first `deploy-shuttle doctor` foundation:
 
 ### Scope
 
-Add 10 new readiness checks plus an `app:` section in `.deployshuttle.yml`:
+Add 10 new readiness checks plus an `app:` section in `.shuttle.yml`:
 
 - `system.updates_pending` (apt list --upgradable count, skipped on non-APT).
 - `system.memory_low` (`free -m` available vs total, fail < 10%, high < 5%).
@@ -691,24 +691,24 @@ treat them as the same check.
 
 ### Scope
 
-- Add `--preset` flag to `deploy-shuttle init` covering `nextjs`, `laravel`,
+- Add `--preset` flag to `shuttle init` covering `nextjs`, `laravel`,
   `node-api`, and `docker-swarm`.
-- Generate an opinionated `.deployshuttle.yml` alongside the existing
+- Generate an opinionated `.shuttle.yml` alongside the existing
   `shuttle.yml` when `--preset` is provided.
 - Pre-fill `app.healthcheckPath`, `docker.workerServices`, and
   per-stack `checks.ignore` (e.g. drop Adminer noise on Next.js/Node API).
-- Reuse the same `--force` flag to overwrite an existing `.deployshuttle.yml`.
+- Reuse the same `--force` flag to overwrite an existing `.shuttle.yml`.
 - Reject unknown presets with a clear error listing supported values.
 
 ### Completion Checklist
 
 - [x] `templates.ReadinessPresets`, `IsReadinessPreset`, `DeployShuttleYML`
   added; each preset parses as valid YAML with `version: 1`.
-- [x] `init --preset <name>` writes `.deployshuttle.yml` with the supplied
+- [x] `init --preset <name>` writes `.shuttle.yml` with the supplied
   `--domain` (or a placeholder) baked in.
 - [x] Without `--preset`, `init` keeps its previous behavior (only
   `shuttle.yml` written).
-- [x] `--force` overrides existing `.deployshuttle.yml`; absence of `--force`
+- [x] `--force` overrides existing `.shuttle.yml`; absence of `--force`
   refuses to clobber.
 - [x] Unknown preset raises an actionable error.
 - [x] Tests cover happy-path generation, force semantics, unknown preset, and
@@ -773,7 +773,7 @@ treat them as the same check.
 
 ### Scope
 
-- Add a `Cloudflare` config block to `.deployshuttle.yml` (`enabled`, `zone`,
+- Add a `Cloudflare` config block to `.shuttle.yml` (`enabled`, `zone`,
   `tokenEnv`).
 - Implement a minimal Cloudflare REST client (`api.cloudflare.com/client/v4`)
   with `zoneID`, `setting`, `dnsRecords` methods and base URL override for
@@ -823,7 +823,7 @@ tag v1 later":
    Raspberry Pi 4/5 are core targets; without arm64 the install script
    errors out for them.
 2. `action.yml` ran `curl install.sh | bash` then immediately invoked
-   `deploy-shuttle --version`. The default install dir is
+   `shuttle --version`. The default install dir is
    `~/.local/bin`, which is not guaranteed on the runner's `$PATH`,
    especially on self-hosted runners. The next composite step would
    fail with "command not found" the first time anyone used the Action.
@@ -870,7 +870,7 @@ tag v1 later":
 ### Scope
 
 - Remove license gates on `doctor --target` (remote SSH scan) and `--config`
-  (.deployshuttle.yml). These are the viral hook + the friction-reduction
+  (.shuttle.yml). These are the viral hook + the friction-reduction
   tool; gating them killed the funnel before the product could prove value.
 - Keep license gates on:
   - `report --format html` (hosted/shareable client deliverable),
@@ -884,7 +884,7 @@ tag v1 later":
 | Feature | Free | Pro 29 EUR/mo | Agency 99 EUR/mo |
 | --- | --- | --- | --- |
 | `doctor` (local + --target) | yes | yes | yes |
-| `--config .deployshuttle.yml` | yes | yes | yes |
+| `--config .shuttle.yml` | yes | yes | yes |
 | Console + Markdown report | yes | yes | yes |
 | HTML report (hosted/shareable) | no | yes | yes |
 | PDF report (white-label) | no | no | yes |
@@ -917,7 +917,7 @@ Current repository state:
 - `doctor` supports local and remote SSH scans.
 - Remote SSH target tested against `root@<prod-vps>:7022`.
 - Docker classic, Docker Swarm, and mixed single-VPS runtime detection are implemented.
-- `.deployshuttle.yml` readiness config supports check ignores and Docker allowlists.
+- `.shuttle.yml` readiness config supports check ignores and Docker allowlists.
 - Markdown and PDF local reports are implemented.
 - React PDF renderer lives in `report-pdf/`.
 - Latest report workflow is implemented with `doctor --output` and default `report` input.
@@ -947,9 +947,9 @@ Harden Dry-Run Planner
 
 Goal:
 
-- Add `deploy-shuttle harden --dry-run`.
+- Add `shuttle harden --dry-run`.
 - Do not mutate the server.
-- Read latest doctor report by default from `.deployshuttle/latest-report.json`.
+- Read latest doctor report by default from `.shuttle/latest-report.json`.
 - Accept `--input <doctor.json>` and `--target user@host`.
 - Convert findings into concrete proposed actions.
 

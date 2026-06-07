@@ -24,7 +24,7 @@ Run your first scan
 
 ```bash
 curl -fsSL https://deployshuttle.dev/install.sh | bash
-deploy-shuttle doctor --target root@your-server
+shuttle doctor --target root@your-server
 ```
 
 ### Feature blocks
@@ -85,7 +85,7 @@ Old positioning:
 New positioning:
 - Audit, harden and deploy Docker apps on VPS.
 - CLI-first production readiness tool.
-- Main hook: `deploy-shuttle doctor --target root@server`.
+- Main hook: `shuttle doctor --target root@server`.
 
 Implementation guidance:
 1. Do not remove existing deploy-related code.

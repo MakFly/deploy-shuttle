@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "deploy-shuttle-license-server",
+      "name": "shuttle-license-server",
       "dependencies": {
         "hono": "^4.6.0",
         "postgres": "^3.4.0",

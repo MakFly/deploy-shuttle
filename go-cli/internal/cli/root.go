@@ -8,7 +8,7 @@ import (
 
 func NewRootCommand() *cobra.Command {
 	root := &cobra.Command{
-		Use:     "deploy-shuttle",
+		Use:     "shuttle",
 		Short:   "Audit, harden and deploy Docker apps on VPS",
 		Version: version.Version,
 	}

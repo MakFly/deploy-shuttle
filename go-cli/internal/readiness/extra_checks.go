@@ -271,7 +271,7 @@ func checkTLSCertificate(domain string) Check {
 			return CheckResult{
 				ID: "tls.cert_missing", Title: "TLS certificate is present and valid",
 				Category: "tls", Severity: Critical, Status: Skipped,
-				Summary: "No app.domain configured in .deployshuttle.yml; skipping TLS check.",
+				Summary: "No app.domain configured in .shuttle.yml; skipping TLS check.",
 			}
 		}
 		if adapter.Run("command -v openssl >/dev/null 2>&1", time.Second).ExitCode != 0 {
@@ -513,7 +513,7 @@ func checkHealthEndpoint(domain string, path string) Check {
 			ID: "monitoring.no_health_endpoint", Title: "App exposes a health endpoint",
 			Category: "monitoring", Severity: Medium, Status: Failed,
 			Summary:     url + " did not return a 2xx response (got " + fallback(code, "n/a") + ").",
-			Remediation: "Implement a /health endpoint returning 200 OK and reference it via app.healthcheckPath in .deployshuttle.yml.",
+			Remediation: "Implement a /health endpoint returning 200 OK and reference it via app.healthcheckPath in .shuttle.yml.",
 			Evidence:    map[string]any{"url": url, "httpCode": code},
 		}
 	}

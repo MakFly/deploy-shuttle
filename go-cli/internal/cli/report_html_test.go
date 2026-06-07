@@ -12,7 +12,7 @@ func TestHTMLReportContainsKeyMetadata(t *testing.T) {
 		Target:      "root@example:7022",
 		Score:       70,
 		Level:       readiness.Level("risky"),
-		ConfigPath:  ".deployshuttle.yml",
+		ConfigPath:  ".shuttle.yml",
 		GeneratedAt: "2026-05-02T13:00:00Z",
 		Checks: []readiness.CheckResult{
 			{

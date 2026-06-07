@@ -7,11 +7,11 @@ dist/
 !.env.example
 data/
 .claude/agent-memory/
-.deployshuttle/
+.shuttle/latest-report.json
 
 # instant-grep index
 .ig/
 
 # build artifacts
-go-cli/deploy-shuttle
+go-cli/shuttle
 config.bat

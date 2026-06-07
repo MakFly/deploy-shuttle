@@ -10,5 +10,5 @@ var Version = "dev"
 var LicensePubKeyB64 = ""
 
 // LicenseServer is the default license server endpoint. Can be overridden at
-// runtime via --server or DEPLOY_SHUTTLE_LICENSE_SERVER.
+// runtime via --server or SHUTTLE_LICENSE_SERVER.
 var LicenseServer = "https://license.deployshuttle.io"

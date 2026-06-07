@@ -3,23 +3,23 @@
 #
 # Detects the current OS / architecture, downloads the latest release binary
 # from GitHub, verifies the checksum, and installs it into ~/.local/bin
-# (or $DEPLOY_SHUTTLE_INSTALL_DIR if set).
+# (or $SHUTTLE_INSTALL_DIR if set).
 #
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
 #
 # Optional environment variables:
-#   DEPLOY_SHUTTLE_VERSION       Specific release tag (default: latest)
-#   DEPLOY_SHUTTLE_INSTALL_DIR   Install directory (default: $HOME/.local/bin)
+#   SHUTTLE_VERSION       Specific release tag (default: latest)
+#   SHUTTLE_INSTALL_DIR   Install directory (default: $HOME/.local/bin)
 
 set -eu
 
 REPO="MakFly/deploy-shuttle"
-INSTALL_DIR="${DEPLOY_SHUTTLE_INSTALL_DIR:-$HOME/.local/bin}"
-VERSION="${DEPLOY_SHUTTLE_VERSION:-latest}"
+INSTALL_DIR="${SHUTTLE_INSTALL_DIR:-$HOME/.local/bin}"
+VERSION="${SHUTTLE_VERSION:-latest}"
 
 err() {
-  printf 'deploy-shuttle install: %s\n' "$*" >&2
+  printf 'shuttle install: %s\n' "$*" >&2
   exit 1
 }
 
@@ -54,16 +54,16 @@ case "$arch" in
 esac
 
 # Available release artifacts (see scripts/build-go.sh):
-#   deploy-shuttle-linux-x64
-#   deploy-shuttle-linux-arm64
-#   deploy-shuttle-darwin-x64
-#   deploy-shuttle-darwin-arm64
+#   shuttle-linux-x64
+#   shuttle-linux-arm64
+#   shuttle-darwin-x64
+#   shuttle-darwin-arm64
 case "$os_tag-$arch_tag" in
   linux-x64|linux-arm64|darwin-x64|darwin-arm64) : ;;
   *) err "no prebuilt binary for $os_tag-$arch_tag" ;;
 esac
 
-asset="deploy-shuttle-${os_tag}-${arch_tag}"
+asset="shuttle-${os_tag}-${arch_tag}"
 checksums="checksums.txt"
 
 if [ "$VERSION" = "latest" ]; then
@@ -98,10 +98,10 @@ else
 fi
 
 mkdir -p "$INSTALL_DIR"
-mv "$tmpdir/$asset" "$INSTALL_DIR/deploy-shuttle"
-chmod +x "$INSTALL_DIR/deploy-shuttle"
+mv "$tmpdir/$asset" "$INSTALL_DIR/shuttle"
+chmod +x "$INSTALL_DIR/shuttle"
 
-printf '\nInstalled: %s/deploy-shuttle\n' "$INSTALL_DIR"
+printf '\nInstalled: %s/shuttle\n' "$INSTALL_DIR"
 
 case ":$PATH:" in
   *":$INSTALL_DIR:"*) ;;
@@ -112,4 +112,4 @@ case ":$PATH:" in
     ;;
 esac
 
-printf '\nRun: deploy-shuttle doctor --help\n'
+printf '\nRun: shuttle doctor --help\n'

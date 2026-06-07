@@ -52,7 +52,7 @@ func Require(feature string) error {
 	state, err := Load("")
 	if err != nil {
 		if errors.Is(err, ErrNoLicense) {
-			return ErrFeatureLocked{Feature: feature, Reason: fmt.Sprintf("no license activated. Run `deploy-shuttle license activate <key>` or buy at %s", CheckoutURL)}
+			return ErrFeatureLocked{Feature: feature, Reason: fmt.Sprintf("no license activated. Run `shuttle license activate <key>` or buy at %s", CheckoutURL)}
 		}
 		return ErrFeatureLocked{Feature: feature, Reason: fmt.Sprintf("could not read license state: %s", err)}
 	}
@@ -60,9 +60,9 @@ func Require(feature string) error {
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrTokenExpired):
-			return ErrFeatureLocked{Feature: feature, Reason: "license token expired offline. Run `deploy-shuttle license refresh` while online"}
+			return ErrFeatureLocked{Feature: feature, Reason: "license token expired offline. Run `shuttle license refresh` while online"}
 		case errors.Is(err, ErrFingerprintMismatch):
-			return ErrFeatureLocked{Feature: feature, Reason: "license token was activated for a different machine. Run `deploy-shuttle license activate <key>` here"}
+			return ErrFeatureLocked{Feature: feature, Reason: "license token was activated for a different machine. Run `shuttle license activate <key>` here"}
 		case errors.Is(err, ErrSignatureInvalid):
 			return ErrFeatureLocked{Feature: feature, Reason: "license token signature is invalid. Re-activate to fetch a fresh token"}
 		default:
@@ -89,7 +89,7 @@ func RequireOrAttemptRefresh(ctx context.Context, feature string) error {
 	if time.Now().UTC().Before(state.RefreshAt) {
 		return nil
 	}
-	if os.Getenv("DEPLOY_SHUTTLE_OFFLINE") != "" {
+	if os.Getenv("SHUTTLE_OFFLINE") != "" {
 		return nil
 	}
 	client := NewClient(state.ServerURL)
@@ -128,11 +128,11 @@ func decodePubKey(b64 string) (ed25519.PublicKey, error) {
 	return ed25519.PublicKey(raw), nil
 }
 
-// devOverride lets developers skip the gate when DEPLOY_SHUTTLE_DEV=1.
+// devOverride lets developers skip the gate when SHUTTLE_DEV=1.
 // The override is only effective when the binary was built without an
 // embedded public key (i.e. local `go build`); it has no effect on official
 // release builds because Require returns early when version.LicensePubKeyB64
 // is empty.
 func devOverride() bool {
-	return os.Getenv("DEPLOY_SHUTTLE_DEV") != ""
+	return os.Getenv("SHUTTLE_DEV") != ""
 }

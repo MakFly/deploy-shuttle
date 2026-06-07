@@ -34,14 +34,14 @@ func DefaultPath() string {
 }
 
 func userConfigDir() string {
-	if dir := os.Getenv("DEPLOY_SHUTTLE_HOME"); dir != "" {
+	if dir := os.Getenv("SHUTTLE_HOME"); dir != "" {
 		return dir
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ".deployshuttle"
+		return ".shuttle"
 	}
-	return filepath.Join(home, ".deployshuttle")
+	return filepath.Join(home, ".shuttle")
 }
 
 // Load reads license state from disk. Returns ErrNoLicense when absent.

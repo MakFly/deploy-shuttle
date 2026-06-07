@@ -69,7 +69,7 @@ func newInitCommand() *cobra.Command {
 		Short: "Detect your stack and generate configuration",
 		Long: "Analyze the current project to detect the technology stack, then generate:\n" +
 			"  - shuttle.yml (deploy config)\n" +
-			"  - .deployshuttle.yml (readiness config with the right preset)\n" +
+			"  - .shuttle.yml (readiness config with the right preset)\n" +
 			"  - optionally, a GitHub Actions workflow (--ci)\n\n" +
 			"Use --preset to override auto-detection. Supported presets: " +
 			strings.Join(templates.ReadinessPresets, ", ") + ".",
@@ -128,21 +128,21 @@ func newInitCommand() *cobra.Command {
 				fmt.Println("✓ shuttle.yml created")
 			}
 
-			// --- .deployshuttle.yml ---
+			// --- .shuttle.yml ---
 			effectivePreset := stack.Preset
 			if effectivePreset != "" {
-				if _, err := os.Stat(".deployshuttle.yml"); err == nil && !force {
+				if _, err := os.Stat(".shuttle.yml"); err == nil && !force {
 					if preset != "" {
-						return fmt.Errorf(".deployshuttle.yml already exists; use --force to overwrite")
+						return fmt.Errorf(".shuttle.yml already exists; use --force to overwrite")
 					}
-					fmt.Println(".deployshuttle.yml already exists (use --force to overwrite)")
+					fmt.Println(".shuttle.yml already exists (use --force to overwrite)")
 				} else {
 					body := templates.DeployShuttleYML(effectivePreset, domain)
 					if body != "" {
-						if err := os.WriteFile(".deployshuttle.yml", []byte(body), 0o644); err != nil {
+						if err := os.WriteFile(".shuttle.yml", []byte(body), 0o644); err != nil {
 							return err
 						}
-						fmt.Printf("✓ .deployshuttle.yml created (preset: %s)\n", effectivePreset)
+						fmt.Printf("✓ .shuttle.yml created (preset: %s)\n", effectivePreset)
 					}
 				}
 			}
@@ -150,7 +150,7 @@ func newInitCommand() *cobra.Command {
 			// --- CI workflow ---
 			if withCI {
 				ciDir := filepath.Join(".github", "workflows")
-				ciFile := filepath.Join(ciDir, "deploy-shuttle.yml")
+				ciFile := filepath.Join(ciDir, "shuttle.yml")
 				if _, err := os.Stat(ciFile); err == nil && !force {
 					fmt.Println("CI workflow already exists (use --force to overwrite)")
 				} else {
@@ -161,7 +161,7 @@ func newInitCommand() *cobra.Command {
 					if err := os.WriteFile(ciFile, []byte(workflow), 0o644); err != nil {
 						return err
 					}
-					fmt.Println("✓ .github/workflows/deploy-shuttle.yml created")
+					fmt.Println("✓ .github/workflows/shuttle.yml created")
 				}
 			}
 
@@ -169,10 +169,10 @@ func newInitCommand() *cobra.Command {
 			fmt.Println("\nNext steps:")
 			fmt.Println("  1. Edit shuttle.yml with your server details")
 			if effectivePreset != "" {
-				fmt.Println("  2. Review .deployshuttle.yml (adjust ignore rules if needed)")
-				fmt.Println("  3. Run: deploy-shuttle doctor")
+				fmt.Println("  2. Review .shuttle.yml (adjust ignore rules if needed)")
+				fmt.Println("  3. Run: shuttle doctor")
 			} else {
-				fmt.Println("  2. Run: deploy-shuttle doctor")
+				fmt.Println("  2. Run: shuttle doctor")
 			}
 			return nil
 		},
@@ -203,11 +203,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install deploy-shuttle
+      - name: Install shuttle
         run: curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
 
       - name: Run readiness scan
-        run: deploy-shuttle doctor --fail-below 75
+        run: shuttle doctor --fail-below 75
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 `

@@ -32,7 +32,7 @@ function licenseEmailHtml(key: string): string {
     <p>Your license key is:</p>
     <p style="font-family: monospace; font-size: 16px; padding: 12px; background: #f4f4f5; border-radius: 6px; display: inline-block;"><strong>${key}</strong></p>
     <p>Activate it on a machine:</p>
-    <pre style="background: #111; color: #eee; padding: 12px; border-radius: 6px;">deploy-shuttle license activate ${key}</pre>
+    <pre style="background: #111; color: #eee; padding: 12px; border-radius: 6px;">shuttle license activate ${key}</pre>
     <p>The CLI verifies offline for 14 days at a time and refreshes silently when you're online.</p>
     <p>Thanks for supporting the project.</p>
   `;
@@ -45,7 +45,7 @@ Your license key is:
   ${key}
 
 Activate it on a machine:
-  deploy-shuttle license activate ${key}
+  shuttle license activate ${key}
 
 The CLI verifies offline for 14 days at a time and refreshes silently when you're online.
 `;

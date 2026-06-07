@@ -12,7 +12,7 @@ One command gives you a security score, a shareable report, and a hardening plan
 [![GitHub Action](https://img.shields.io/badge/action-MakFly%2Fdeploy--shuttle-2088FF?logo=githubactions&logoColor=white)](#github-action)
 
 ```bash
-deploy-shuttle doctor --target root@server
+shuttle doctor --target root@server
 ```
 
 </div>
@@ -93,16 +93,16 @@ Or download manually from [Releases](https://github.com/MakFly/deploy-shuttle/re
 
 ```bash
 # Local scan (current machine):
-deploy-shuttle doctor
+shuttle doctor
 
 # Remote scan over SSH (uses your SSH agent):
-deploy-shuttle doctor --target root@203.0.113.10
+shuttle doctor --target root@203.0.113.10
 
 # Custom SSH port:
-deploy-shuttle doctor --target root@203.0.113.10:7022
+shuttle doctor --target root@203.0.113.10:7022
 
 # Save the JSON report for downstream tooling:
-deploy-shuttle doctor --target root@server --output .deployshuttle/latest-report.json
+shuttle doctor --target root@server --output .shuttle/latest-report.json
 ```
 
 **Example output:**
@@ -125,28 +125,28 @@ Medium:
 
 ```bash
 # Markdown — good for PRs and engineering audits:
-deploy-shuttle report --format markdown --output report.md
+shuttle report --format markdown --output report.md
 
 # HTML — good for clients, self-contained, opens in any browser:
-deploy-shuttle report --format html --output report.html
+shuttle report --format html --output report.html
 
 # PDF — good for handoff packs, uses the optional React PDF renderer:
-deploy-shuttle report --format pdf --output report.pdf
+shuttle report --format pdf --output report.pdf
 ```
 
-By default `report` reads `.deployshuttle/latest-report.json`. Pass `--input <file>` for a different doctor JSON.
+By default `report` reads `.shuttle/latest-report.json`. Pass `--input <file>` for a different doctor JSON.
 
 ### Plan and Apply Hardening
 
 ```bash
 # Dry-run plan — never touches the server:
-deploy-shuttle harden --dry-run
+shuttle harden --dry-run
 
 # Apply only safe-auto-apply actions (locally):
-deploy-shuttle harden --apply --yes
+shuttle harden --apply --yes
 
 # Apply over SSH on the audited target:
-deploy-shuttle harden --apply --target root@203.0.113.10 --yes
+shuttle harden --apply --target root@203.0.113.10 --yes
 ```
 
 The dry-run plan converts each open finding into a concrete proposed action with the source check ID, rationale, and either ready-to-run commands or manual steps. `--apply` only executes commands that are **idempotent, scoped, and reversible**.
@@ -179,10 +179,10 @@ jobs:
 | `target` | no | — | SSH target (`user@host` or `user@host:port`). Omit to scan the runner. |
 | `ssh-private-key` | no | — | SSH private key (PEM) for remote scans. |
 | `ssh-known-hosts` | no | — | Known hosts content. Auto-detected via `ssh-keyscan` when omitted. |
-| `config` | no | — | Path to `.deployshuttle.yml`. |
+| `config` | no | — | Path to `.shuttle.yml`. |
 | `fail-below` | no | `75` | Fail the job when the score is strictly below this threshold. |
-| `output` | no | `.deployshuttle/latest-report.json` | JSON report path. |
-| `version` | no | `latest` | `deploy-shuttle` version to install. |
+| `output` | no | `.shuttle/latest-report.json` | JSON report path. |
+| `version` | no | `latest` | `shuttle` version to install. |
 
 **Action outputs:** `score`, `level`, `report`
 
@@ -191,7 +191,7 @@ The Action writes a job summary with the readiness level and exits non-zero on a
 ### CLI in Any CI
 
 ```yaml
-- run: deploy-shuttle doctor --target ${{ secrets.SSH_TARGET }} --fail-below 80
+- run: shuttle doctor --target ${{ secrets.SSH_TARGET }} --fail-below 80
 ```
 
 Works in GitHub Actions, GitLab CI, CircleCI, Jenkins — anywhere a Linux runner can run a static binary over SSH.
@@ -200,7 +200,7 @@ Works in GitHub Actions, GitLab CI, CircleCI, Jenkins — anywhere a Linux runne
 
 ## Configuration
 
-Drop a `.deployshuttle.yml` at the project root to ignore checks, allow-list workloads, or tune behavior:
+Drop a `.shuttle.yml` at the project root to ignore checks, allow-list workloads, or tune behavior:
 
 ```yaml
 app:
@@ -226,13 +226,13 @@ docker:
 
 ### Stack Presets
 
-`init --preset` writes an opinionated `.deployshuttle.yml` for common stacks — fewer false positives on day one:
+`init --preset` writes an opinionated `.shuttle.yml` for common stacks — fewer false positives on day one:
 
 ```bash
-deploy-shuttle init --preset nextjs       --domain app.example.com
-deploy-shuttle init --preset laravel      --domain shop.example.com
-deploy-shuttle init --preset node-api     --domain api.example.com
-deploy-shuttle init --preset docker-swarm --domain edge.example.com
+shuttle init --preset nextjs       --domain app.example.com
+shuttle init --preset laravel      --domain shop.example.com
+shuttle init --preset node-api     --domain api.example.com
+shuttle init --preset docker-swarm --domain edge.example.com
 ```
 
 Each preset pre-fills `app.healthcheckPath`, relevant `docker.workerServices` patterns, and ignores checks that don't apply to the stack.
@@ -281,7 +281,7 @@ Full reference with check IDs and remediation hints: [`docs/check-catalog.md`](d
 
 ```text
               ┌─────────────────────────────────────────────────┐
-              │               deploy-shuttle CLI                │
+              │                  shuttle CLI                    │
               │                                                 │
               │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
               │  │  doctor  │  │  report  │  │    harden    │  │
@@ -330,7 +330,7 @@ init  new  dev  provision  deploy  rollback  destroy
 logs  ssh  status  exec  lock  secrets  license  validate  ci  monitor
 ```
 
-Run `deploy-shuttle <command> --help` for usage. The primary workflow is `doctor` → `report` → `harden`.
+Run `shuttle <command> --help` for usage. The primary workflow is `doctor` → `report` → `harden`.
 
 ---
 
@@ -349,7 +349,7 @@ go vet ./...
 gofmt -w .
 
 # Run locally:
-go run ./cmd/deploy-shuttle --help
+go run ./cmd/shuttle --help
 ```
 
 Build release binaries:

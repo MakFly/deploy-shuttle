@@ -84,7 +84,7 @@ func newDoctorCommand() *cobra.Command {
 	cmd.Flags().StringVar(&format, "format", "console", "output format: console or json")
 	cmd.Flags().StringVar(&profile, "profile", "", "comma-separated profile labels")
 	cmd.Flags().StringVar(&failBelow, "fail-below", "", "exit with code 1 when score is below threshold")
-	cmd.Flags().StringVar(&configPath, "config", "", "path to .deployshuttle.yml readiness config")
+	cmd.Flags().StringVar(&configPath, "config", "", "path to .shuttle.yml readiness config")
 	cmd.Flags().StringVar(&outputPath, "output", "", "write doctor JSON report to a file")
 	return cmd
 }

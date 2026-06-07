@@ -1,7 +1,7 @@
 # DeployShuttle license server — Fly.io app config.
 # Update `app` and `primary_region` for your account, then `fly deploy`.
 
-app = "deploy-shuttle-license"
+app = "shuttle-license"
 primary_region = "cdg"
 
 [build]

@@ -36,8 +36,8 @@ func TestInitWithoutPresetSkipsDeployshuttleYAML(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(dir, "shuttle.yml")); err != nil {
 			t.Fatalf("shuttle.yml should exist: %v", err)
 		}
-		if _, err := os.Stat(filepath.Join(dir, ".deployshuttle.yml")); !os.IsNotExist(err) {
-			t.Fatalf(".deployshuttle.yml should not exist without --preset, got err=%v", err)
+		if _, err := os.Stat(filepath.Join(dir, ".shuttle.yml")); !os.IsNotExist(err) {
+			t.Fatalf(".shuttle.yml should not exist without --preset, got err=%v", err)
 		}
 	})
 }
@@ -50,9 +50,9 @@ func TestInitWithPresetWritesValidYAML(t *testing.T) {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("init --preset nextjs failed: %v", err)
 		}
-		body, err := os.ReadFile(filepath.Join(dir, ".deployshuttle.yml"))
+		body, err := os.ReadFile(filepath.Join(dir, ".shuttle.yml"))
 		if err != nil {
-			t.Fatalf("read .deployshuttle.yml: %v", err)
+			t.Fatalf("read .shuttle.yml: %v", err)
 		}
 		var parsed map[string]any
 		if err := yaml.Unmarshal(body, &parsed); err != nil {
@@ -83,7 +83,7 @@ func TestInitRejectsUnknownPreset(t *testing.T) {
 
 func TestInitForceOverwritesExistingDeployshuttleYAML(t *testing.T) {
 	withTempDir(t, func(dir string) {
-		if err := os.WriteFile(filepath.Join(dir, ".deployshuttle.yml"), []byte("version: 1\n# stale\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, ".shuttle.yml"), []byte("version: 1\n# stale\n"), 0o644); err != nil {
 			t.Fatalf("seed: %v", err)
 		}
 		// Without --force we must refuse.
@@ -101,7 +101,7 @@ func TestInitForceOverwritesExistingDeployshuttleYAML(t *testing.T) {
 		if err := cmd.Execute(); err != nil {
 			t.Fatalf("force overwrite failed: %v", err)
 		}
-		body, _ := os.ReadFile(filepath.Join(dir, ".deployshuttle.yml"))
+		body, _ := os.ReadFile(filepath.Join(dir, ".shuttle.yml"))
 		if strings.Contains(string(body), "stale") {
 			t.Fatal("expected file to be overwritten")
 		}

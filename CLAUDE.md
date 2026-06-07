@@ -16,14 +16,13 @@ Audit, harden and deploy Docker apps on VPS.
 Primary hook:
 
 ```bash
-deploy-shuttle doctor --target root@server
+shuttle doctor --target root@server
 ```
 
 Existing deploy/provision features must be preserved. Reframe deployment as the natural
 continuation after readiness checks, not as the only product promise.
 
-Current config lives in `shuttle.yml`. The planned readiness config is `.deployshuttle.yml`;
-do not treat it as implemented until code and docs explicitly support it.
+Current config lives in `shuttle.yml`. The readiness config is `.shuttle.yml`.
 
 The product plan lives in `plans/`. Use it as the source of truth for PRD, MVP scope,
 check catalog, command design, scoring, architecture, and launch direction. The previous
@@ -33,7 +32,7 @@ TypeScript/Bun implementation lives in `legacy/ts-cli/` and is reference-only.
 
 ```bash
 cd go-cli
-go run ./cmd/deploy-shuttle --help
+go run ./cmd/shuttle --help
 go test ./...
 go vet ./...
 gofmt -w .
@@ -127,7 +126,7 @@ Reference implementation only. Do not add new product work there unless explicit
 - **CLI framework**: Cobra command constructors live in `go-cli/internal/cli/`.
 - **Config**: `config.Load(path, env)` resolves `shuttle.yml`, defaults, and optional env overlays.
 - **Shell safety**: use `shell.Escape()` for values interpolated into remote shell commands.
-- **Secrets**: local secrets use a passphrase-protected envelope with Argon2id and XChaCha20-Poly1305 in `.shuttle/secrets.enc`; CI/non-interactive shells must set `DEPLOY_SHUTTLE_SECRETS_PASSPHRASE`.
+- **Secrets**: local secrets use a passphrase-protected envelope with Argon2id and XChaCha20-Poly1305 in `.shuttle/secrets.enc`; CI/non-interactive shells must set `SHUTTLE_SECRETS_PASSPHRASE`.
 - **Remote paths**: runtime helpers keep app state under `/opt/shuttle/<app>/`.
 - **Readiness checks**: add doctor checks in `go-cli/internal/readiness/` and keep scoring deterministic.
 - **Compatibility**: old TS behavior is reference material only; if Go behavior is intentionally partial, document that clearly in `README.md` or `plans/08-execution-tracker.md`.
@@ -141,7 +140,7 @@ Reference implementation only. Do not add new product work there unless explicit
 ## Repo Layout
 
 - `go-cli/` — active Go CLI
-- `go-cli/cmd/deploy-shuttle/` — main package
+- `go-cli/cmd/shuttle/` — main package
 - `go-cli/internal/` — internal CLI, config, readiness, SSH, templates, runtime, secrets packages
 - `legacy/ts-cli/` — archived TypeScript/Bun implementation
 - `scripts/` — release/build tooling

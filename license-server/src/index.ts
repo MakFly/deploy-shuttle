@@ -11,7 +11,7 @@ import { env } from "./lib/env";
 const app = new Hono();
 app.use("*", logger());
 
-app.get("/", (c) => c.json({ name: "deploy-shuttle license server", status: "ok" }));
+app.get("/", (c) => c.json({ name: "shuttle license server", status: "ok" }));
 app.get("/healthz", (c) => c.json({ ok: true }));
 
 app.route("/activate", activateRoute);

@@ -49,13 +49,13 @@ Medium:
   [!] No HSTS header detected
 
 Next:
-  deploy-shuttle harden --only firewall,docker
-  deploy-shuttle report --format html
+  shuttle harden --only firewall,docker
+  shuttle report --format html
 ```
 
 ## 2. Configuration File
 
-`.deployshuttle.yml`
+`.shuttle.yml`
 
 ```yaml
 version: 1
@@ -182,7 +182,7 @@ For GitHub issues, client handoff, docs.
 Current CLI target:
 
 ```bash
-deploy-shuttle report --input doctor.json --format markdown --output report.md
+shuttle report --input doctor.json --format markdown --output report.md
 ```
 
 ### HTML report
@@ -208,7 +208,7 @@ Generated locally through the optional React PDF renderer in `report-pdf/`.
 Current CLI target:
 
 ```bash
-deploy-shuttle report --input doctor.json --format pdf --output report.pdf
+shuttle report --input doctor.json --format pdf --output report.pdf
 ```
 
 Notes:
@@ -236,7 +236,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: curl -fsSL https://deployshuttle.dev/install.sh | bash
-      - run: deploy-shuttle doctor --target deploy@server --format json --fail-below 75
+      - run: shuttle doctor --target deploy@server --format json --fail-below 75
 ```
 
 Exit codes:
