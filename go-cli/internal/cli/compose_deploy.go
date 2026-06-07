@@ -25,19 +25,20 @@ type composeFile struct {
 }
 
 type composeService struct {
-	Build       any               `yaml:"build,omitempty"`
-	Image       string            `yaml:"image,omitempty"`
-	Environment any               `yaml:"environment,omitempty"`
-	Volumes     []string          `yaml:"volumes,omitempty"`
-	Expose      []string          `yaml:"expose,omitempty"`
-	Ports       []string          `yaml:"ports,omitempty"`
-	DependsOn   any               `yaml:"depends_on,omitempty"`
-	Restart     string            `yaml:"restart,omitempty"`
-	Networks    []string          `yaml:"networks,omitempty"`
-	EnvFile     any               `yaml:"env_file,omitempty"`
-	Labels      map[string]string `yaml:"labels,omitempty"`
-	Command     any               `yaml:"command,omitempty"`
-	Healthcheck any               `yaml:"healthcheck,omitempty"`
+	Build         any               `yaml:"build,omitempty"`
+	Image         string            `yaml:"image,omitempty"`
+	ContainerName string            `yaml:"container_name,omitempty"`
+	Environment   any               `yaml:"environment,omitempty"`
+	Volumes       []string          `yaml:"volumes,omitempty"`
+	Expose        []string          `yaml:"expose,omitempty"`
+	Ports         []string          `yaml:"ports,omitempty"`
+	DependsOn     any               `yaml:"depends_on,omitempty"`
+	Restart       string            `yaml:"restart,omitempty"`
+	Networks      []string          `yaml:"networks,omitempty"`
+	EnvFile       any               `yaml:"env_file,omitempty"`
+	Labels        map[string]string `yaml:"labels,omitempty"`
+	Command       any               `yaml:"command,omitempty"`
+	Healthcheck   any               `yaml:"healthcheck,omitempty"`
 }
 
 func deployCompose(cfg *config.Config, skipBuild bool, dryRun bool) error {

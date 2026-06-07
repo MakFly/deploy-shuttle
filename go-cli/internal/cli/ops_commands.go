@@ -78,6 +78,9 @@ func newDeployCommand() *cobra.Command {
 			if cfg.Deploy.Strategy == "compose" {
 				return deployCompose(cfg, skipBuild, dryRun)
 			}
+			if cfg.Deploy.Strategy == "blue-green" {
+				return deployBlueGreen(cfg, skipBuild, dryRun)
+			}
 			image := fmt.Sprintf("shuttle/%s:latest", cfg.App)
 			if !skipBuild {
 				if dryRun {

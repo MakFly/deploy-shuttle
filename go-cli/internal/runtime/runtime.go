@@ -17,3 +17,7 @@ func StatePath(app string) string {
 func LockDir(app string) string {
 	return fmt.Sprintf("/opt/shuttle/%s/.deploy.lock", app)
 }
+
+func BlueGreenDir(app, slot string) string {
+	return fmt.Sprintf("/opt/shuttle/%s/%s/", app, slot)
+}
