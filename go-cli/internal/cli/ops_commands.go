@@ -262,9 +262,27 @@ func newExecCommand() *cobra.Command {
 }
 
 func newRollbackCommand() *cobra.Command {
-	return simpleConfigCommand("rollback", "Rollback the application to a previous version", func(cfg *config.Config) error {
-		return fmt.Errorf("rollback needs persisted deployment state parity; Go port command surface is present but rollback execution is not yet safe")
-	})
+	var flags configFlags
+	var yes bool
+	var dryRun bool
+	cmd := &cobra.Command{
+		Use:   "rollback",
+		Short: "Rollback the application to a previous blue/green deployment",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cfg, err := loadWithFlags(flags)
+			if err != nil {
+				return err
+			}
+			if !dryRun && !yes {
+				return fmt.Errorf("pass --yes to confirm rollback (or use --dry-run to preview)")
+			}
+			return rollbackDeploy(cfg, dryRun)
+		},
+	}
+	addConfigFlags(cmd, &flags)
+	cmd.Flags().BoolVar(&yes, "yes", false, "confirm rollback execution")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would happen without executing")
+	return cmd
 }
 
 func newDestroyCommand() *cobra.Command {
