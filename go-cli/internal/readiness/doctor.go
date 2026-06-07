@@ -651,7 +651,7 @@ func databasePortsFirewallRestricted(firewallText string, ports []string) bool {
 }
 
 func dockerRuntimeCommand(swarmCommand string, classicCommand string) string {
-	return "if docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null | grep -q '^true$'; then echo __deployshuttle_runtime=swarm; " + swarmCommand + "; fi; echo __deployshuttle_runtime=classic; " + classicCommand
+	return "if docker info --format '{{.Swarm.ControlAvailable}}' 2>/dev/null | grep -q '^true$'; then echo __shuttle_runtime=swarm; " + swarmCommand + "; fi; echo __shuttle_runtime=classic; " + classicCommand
 }
 
 func splitRuntimeOutput(output string) (string, string) {
@@ -659,8 +659,8 @@ func splitRuntimeOutput(output string) (string, string) {
 	bodyLines := []string{}
 	lines := strings.Split(output, "\n")
 	for _, line := range lines {
-		if strings.HasPrefix(line, "__deployshuttle_runtime=") {
-			seen[strings.TrimPrefix(line, "__deployshuttle_runtime=")] = true
+		if strings.HasPrefix(line, "__shuttle_runtime=") {
+			seen[strings.TrimPrefix(line, "__shuttle_runtime=")] = true
 			continue
 		}
 		bodyLines = append(bodyLines, line)

@@ -44,7 +44,7 @@ func EmptyConfig() Config {
 
 func LoadConfig(path string) (Config, string, error) {
 	if path == "" {
-		found, err := findOptional(".deployshuttle.yml")
+		found, err := findOptional(".shuttle.yml")
 		if err != nil {
 			return EmptyConfig(), "", err
 		}
@@ -62,7 +62,7 @@ func LoadConfig(path string) (Config, string, error) {
 		return EmptyConfig(), "", err
 	}
 	if cfg.Version != 0 && cfg.Version != 1 {
-		return EmptyConfig(), "", errors.New("unsupported .deployshuttle.yml version")
+		return EmptyConfig(), "", errors.New("unsupported .shuttle.yml version")
 	}
 	if cfg.Version == 0 {
 		cfg.Version = 1

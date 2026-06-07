@@ -14,7 +14,7 @@ func newUninstallCommand() *cobra.Command {
 	var yes bool
 	cmd := &cobra.Command{
 		Use:   "uninstall",
-		Short: "Remove deploy-shuttle from this machine",
+		Short: "Remove shuttle from this machine",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			exe, err := os.Executable()
 			if err != nil {
@@ -30,7 +30,6 @@ func newUninstallCommand() *cobra.Command {
 			if home != "" {
 				candidates := []string{
 					filepath.Join(home, ".shuttle"),
-					filepath.Join(home, ".deployshuttle"),
 				}
 				for _, c := range candidates {
 					if info, err := os.Stat(c); err == nil && info.IsDir() {
@@ -63,7 +62,7 @@ func newUninstallCommand() *cobra.Command {
 				return fmt.Errorf("failed to remove binary: %w", err)
 			}
 			fmt.Printf("✓ Removed %s\n", exe)
-			fmt.Println("\ndeploy-shuttle has been uninstalled.")
+			fmt.Println("\nshuttle has been uninstalled.")
 			return nil
 		},
 	}

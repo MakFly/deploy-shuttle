@@ -55,7 +55,7 @@ func TestParseSSHTargetRejectsInvalidPort(t *testing.T) {
 
 func TestWriteDoctorOutputCreatesParentDirectory(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, ".deployshuttle", "latest-report.json")
+	path := filepath.Join(dir, ".shuttle", "latest-report.json")
 	if err := writeDoctorOutput(path, `{"score":100}`); err != nil {
 		t.Fatalf("write output: %v", err)
 	}

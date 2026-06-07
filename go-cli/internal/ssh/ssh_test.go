@@ -31,7 +31,7 @@ func TestResolveSSHConfig(t *testing.T) {
   HostName 203.0.113.10
   User deploy
   Port 7022
-  IdentityFile ~/.ssh/id_deployshuttle
+  IdentityFile ~/.ssh/id_shuttle
 `
 	if err := os.WriteFile(filepath.Join(sshDir, "config"), []byte(config), 0o600); err != nil {
 		t.Fatal(err)
@@ -44,7 +44,7 @@ func TestResolveSSHConfig(t *testing.T) {
 	if cfg.HostName != "203.0.113.10" || cfg.User != "deploy" || cfg.Port != 7022 {
 		t.Fatalf("unexpected config: %#v", cfg)
 	}
-	if len(cfg.IdentityFiles) != 1 || cfg.IdentityFiles[0] != filepath.Join(sshDir, "id_deployshuttle") {
+	if len(cfg.IdentityFiles) != 1 || cfg.IdentityFiles[0] != filepath.Join(sshDir, "id_shuttle") {
 		t.Fatalf("unexpected identity files: %#v", cfg.IdentityFiles)
 	}
 }
@@ -57,7 +57,7 @@ func TestAuthMethodsUsesDeployShuttleKey(t *testing.T) {
 	if err := os.MkdirAll(sshDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(sshDir, "id_deployshuttle"), testPrivateKey(t), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(sshDir, "id_shuttle"), testPrivateKey(t), 0o600); err != nil {
 		t.Fatal(err)
 	}
 

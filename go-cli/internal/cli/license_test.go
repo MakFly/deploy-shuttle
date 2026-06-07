@@ -10,7 +10,7 @@ import (
 )
 
 func TestLicenseDeactivateCallsServerAndClearsLocalState(t *testing.T) {
-	t.Setenv("DEPLOY_SHUTTLE_HOME", t.TempDir())
+	t.Setenv("SHUTTLE_HOME", t.TempDir())
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
@@ -46,7 +46,7 @@ func TestLicenseDeactivateCallsServerAndClearsLocalState(t *testing.T) {
 }
 
 func TestLicenseDeactivateLocalOnlySkipsServer(t *testing.T) {
-	t.Setenv("DEPLOY_SHUTTLE_HOME", t.TempDir())
+	t.Setenv("SHUTTLE_HOME", t.TempDir())
 	called := false
 	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 		called = true

@@ -170,7 +170,7 @@ Weak signal:
 
 - Markdown report.
 - HTML report.
-- `.deployshuttle.yml`.
+- `.shuttle.yml`.
 - `init --preset node-api`.
 - `init --preset next`.
 - `init --preset laravel`.

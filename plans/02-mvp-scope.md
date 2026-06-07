@@ -2,17 +2,17 @@
 
 ## 1. CLI Commands
 
-### `deploy-shuttle doctor`
+### `shuttle doctor`
 
 Runs a production readiness audit against local machine or remote VPS.
 
 Examples:
 
 ```bash
-deploy-shuttle doctor
-deploy-shuttle doctor --target root@1.2.3.4
-deploy-shuttle doctor --target deploy@server.example.com --profile docker
-deploy-shuttle doctor --format json
+shuttle doctor
+shuttle doctor --target root@1.2.3.4
+shuttle doctor --target deploy@server.example.com --profile docker
+shuttle doctor --format json
 ```
 
 Responsibilities:
@@ -24,16 +24,16 @@ Responsibilities:
 - print actionable report;
 - return non-zero exit code if critical issues exist.
 
-### `deploy-shuttle report`
+### `shuttle report`
 
 Generates an HTML, JSON or Markdown report from the latest scan.
 
 Examples:
 
 ```bash
-deploy-shuttle report --format html
-deploy-shuttle report --format markdown
-deploy-shuttle report --output ./deployshuttle-report.html
+shuttle report --format html
+shuttle report --format markdown
+shuttle report --output ./shuttle-report.html
 ```
 
 MVP formats:
@@ -45,16 +45,16 @@ MVP formats:
 
 PDF can wait.
 
-### `deploy-shuttle harden`
+### `shuttle harden`
 
 Applies safe hardening fixes.
 
 Examples:
 
 ```bash
-deploy-shuttle harden --target root@1.2.3.4
-deploy-shuttle harden --target root@1.2.3.4 --only firewall,ssh,docker
-deploy-shuttle harden --dry-run
+shuttle harden --target root@1.2.3.4
+shuttle harden --target root@1.2.3.4 --only firewall,ssh,docker
+shuttle harden --dry-run
 ```
 
 MVP behavior:
@@ -64,18 +64,18 @@ MVP behavior:
 - each fix must be reversible or clearly documented;
 - never modify app data without explicit consent.
 
-### `deploy-shuttle init`
+### `shuttle init`
 
 Generates production files for a project.
 
 Examples:
 
 ```bash
-deploy-shuttle init
-deploy-shuttle init --preset next
-deploy-shuttle init --preset laravel
-deploy-shuttle init --preset symfony
-deploy-shuttle init --preset node-api
+shuttle init
+shuttle init --preset next
+shuttle init --preset laravel
+shuttle init --preset symfony
+shuttle init --preset node-api
 ```
 
 Generated files:
@@ -83,17 +83,17 @@ Generated files:
 - `docker-compose.prod.yml`;
 - `Caddyfile`;
 - `.env.production.example`;
-- `.deployshuttle.yml`;
+- `.shuttle.yml`;
 - optional backup script;
 - optional healthcheck route suggestion.
 
-### `deploy-shuttle deploy`
+### `shuttle deploy`
 
 MVP can be minimal or postponed after `doctor` and `report`.
 
 Initial behavior:
 
-- read `.deployshuttle.yml`;
+- read `.shuttle.yml`;
 - upload compose/Caddy/env to VPS;
 - run `docker compose pull/build/up -d`;
 - run healthcheck;
@@ -102,8 +102,8 @@ Initial behavior:
 Examples:
 
 ```bash
-deploy-shuttle deploy --target deploy@server
-deploy-shuttle deploy --env production
+shuttle deploy --target deploy@server
+shuttle deploy --env production
 ```
 
 ## 2. Production Readiness Checks
@@ -149,39 +149,39 @@ Categories:
 
 ```bash
 # scan current machine
-deploy-shuttle doctor
+shuttle doctor
 
 # scan remote server
-deploy-shuttle doctor --target root@203.0.113.10
+shuttle doctor --target root@203.0.113.10
 
 # fail if score too low
-deploy-shuttle doctor --target root@203.0.113.10 --fail-below 75
+shuttle doctor --target root@203.0.113.10 --fail-below 75
 
 # generate HTML report
-deploy-shuttle report --format html --output report.html
+shuttle report --format html --output report.html
 
 # preview fixes
-deploy-shuttle harden --target root@203.0.113.10 --dry-run
+shuttle harden --target root@203.0.113.10 --dry-run
 
 # apply only firewall fixes
-deploy-shuttle harden --target root@203.0.113.10 --only firewall
+shuttle harden --target root@203.0.113.10 --only firewall
 
 # initialize production files
-deploy-shuttle init --preset next
+shuttle init --preset next
 ```
 
 ## 4. Acceptance Criteria for MVP
 
 MVP is accepted when:
 
-- `deploy-shuttle doctor` runs locally.
-- `deploy-shuttle doctor --target user@host` runs remotely over SSH.
+- `shuttle doctor` runs locally.
+- `shuttle doctor --target user@host` runs remotely over SSH.
 - At least 15 checks are implemented.
 - Console report is readable.
 - JSON report is valid.
 - Score is deterministic.
 - `--fail-below` works.
-- `.deployshuttle.yml` is supported.
+- `.shuttle.yml` is supported.
 - Report generation supports Markdown and HTML.
 - No secrets are printed in output.
 - `harden --dry-run` lists planned fixes without applying them.

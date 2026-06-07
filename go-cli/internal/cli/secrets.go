@@ -18,7 +18,7 @@ func newSecretsCommand() *cobra.Command {
 	var flags configFlags
 	root := &cobra.Command{Use: "secrets", Short: "Manage local encrypted secrets"}
 	store := func() (secrets.Store, error) {
-		passphrase := os.Getenv("DEPLOY_SHUTTLE_SECRETS_PASSPHRASE")
+		passphrase := os.Getenv("SHUTTLE_SECRETS_PASSPHRASE")
 		if passphrase == "" && term.IsTerminal(int(os.Stdin.Fd())) {
 			fmt.Fprint(os.Stderr, "Secrets passphrase: ")
 			raw, err := term.ReadPassword(int(os.Stdin.Fd()))

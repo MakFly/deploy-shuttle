@@ -8,7 +8,7 @@ mkdir -p "$DIST"
 cd "$ROOT/go-cli"
 
 # Version: prefer env var, then `git describe`, else "dev".
-VERSION="${DEPLOY_SHUTTLE_VERSION:-}"
+VERSION="${SHUTTLE_VERSION:-}"
 if [ -z "$VERSION" ]; then
   VERSION="$(git -C "$ROOT" describe --tags --always --dirty 2>/dev/null || echo dev)"
 fi
@@ -32,13 +32,13 @@ build() {
   goos="$1"
   goarch="$2"
   out="$3"
-  GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags "$LDFLAGS" -o "$DIST/$out" ./cmd/deploy-shuttle
+  GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags "$LDFLAGS" -o "$DIST/$out" ./cmd/shuttle
 }
 
-build linux  amd64 deploy-shuttle-linux-x64
-build linux  arm64 deploy-shuttle-linux-arm64
-build darwin arm64 deploy-shuttle-darwin-arm64
-build darwin amd64 deploy-shuttle-darwin-x64
+build linux  amd64 shuttle-linux-x64
+build linux  arm64 shuttle-linux-arm64
+build darwin arm64 shuttle-darwin-arm64
+build darwin amd64 shuttle-darwin-x64
 
 cd "$DIST"
-sha256sum deploy-shuttle-* > checksums.txt
+sha256sum shuttle-* > checksums.txt

@@ -54,7 +54,7 @@ func newLicenseActivateCommand() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&server, "server", "", "license server URL (default: env DEPLOY_SHUTTLE_LICENSE_SERVER or built-in)")
+	cmd.Flags().StringVar(&server, "server", "", "license server URL (default: env SHUTTLE_LICENSE_SERVER or built-in)")
 	return cmd
 }
 
@@ -167,7 +167,7 @@ func resolveServer(flag string) string {
 	if flag != "" {
 		return flag
 	}
-	if env := os.Getenv("DEPLOY_SHUTTLE_LICENSE_SERVER"); env != "" {
+	if env := os.Getenv("SHUTTLE_LICENSE_SERVER"); env != "" {
 		return env
 	}
 	return version.LicenseServer

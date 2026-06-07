@@ -57,7 +57,7 @@ To                         Action      From
 }
 
 func TestSplitRuntimeOutput(t *testing.T) {
-	mode, body := splitRuntimeOutput("__deployshuttle_runtime=swarm\nservice-a\ton-failure\n__deployshuttle_runtime=classic\n/container\tunless-stopped\n")
+	mode, body := splitRuntimeOutput("__shuttle_runtime=swarm\nservice-a\ton-failure\n__shuttle_runtime=classic\n/container\tunless-stopped\n")
 	if mode != "mixed" {
 		t.Fatalf("expected mixed mode, got %q", mode)
 	}

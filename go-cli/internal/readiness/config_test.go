@@ -8,7 +8,7 @@ import (
 
 func TestLoadConfig(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, ".deployshuttle.yml")
+	path := filepath.Join(dir, ".shuttle.yml")
 	if err := os.WriteFile(path, []byte(`version: 1
 checks:
   profile:

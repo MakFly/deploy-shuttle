@@ -31,8 +31,8 @@ func TestRequireFailsWhenNoLicense(t *testing.T) {
 	t.Cleanup(func() { version.LicensePubKeyB64 = old })
 
 	dir := t.TempDir()
-	t.Setenv("DEPLOY_SHUTTLE_HOME", dir)
-	t.Setenv("DEPLOY_SHUTTLE_DEV", "")
+	t.Setenv("SHUTTLE_HOME", dir)
+	t.Setenv("SHUTTLE_DEV", "")
 
 	err = Require("doctor --target")
 	if !IsFeatureLocked(err) {
@@ -50,8 +50,8 @@ func TestRequireSucceedsWithValidToken(t *testing.T) {
 	t.Cleanup(func() { version.LicensePubKeyB64 = old })
 
 	dir := t.TempDir()
-	t.Setenv("DEPLOY_SHUTTLE_HOME", dir)
-	t.Setenv("DEPLOY_SHUTTLE_DEV", "")
+	t.Setenv("SHUTTLE_HOME", dir)
+	t.Setenv("SHUTTLE_DEV", "")
 
 	fp := MachineFingerprint()
 	tok, err := SignToken(priv, Token{Key: "K", Tier: "pro", FP: fp, IAT: time.Now().Add(-time.Minute).Unix(), EXP: time.Now().Add(time.Hour).Unix()})
@@ -66,7 +66,7 @@ func TestRequireSucceedsWithValidToken(t *testing.T) {
 		t.Fatalf("expected pass, got %v", err)
 	}
 
-	// Sanity: the saved file lives under the temp DEPLOY_SHUTTLE_HOME.
+	// Sanity: the saved file lives under the temp SHUTTLE_HOME.
 	if _, err := Load(filepath.Join(dir, "license.json")); err != nil {
 		t.Fatalf("load explicit path: %v", err)
 	}
@@ -82,8 +82,8 @@ func TestRequireRejectsExpiredToken(t *testing.T) {
 	t.Cleanup(func() { version.LicensePubKeyB64 = old })
 
 	dir := t.TempDir()
-	t.Setenv("DEPLOY_SHUTTLE_HOME", dir)
-	t.Setenv("DEPLOY_SHUTTLE_DEV", "")
+	t.Setenv("SHUTTLE_HOME", dir)
+	t.Setenv("SHUTTLE_DEV", "")
 
 	fp := MachineFingerprint()
 	tok, _ := SignToken(priv, Token{Tier: "pro", FP: fp, IAT: time.Now().Add(-48 * time.Hour).Unix(), EXP: time.Now().Add(-time.Hour).Unix()})
@@ -108,7 +108,7 @@ func TestRequireDevOverride(t *testing.T) {
 	version.LicensePubKeyB64 = base64.StdEncoding.EncodeToString(pub)
 	t.Cleanup(func() { version.LicensePubKeyB64 = old })
 
-	t.Setenv("DEPLOY_SHUTTLE_DEV", "1")
+	t.Setenv("SHUTTLE_DEV", "1")
 	if err := Require("test"); err != nil {
 		t.Fatalf("expected dev override, got %v", err)
 	}

@@ -25,9 +25,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: deploy-shuttle doctor --format json --fail-below 75
+      - run: shuttle doctor --format json --fail-below 75
 `
-			return os.WriteFile(filepath.Join(dir, "deploy-shuttle.yml"), []byte(content), 0o644)
+			return os.WriteFile(filepath.Join(dir, "shuttle.yml"), []byte(content), 0o644)
 		},
 	})
 	return root

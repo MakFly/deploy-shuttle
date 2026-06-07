@@ -166,7 +166,7 @@ func authMethods(identityFiles []string) ([]gossh.AuthMethod, error) {
 	seen := map[string]bool{}
 	candidates := append([]string{}, identityFiles...)
 	candidates = append(candidates,
-		filepath.Join(homeDir(), ".ssh", "id_deployshuttle"),
+		filepath.Join(homeDir(), ".ssh", "id_shuttle"),
 		filepath.Join(homeDir(), ".ssh", "id_ed25519"),
 		filepath.Join(homeDir(), ".ssh", "id_rsa"),
 	)
@@ -187,7 +187,7 @@ func authMethods(identityFiles []string) ([]gossh.AuthMethod, error) {
 		methods = append(methods, gossh.PublicKeys(signer))
 	}
 	if len(methods) == 0 {
-		return nil, fmt.Errorf("no SSH auth method found; load ssh-agent or add ~/.ssh/id_deployshuttle, ~/.ssh/id_ed25519, or ~/.ssh/id_rsa")
+		return nil, fmt.Errorf("no SSH auth method found; load ssh-agent or add ~/.ssh/id_shuttle, ~/.ssh/id_ed25519, or ~/.ssh/id_rsa")
 	}
 	return methods, nil
 }

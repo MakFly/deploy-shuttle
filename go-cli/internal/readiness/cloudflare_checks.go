@@ -159,10 +159,10 @@ func ResolveCloudflareToken(cfg CloudflareConfig) string {
 // missing, every check skips cleanly with an explanatory summary.
 func cloudflareChecks(cfg CloudflareConfig, domain string, client *CloudflareClient) []Check {
 	if !cfg.Enabled {
-		return cloudflareSkipped("Cloudflare checks disabled (cloudflare.enabled is false in .deployshuttle.yml).")
+		return cloudflareSkipped("Cloudflare checks disabled (cloudflare.enabled is false in .shuttle.yml).")
 	}
 	if cfg.Zone == "" {
-		return cloudflareSkipped("Cloudflare checks skipped: cloudflare.zone is not set in .deployshuttle.yml.")
+		return cloudflareSkipped("Cloudflare checks skipped: cloudflare.zone is not set in .shuttle.yml.")
 	}
 	if client == nil {
 		return cloudflareSkipped("Cloudflare API token not found (set CLOUDFLARE_API_TOKEN or cloudflare.tokenEnv).")

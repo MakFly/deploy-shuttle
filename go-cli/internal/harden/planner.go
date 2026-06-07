@@ -142,7 +142,7 @@ func actionsFor(check readiness.CheckResult) []Action {
 		workloads := stringSlice(check.Evidence["workloads"])
 		notes := []string{
 			"Add 'USER appuser' to the Dockerfile or 'user:' in the compose/swarm spec.",
-			"For images that must run as root, document the reason and add the workload to docker.allowRoot in .deployshuttle.yml.",
+			"For images that must run as root, document the reason and add the workload to docker.allowRoot in .shuttle.yml.",
 		}
 		if len(workloads) > 0 {
 			notes = append(notes, "Workloads running as root: "+strings.Join(workloads, ", "))
@@ -160,7 +160,7 @@ func actionsFor(check readiness.CheckResult) []Action {
 		readWrite := stringSlice(check.Evidence["readWriteWorkloads"])
 		notes := []string{
 			"Mount /var/run/docker.sock read-only when possible (':ro').",
-			"For workloads that genuinely orchestrate Docker (CI runners, autoheal), add them to docker.allowDockerSocket in .deployshuttle.yml.",
+			"For workloads that genuinely orchestrate Docker (CI runners, autoheal), add them to docker.allowDockerSocket in .shuttle.yml.",
 		}
 		if len(readWrite) > 0 {
 			notes = append(notes, "Workloads with read-write socket mounts: "+strings.Join(readWrite, ", "))
@@ -434,7 +434,7 @@ func actionsFor(check readiness.CheckResult) []Action {
 		code := stringEvidence(check.Evidence["httpCode"])
 		notes := []string{
 			"Implement a lightweight /health (or /healthz) endpoint that returns 200 only when downstream dependencies are reachable.",
-			"Reference it in '.deployshuttle.yml' under app.healthcheckPath so future scans probe it automatically.",
+			"Reference it in '.shuttle.yml' under app.healthcheckPath so future scans probe it automatically.",
 			"Wire the same endpoint into Docker HEALTHCHECK and uptime monitoring once it exists.",
 		}
 		if url != "" {
@@ -515,7 +515,7 @@ func actionsFor(check readiness.CheckResult) []Action {
 		lines := stringSlice(check.Evidence["lines"])
 		notes := []string{
 			"Replace bind mounts of /var/run/docker.sock, /etc, /root, /proc, /sys, or root '/' with named volumes scoped to the service.",
-			"If a workload genuinely needs the Docker socket, mount it ':ro' and add the workload to docker.allowDockerSocket in .deployshuttle.yml.",
+			"If a workload genuinely needs the Docker socket, mount it ':ro' and add the workload to docker.allowDockerSocket in .shuttle.yml.",
 		}
 		if len(lines) > 0 {
 			notes = append(notes, "Offending lines: "+strings.Join(lines, " | "))

@@ -23,7 +23,7 @@ func newReportCommand() *cobra.Command {
 		Short: "Generate a readiness report from doctor JSON",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if input == "" {
-				input = ".deployshuttle/latest-report.json"
+				input = ".shuttle/latest-report.json"
 			}
 			if format == "" {
 				format = "markdown"
@@ -42,7 +42,7 @@ func newReportCommand() *cobra.Command {
 			switch format {
 			case "markdown", "md":
 				if output == "" {
-					output = "deployshuttle-report.md"
+					output = "shuttle-report.md"
 				}
 				return os.WriteFile(output, []byte(markdownReport(report)), 0o644)
 			case "html":
@@ -50,7 +50,7 @@ func newReportCommand() *cobra.Command {
 					return err
 				}
 				if output == "" {
-					output = "deployshuttle-report.html"
+					output = "shuttle-report.html"
 				}
 				rendered, err := htmlReport(report)
 				if err != nil {
@@ -62,7 +62,7 @@ func newReportCommand() *cobra.Command {
 					return err
 				}
 				if output == "" {
-					output = "deployshuttle-report.pdf"
+					output = "shuttle-report.pdf"
 				}
 				return renderPDF(input, output)
 			default:
@@ -70,7 +70,7 @@ func newReportCommand() *cobra.Command {
 			}
 		},
 	}
-	cmd.Flags().StringVar(&input, "input", "", "doctor JSON report input path (default .deployshuttle/latest-report.json)")
+	cmd.Flags().StringVar(&input, "input", "", "doctor JSON report input path (default .shuttle/latest-report.json)")
 	cmd.Flags().StringVar(&output, "output", "", "report output path")
 	cmd.Flags().StringVar(&format, "format", "markdown", "report format: markdown, html, or pdf")
 	return cmd
@@ -254,7 +254,7 @@ func renderPDF(input string, output string) error {
 }
 
 func findPDFRendererDir() (string, error) {
-	if dir := os.Getenv("DEPLOY_SHUTTLE_PDF_RENDERER_DIR"); dir != "" {
+	if dir := os.Getenv("SHUTTLE_PDF_RENDERER_DIR"); dir != "" {
 		return dir, nil
 	}
 	dir, err := os.Getwd()
@@ -268,7 +268,7 @@ func findPDFRendererDir() (string, error) {
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			return "", errors.New("report-pdf renderer not found; set DEPLOY_SHUTTLE_PDF_RENDERER_DIR")
+			return "", errors.New("report-pdf renderer not found; set SHUTTLE_PDF_RENDERER_DIR")
 		}
 		dir = parent
 	}

@@ -16,7 +16,7 @@ import (
 func newUpdateCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "update",
-		Short: "Update deploy-shuttle to the latest version",
+		Short: "Update shuttle to the latest version",
 		RunE:  runUpdate,
 	}
 }
@@ -103,7 +103,7 @@ func assetName() string {
 	default:
 		return ""
 	}
-	return fmt.Sprintf("deploy-shuttle-%s-%s", osTag, archTag)
+	return fmt.Sprintf("shuttle-%s-%s", osTag, archTag)
 }
 
 func downloadBinary(url string) ([]byte, error) {

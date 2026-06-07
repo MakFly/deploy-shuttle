@@ -53,10 +53,10 @@ func (s Store) passphrase() ([]byte, error) {
 	if s.Passphrase != "" {
 		return []byte(s.Passphrase), nil
 	}
-	if value := os.Getenv("DEPLOY_SHUTTLE_SECRETS_PASSPHRASE"); value != "" {
+	if value := os.Getenv("SHUTTLE_SECRETS_PASSPHRASE"); value != "" {
 		return []byte(value), nil
 	}
-	return nil, fmt.Errorf("missing secrets passphrase; set DEPLOY_SHUTTLE_SECRETS_PASSPHRASE")
+	return nil, fmt.Errorf("missing secrets passphrase; set SHUTTLE_SECRETS_PASSPHRASE")
 }
 
 func deriveKey(passphrase []byte, salt []byte, time uint32, memoryKiB uint32, threads uint8) []byte {

@@ -54,7 +54,7 @@ bun run dev
 ## Deploy on Fly.io
 
 ```bash
-fly launch --name deploy-shuttle-license --copy-config --no-deploy
+fly launch --name shuttle-license --copy-config --no-deploy
 fly secrets set \
   DATABASE_URL="..." \
   LICENSE_PRIVATE_KEY_B64="..." \
@@ -70,8 +70,8 @@ fly deploy
 After the first deploy, point the CLI at the new host:
 
 ```bash
-DEPLOY_SHUTTLE_LICENSE_SERVER=https://deploy-shuttle-license.fly.dev \
-  deploy-shuttle license activate <key>
+SHUTTLE_LICENSE_SERVER=https://shuttle-license.fly.dev \
+  shuttle license activate <key>
 ```
 
 Or bake the URL into the CLI via the `LICENSE_SERVER` build env.
