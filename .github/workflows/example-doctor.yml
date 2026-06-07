@@ -1,0 +1,47 @@
+# Example workflow: Production Readiness Check with DeployShuttle
+# Copy this workflow into your own repository and configure the secrets.
+#
+# Required secrets:
+#   VPS_TARGET       - SSH target (e.g. root@203.0.113.42 or deploy@myserver:2222)
+#   SSH_PRIVATE_KEY  - PEM-encoded private key for SSH access
+#
+# Optional:
+#   Place a .deployshuttle.yml at your repo root to customize checks.
+
+name: Production Readiness Check
+
+on:
+  schedule:
+    # Run daily at 06:00 UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  doctor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: MakFly/deploy-shuttle@v1
+        id: doctor
+        with:
+          target: ${{ secrets.VPS_TARGET }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fail-below: '70'
+
+      - name: Print score
+        if: always()
+        run: |
+          echo "Production Readiness Score: ${{ steps.doctor.outputs.score }}/100"
+          echo "Level: ${{ steps.doctor.outputs.level }}"
+
+      - name: Generate badge URL
+        if: always()
+        run: |
+          SCORE="${{ steps.doctor.outputs.score }}"
+          if [ -n "$SCORE" ]; then
+            echo "Badge: https://img.shields.io/badge/production_readiness-${SCORE}%25-brightgreen"
+          fi
