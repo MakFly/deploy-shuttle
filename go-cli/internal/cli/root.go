@@ -11,6 +11,9 @@ func NewRootCommand() *cobra.Command {
 		Use:     "shuttle",
 		Short:   "Audit, harden and deploy Docker apps on VPS",
 		Version: version.Version,
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			checkForUpdateAsync()
+		},
 	}
 	root.PersistentFlags().BoolVarP(&output.Verbose, "verbose", "v", false, "enable verbose output")
 	root.AddCommand(
