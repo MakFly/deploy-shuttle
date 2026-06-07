@@ -452,11 +452,9 @@ func generateBlueGreenCaddyConf(cfg *config.Config, activeSlot string) string {
 		slotUpstream := rewriteUpstreamForSlot(upstream, cfg.App, activeSlot)
 
 		fmt.Fprintf(&b, "%s {\n", domain)
-		tlsSnippet := cfg.Caddy.TLSSnippet
-		if tlsSnippet == "" {
-			tlsSnippet = "standard_tls"
+		if cfg.Caddy.TLSSnippet != "" {
+			fmt.Fprintf(&b, "    import %s\n\n", cfg.Caddy.TLSSnippet)
 		}
-		fmt.Fprintf(&b, "    import %s\n\n", tlsSnippet)
 		b.WriteString("    header {\n")
 		b.WriteString("        X-Content-Type-Options \"nosniff\"\n")
 		b.WriteString("        X-Frame-Options \"DENY\"\n")
