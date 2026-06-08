@@ -14,17 +14,80 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// caddyfileContent returns a minimal Caddyfile that imports per-site configs.
+func caddyfileContent(email string) string {
+	var b strings.Builder
+	b.WriteString("{\n")
+	if email != "" {
+		fmt.Fprintf(&b, "    email %s\n", email)
+	}
+	b.WriteString("}\n")
+	b.WriteString("import /etc/caddy/conf.d/*.caddy\n")
+	return b.String()
+}
+
+// caddyStackYML returns the Docker Swarm stack definition for Caddy.
+func caddyStackYML() string {
+	return `version: "3.8"
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: ingress
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: ingress
+      - target: 443
+        published: 443
+        protocol: udp
+        mode: ingress
+    volumes:
+      - /opt/shuttle/caddy/Caddyfile:/etc/caddy/Caddyfile
+      - /opt/shuttle/caddy/conf.d:/etc/caddy/conf.d
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - caddy_network
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  caddy_network:
+    external: true
+`
+}
+
 func newProvisionCommand() *cobra.Command {
 	var flags configFlags
 	var username string
+	var skipCaddy bool
+	var emailFlag string
 	cmd := &cobra.Command{
 		Use:   "provision",
-		Short: "Bootstrap a VPS: install Docker, Caddy, create deploy user",
+		Short: "Bootstrap a VPS: Docker Swarm, Caddy, UFW, fail2ban, deploy user",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadWithFlags(flags)
 			if err != nil {
 				return err
 			}
+
+			// Resolve Let's Encrypt email: flag > config > empty
+			caddyEmail := emailFlag
+			if caddyEmail == "" {
+				caddyEmail = cfg.Caddy.Email
+			}
+
 			for name, group := range cfg.Servers {
 				user := group.User
 				if username != "" {
@@ -38,21 +101,114 @@ func newProvisionCommand() *cobra.Command {
 						return err
 					}
 					sshPort := group.Port
-					commands := []string{
+
+					// --- 1. Base packages ---
+					fmt.Println("  → Installing base packages...")
+					baseCommands := []string{
 						"apt-get update -y",
-						"apt-get install -y ca-certificates curl gnupg ufw fail2ban",
-						fmt.Sprintf("id -u %s >/dev/null 2>&1 || useradd -m -s /bin/bash %s", shell.Escape(user), shell.Escape(user)),
-						"curl -fsSL https://get.docker.com | sh",
-						fmt.Sprintf("usermod -aG docker %s", shell.Escape(user)),
-						fmt.Sprintf("mkdir -p %s && chown -R %s:%s %s", shell.Escape(runtime.AppDir(cfg.App)), shell.Escape(user), shell.Escape(user), shell.Escape(runtime.AppDir(cfg.App))),
-						fmt.Sprintf("ufw allow %d/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable", sshPort),
+						"apt-get install -y ca-certificates curl gnupg ufw fail2ban unattended-upgrades apt-listchanges",
 					}
-					for _, command := range commands {
+					for _, command := range baseCommands {
 						res := client.Run(command)
 						if res.Code != 0 {
 							return fmt.Errorf("provision command failed on %s: %s", host, res.Stderr)
 						}
 					}
+
+					// --- 2. Docker ---
+					fmt.Println("  → Installing Docker...")
+					res := client.Run("curl -fsSL https://get.docker.com | sh")
+					if res.Code != 0 {
+						return fmt.Errorf("provision command failed on %s: %s", host, res.Stderr)
+					}
+
+					// --- 3. Docker Swarm init + overlay network ---
+					fmt.Println("  → Initializing Docker Swarm...")
+					swarmCommands := []string{
+						"docker swarm init --advertise-addr $(hostname -I | awk '{print $1}') 2>/dev/null || true",
+						"docker network create --driver overlay --attachable caddy_network 2>/dev/null || true",
+					}
+					for _, command := range swarmCommands {
+						res = client.Run(command)
+						if res.Code != 0 {
+							return fmt.Errorf("provision command failed on %s: %s", host, res.Stderr)
+						}
+					}
+
+					// --- 4. Caddy setup (Swarm service) ---
+					if !skipCaddy {
+						fmt.Println("  → Setting up Caddy reverse proxy...")
+						// Create directory structure
+						res = client.Run("mkdir -p /opt/shuttle/caddy/conf.d")
+						if res.Code != 0 {
+							return fmt.Errorf("provision command failed on %s: %s", host, res.Stderr)
+						}
+
+						// Upload Caddyfile
+						res = client.UploadContent(caddyfileContent(caddyEmail), "/opt/shuttle/caddy/Caddyfile", 0o644)
+						if res.Code != 0 {
+							return fmt.Errorf("failed to upload Caddyfile on %s: %s", host, res.Stderr)
+						}
+
+						// Upload docker-stack.yml
+						res = client.UploadContent(caddyStackYML(), "/opt/shuttle/caddy/docker-stack.yml", 0o644)
+						if res.Code != 0 {
+							return fmt.Errorf("failed to upload docker-stack.yml on %s: %s", host, res.Stderr)
+						}
+
+						// Deploy Caddy as Swarm stack
+						res = client.Run("docker stack deploy -c /opt/shuttle/caddy/docker-stack.yml shuttle")
+						if res.Code != 0 {
+							return fmt.Errorf("failed to deploy Caddy stack on %s: %s", host, res.Stderr)
+						}
+					}
+
+					// --- 5. UFW firewall ---
+					fmt.Println("  → Configuring UFW firewall...")
+					ufwCmd := fmt.Sprintf("ufw allow %d/tcp && ufw allow 80/tcp && ufw allow 443/tcp && ufw --force enable", sshPort)
+					res = client.Run(ufwCmd)
+					if res.Code != 0 {
+						return fmt.Errorf("provision command failed on %s: %s", host, res.Stderr)
+					}
+
+					// --- 6. fail2ban ---
+					fmt.Println("  → Enabling fail2ban...")
+					res = client.Run("systemctl enable --now fail2ban 2>/dev/null || true")
+					if res.Code != 0 {
+						return fmt.Errorf("provision command failed on %s: %s", host, res.Stderr)
+					}
+
+					// --- 7. Deploy user ---
+					fmt.Println("  → Creating deploy user...")
+					deployUserCommands := []string{
+						fmt.Sprintf("id -u %s >/dev/null 2>&1 || useradd -m -s /bin/bash %s", shell.Escape(user), shell.Escape(user)),
+						fmt.Sprintf("usermod -aG docker %s", shell.Escape(user)),
+						fmt.Sprintf("mkdir -p %s && chown -R %s:%s %s", shell.Escape(runtime.AppDir(cfg.App)), shell.Escape(user), shell.Escape(user), shell.Escape(runtime.AppDir(cfg.App))),
+					}
+					for _, command := range deployUserCommands {
+						res = client.Run(command)
+						if res.Code != 0 {
+							return fmt.Errorf("provision command failed on %s: %s", host, res.Stderr)
+						}
+					}
+
+					// --- 8. Unattended upgrades ---
+					fmt.Println("  → Configuring unattended-upgrades...")
+					unattendedConf := "APT::Periodic::Update-Package-Lists \"1\";\nAPT::Periodic::Unattended-Upgrade \"1\";\nAPT::Periodic::AutocleanInterval \"7\";\n"
+					res = client.UploadContent(unattendedConf, "/etc/apt/apt.conf.d/20auto-upgrades", 0o644)
+					if res.Code != 0 {
+						return fmt.Errorf("failed to configure unattended-upgrades on %s: %s", host, res.Stderr)
+					}
+
+					// --- 9. Daily docker prune cron ---
+					fmt.Println("  → Setting up daily Docker prune cron...")
+					pruneScript := "#!/bin/sh\ndocker system prune -af --filter 'until=72h' > /dev/null 2>&1\n"
+					res = client.UploadContent(pruneScript, "/etc/cron.daily/docker-prune", 0o755)
+					if res.Code != 0 {
+						return fmt.Errorf("failed to setup docker prune cron on %s: %s", host, res.Stderr)
+					}
+
+					fmt.Printf("✓ %s provisioned successfully\n\n", host)
 				}
 			}
 			return nil
@@ -60,6 +216,8 @@ func newProvisionCommand() *cobra.Command {
 	}
 	addConfigFlags(cmd, &flags)
 	cmd.Flags().StringVar(&username, "user", "", "override SSH user from config")
+	cmd.Flags().BoolVar(&skipCaddy, "skip-caddy", false, "skip Caddy reverse proxy setup")
+	cmd.Flags().StringVar(&emailFlag, "email", "", "email for Let's Encrypt certificates")
 	return cmd
 }
 

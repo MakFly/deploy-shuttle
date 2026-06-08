@@ -137,6 +137,7 @@ type Caddy struct {
 	ReloadCommand string            `yaml:"reload_command,omitempty" json:"reload_command,omitempty"`
 	TLSSnippet    string            `yaml:"tls_snippet,omitempty" json:"tls_snippet,omitempty"`
 	Routes        map[string]string `yaml:"routes,omitempty" json:"routes,omitempty"`
+	Email         string            `yaml:"email,omitempty" json:"email,omitempty"`
 }
 
 type Dev struct {
