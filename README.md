@@ -29,6 +29,7 @@ shuttle deploy
 - [Quick Start](#quick-start)
   - [Install](#install)
   - [From Code to Production](#from-code-to-production)
+  - [Pro Templates](#pro-templates)
   - [Audit an Existing Server](#audit-an-existing-server)
 - [Deploy Strategies](#deploy-strategies)
 - [Secrets Management](#secrets-management)
@@ -36,6 +37,7 @@ shuttle deploy
 - [CI / CD Integration](#cicd-integration)
 - [Configuration](#configuration)
 - [Check Catalog](#check-catalog)
+- [Pricing](#pricing)
 - [Commands](#commands)
 - [Architecture](#architecture)
 - [Supported Platforms](#supported-platforms)
@@ -84,9 +86,19 @@ You can ship a Docker app to a **$5 VPS** in an afternoon -- but the gap between
 - **Rollback support** for all strategies
 - **Caddy SIGUSR1 hot-reload** for instant upstream switching (blue-green)
 
+### Pro Templates
+
+- **Full production stack in one flag** -- `shuttle init --pro` generates a multi-service Docker Compose with database, Redis, queue workers, scheduler, and mail trap
+- **Composable** -- pick exactly what you need: `--with-db postgres`, `--with-redis`, `--with-queue`, `--with-scheduler`, `--with-mailpit`
+- **Laravel-optimized** -- Queue worker, Scheduler, Horizon (when Redis is enabled), all pre-configured with resource limits and healthchecks
+- **Symfony-optimized** -- Messenger consumer, Scheduler via `messenger:consume scheduler_default`, pre-wired Redis transport
+- **Pre-wired `.env.example`** -- service hostnames, ports, and connection strings filled in (`DB_HOST=postgres`, `REDIS_HOST=redis`)
+- **CI/CD included** -- Pro GitHub Actions workflow with database service containers for integration tests
+- **One-time purchase** -- 199 EUR, unlimited projects and servers
+
 ### Developer Experience
 
-- **Interactive `shuttle init`** -- detects your stack (Laravel, Symfony, Next.js, Node API), generates Dockerfile + docker-compose.yml + .dockerignore
+- **Interactive `shuttle init`** -- detects your stack (Laravel, Symfony, Next.js, Node API), generates Dockerfile + docker-compose.yml + .dockerignore + .env.example
 - **`shuttle provision`** -- bootstraps a bare VPS with Docker Swarm + Caddy + UFW in one command
 - **Auto-update checks** on startup with `shuttle update`
 - **Score badge** for README with `shuttle badge`
@@ -126,6 +138,52 @@ shuttle deploy
 
 # -> https://my-app.fr is live with TLS
 ```
+
+### Pro Templates
+
+Generate a full production stack with services, workers, and CI/CD in one command:
+
+```bash
+cd my-laravel-app
+
+# Full stack: Postgres + Redis + Queue + Scheduler + Horizon + Mailpit + CI
+shuttle init --pro
+
+# Or pick individual services:
+shuttle init --with-db postgres --with-redis
+
+# MySQL instead of Postgres:
+shuttle init --pro --with-db mysql
+```
+
+**What `--pro` generates for Laravel:**
+
+```yaml
+services:
+  web:        # FrankenPHP + Octane, healthcheck, resource limits
+  postgres:   # PostgreSQL 16, named volume, pg_isready healthcheck
+  redis:      # Redis 7 with AOF persistence, redis-cli ping healthcheck
+  queue:      # php artisan queue:work --tries=3 --timeout=90
+  scheduler:  # php artisan schedule:work
+  horizon:    # php artisan horizon (when Redis is enabled)
+  mailpit:    # SMTP trap on :1025, web UI on :8025
+```
+
+**What `--pro` generates for Symfony:**
+
+```yaml
+services:
+  web:        # FrankenPHP worker mode, healthcheck, resource limits
+  postgres:   # PostgreSQL 16, named volume, pg_isready healthcheck
+  redis:      # Redis 7 with AOF persistence
+  messenger:  # php bin/console messenger:consume async --time-limit=3600
+  scheduler:  # php bin/console messenger:consume scheduler_default
+  mailpit:    # SMTP trap on :1025, web UI on :8025
+```
+
+All Pro services include `depends_on` with health conditions, resource limits, named volumes, and a shared `app-network`. The `.env.example` is pre-filled with service hostnames (`DB_HOST=postgres`, `REDIS_HOST=redis`, `MAIL_HOST=mailpit`).
+
+Pro flags require a [Shuttle Pro license](#pricing). Dev builds (`go build` without ldflags) bypass the gate.
 
 ### Audit an Existing Server
 
@@ -229,7 +287,22 @@ The `doctor` check suite verifies `.env` permissions and Git tracking automatica
 | Next.js | Node 22 standalone | -- | `/` |
 | Node API | Custom | -- | `/health` |
 
-`shuttle init` detects the stack from your project files and generates the appropriate Dockerfile, docker-compose.yml, and .dockerignore.
+`shuttle init` detects the stack from your project files and generates the appropriate Dockerfile, docker-compose.yml, .dockerignore, and .env.example.
+
+### Pro Services per Stack
+
+| Service | Laravel | Symfony | Next.js / Node |
+|---|---|---|---|
+| PostgreSQL 16 | `--with-db postgres` | `--with-db postgres` | `--with-db postgres` |
+| MySQL 8.4 | `--with-db mysql` | `--with-db mysql` | `--with-db mysql` |
+| Redis 7 (AOF) | `--with-redis` | `--with-redis` | `--with-redis` |
+| Queue worker | `queue:work` | `messenger:consume` | -- |
+| Scheduler | `schedule:work` | `scheduler_default` | -- |
+| Horizon | `horizon` (auto with Redis) | -- | -- |
+| Mailpit | `:1025` + `:8025` | `:1025` + `:8025` | `:1025` + `:8025` |
+| CI/CD workflow | PHP + Composer + DB | PHP + Composer + DB | Node + DB |
+
+Queue and scheduler flags (`--with-queue`, `--with-scheduler`) are only available for Laravel and Symfony. Database, Redis, and Mailpit work with all stacks.
 
 ---
 
@@ -312,11 +385,19 @@ docker:
 ```bash
 shuttle init --preset nextjs       --domain app.example.com
 shuttle init --preset laravel      --domain shop.example.com
+shuttle init --preset symfony      --domain api.example.com
 shuttle init --preset node-api     --domain api.example.com
 shuttle init --preset docker-swarm --domain edge.example.com
 ```
 
 Each preset pre-fills `app.healthcheckPath`, relevant `docker.workerServices` patterns, and ignores checks that don't apply to the stack.
+
+Combine with `--pro` for the full production stack:
+
+```bash
+shuttle init --preset laravel --pro --domain shop.example.com
+shuttle init --preset symfony --pro --with-db mysql --domain api.example.com
+```
 
 ### Cloudflare Integration
 
@@ -358,10 +439,39 @@ Full reference with check IDs and remediation hints: [`docs/check-catalog.md`](d
 
 ---
 
+## Pricing
+
+| Feature | Free | Pro (199 EUR one-time) |
+|---|---|---|
+| `shuttle doctor` (local + `--target`) | yes | yes |
+| `.shuttle.yml` readiness config | yes | yes |
+| `shuttle init --preset` (basic templates) | yes | yes |
+| Console + Markdown report | yes | yes |
+| `shuttle harden --dry-run` | yes | yes |
+| `shuttle deploy` / `provision` / `rollback` | yes | yes |
+| `shuttle secrets` (encrypted store) | yes | yes |
+| **`shuttle init --pro` (full stack templates)** | -- | **yes** |
+| **`--with-db`, `--with-redis`, `--with-queue`, etc.** | -- | **yes** |
+| **`shuttle report --format html`** | -- | **yes** |
+| **`shuttle report --format pdf`** | -- | **yes** |
+| **`shuttle harden --apply`** | -- | **yes** |
+
+One license, unlimited projects, unlimited servers. No subscription, no per-seat pricing.
+
+```bash
+# Activate after purchase:
+shuttle license activate <your-key>
+
+# Check status:
+shuttle license status
+```
+
+---
+
 ## Commands
 
 ```text
-shuttle init        Detect stack, generate Dockerfile + docker-compose.yml + config
+shuttle init        Detect stack, generate Dockerfile + docker-compose.yml + .env.example + config
 shuttle provision   Bootstrap VPS: Docker Swarm + Caddy + UFW
 shuttle deploy      Build and deploy (swarm / compose / blue-green)
 shuttle rollback    Rollback to previous deployment
@@ -380,6 +490,25 @@ shuttle uninstall   Remove shuttle from this machine
 shuttle license     Manage Pro license activation
 ```
 
+### `shuttle init` flags
+
+| Flag | Default | Description |
+|---|---|---|
+| `--preset` | auto-detect | Force a preset (`laravel`, `symfony`, `nextjs`, `node-api`, `docker-swarm`) |
+| `--app` | directory name | Application name |
+| `--domain` | `<app>.example.com` | Production domain |
+| `--host` | -- | Server IP or hostname |
+| `--ci` | false | Generate a GitHub Actions workflow |
+| `--force` | false | Overwrite existing files |
+| **`--pro`** | false | **[Pro]** Enable all Pro services with sensible defaults |
+| **`--with-db`** | -- | **[Pro]** Add database service (`postgres` or `mysql`) |
+| **`--with-redis`** | false | **[Pro]** Add Redis 7 with AOF persistence |
+| **`--with-queue`** | false | **[Pro]** Add queue worker (Laravel/Symfony only) |
+| **`--with-scheduler`** | false | **[Pro]** Add scheduler (Laravel/Symfony only) |
+| **`--with-mailpit`** | false | **[Pro]** Add Mailpit SMTP trap + web UI |
+
+`--pro` expands to `--with-db postgres --with-redis --with-queue --with-scheduler --with-mailpit --ci`.
+
 Run `shuttle <command> --help` for usage details.
 
 ---
@@ -387,22 +516,22 @@ Run `shuttle <command> --help` for usage details.
 ## Architecture
 
 ```text
-              ┌──────────────────────────────────────────────────────────────┐
-              │                        shuttle CLI                           │
-              │                                                              │
-              │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐  │
-              │  │  doctor  │  │  report  │  │  harden  │  │   deploy   │  │
-              │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬─────┘  │
-              └───────│─────────────│─────────────│───────────────│─────────┘
-                      │             │             │               │
-            shell     │   JSON      │    JSON     │    SSH +      │
-            calls     │   report    │    report   │    Docker     │
-                      ▼             ▼             ▼               ▼
-              ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-              │ execx.Local  │ │  MD / HTML / │ │  Planner +   │ │ Swarm /      │
-              │ execx.SSH    │ │  PDF render  │ │  safe apply  │ │ Compose /    │
-              └──────────────┘ └──────────────┘ └──────────────┘ │ Blue-Green   │
-                                                                  └──────────────┘
+              ┌──────────────────────────────────────────────────────────────────┐
+              │                          shuttle CLI                             │
+              │                                                                  │
+              │  ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌──────────────┐  │
+              │  │ doctor │ │ report │ │ harden │ │ deploy │ │  init [Pro]  │  │
+              │  └───┬────┘ └───┬────┘ └───┬────┘ └───┬────┘ └──────┬───────┘  │
+              └──────│──────────│──────────│──────────│──────────────│──────────┘
+                     │          │          │          │              │
+           shell     │  JSON    │  JSON    │  SSH +   │   detect +  │
+           calls     │  report  │  report  │  Docker  │   templates │
+                     ▼          ▼          ▼          ▼              ▼
+              ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+              │  execx   │ │ MD/HTML/ │ │ Planner  │ │ Swarm /  │ │ Compose  │
+              │ Local/SSH│ │ PDF      │ │ + apply  │ │ Compose/ │ │ Services │
+              └──────────┘ └──────────┘ └──────────┘ │ Blue-Grn │ │ (Pro)    │
+                                                      └──────────┘ └──────────┘
 ```
 
 | Component | Role |
@@ -411,6 +540,7 @@ Run `shuttle <command> --help` for usage details.
 | **report** | Reads the JSON and renders Markdown, HTML, or PDF for sharing. |
 | **harden** | Reads the JSON, plans remediation actions, and (with `--apply`) executes only allow-listed commands. |
 | **deploy** | Builds the Docker image, pushes to registry, and deploys via the configured strategy. |
+| **init** | Detects the stack, generates Dockerfile, compose, .env.example, and config. With `--pro`, assembles a multi-service compose from composable service blocks. |
 | **execx** | Unified shell abstraction -- `Local` for the current machine, `SSH` for remote targets. |
 
 Architecture and security details: [`plans/06-architecture-security.md`](plans/06-architecture-security.md)

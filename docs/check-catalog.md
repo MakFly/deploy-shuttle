@@ -14,7 +14,7 @@ Severities map to the score deduction model:
 | `low` | 2 | Counted toward score. |
 | `info` | 0 | Surfaced in reports, no score impact. |
 
-Use [`.deployshuttle.yml`](../README.md#configuration) to ignore findings or allow-list workloads.
+Use [`.shuttle.yml`](../README.md#configuration) to ignore findings or allow-list workloads.
 
 ## System
 
@@ -78,7 +78,7 @@ Use [`.deployshuttle.yml`](../README.md#configuration) to ignore findings or all
 
 | ID | Severity | What it verifies |
 | --- | --- | --- |
-| `tls.cert_missing` | medium / high / critical | Certificate for `app.domain` is reachable, valid, and not expiring within 14 days. Skipped without `app.domain` in `.deployshuttle.yml`. |
+| `tls.cert_missing` | medium / high / critical | Certificate for `app.domain` is reachable, valid, and not expiring within 14 days. Skipped without `app.domain` in `.shuttle.yml`. |
 | `tls.hsts_missing` | medium | `https://<app.domain>` returns a `Strict-Transport-Security` header. Skipped without `app.domain`. |
 
 ## DNS
@@ -116,7 +116,7 @@ All compose checks are skipped cleanly when no file is found.
 ## Cloudflare
 
 Cloudflare checks require `cloudflare.enabled: true` plus a `cloudflare.zone`
-in `.deployshuttle.yml` and an API token (`CLOUDFLARE_API_TOKEN` by default,
+in `.shuttle.yml` and an API token (`CLOUDFLARE_API_TOKEN` by default,
 or the env name set via `cloudflare.tokenEnv`). Token must have read scope on
 Zone / DNS / Zone Settings. All checks skip cleanly when any prerequisite is
 missing or the token is rejected.
