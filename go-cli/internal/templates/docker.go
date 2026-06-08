@@ -41,7 +41,6 @@ COPY --link . .
 
 RUN <<EOF
 composer dump-autoload --classmap-authoritative --no-dev
-php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 php artisan event:cache

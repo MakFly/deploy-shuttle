@@ -233,10 +233,10 @@ services:
       labels:
         shuttle.app: %s
     healthcheck:
-      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:%s/"]
+      test: ["CMD", "php", "-r", "exit(false === @file_get_contents('http://127.0.0.1:%s/', context: stream_context_create(['http' => ['timeout' => 3]])) ? 1 : 0);"]
       interval: 10s
-      timeout: 3s
-      start_period: 15s
+      timeout: 5s
+      start_period: 30s
       retries: 3
 
 networks:

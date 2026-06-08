@@ -1,0 +1,21 @@
+app: shuttle-laravel-test
+domain: 185.158.107.49
+
+server:
+  host: 185.158.107.49
+  user: root
+  port: 7022
+
+deploy:
+  strategy: blue-green
+  timeout: 120
+  retain: 3
+  compose_files:
+    - docker-compose.yml
+
+caddy:
+  conf_dir: /opt/shuttle/caddy/conf.d
+  reload_command: "docker kill --signal=SIGUSR1 $(docker ps -qf name=shuttle_caddy)"
+  email: kev.aubree@gmail.com
+  routes:
+    "185.158.107.49": "web:8000"

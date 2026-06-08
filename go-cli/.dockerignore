@@ -1,0 +1,16 @@
+.git
+.gitignore
+docker-compose*.yml
+shuttle.yml
+.shuttle/
+README.md
+.env
+.env.*
+vendor/
+node_modules/
+tests/
+phpunit.xml
+storage/logs/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*

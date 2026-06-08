@@ -449,10 +449,10 @@ func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices [
 			// Add default healthcheck if none present and this is the web service
 			if svc.Healthcheck == nil && webPort != "" {
 				stackSvc.Healthcheck = map[string]any{
-					"test":         []string{"CMD", "wget", "-qO", "/dev/null", fmt.Sprintf("http://127.0.0.1:%s/", webPort)},
+					"test":         []string{"CMD", "php", "-r", fmt.Sprintf(`exit(false === @file_get_contents("http://127.0.0.1:%s/", context: stream_context_create(["http" => ["timeout" => 3]])) ? 1 : 0);`, webPort)},
 					"interval":     "10s",
-					"timeout":      "3s",
-					"start_period": "15s",
+					"timeout":      "5s",
+					"start_period": "30s",
 					"retries":      3,
 				}
 			}
