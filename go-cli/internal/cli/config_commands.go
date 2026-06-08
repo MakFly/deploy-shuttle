@@ -57,14 +57,14 @@ func newValidateCommand() *cobra.Command {
 // servicePortForPreset returns the default container port for a given preset.
 func servicePortForPreset(preset string) string {
 	switch preset {
-	case "laravel":
-		return "8000"
+	case "laravel", "symfony":
+		return "8080"
 	case "nextjs":
 		return "3000"
 	case "node-api":
 		return "3000"
 	default:
-		return "3000"
+		return "8080"
 	}
 }
 
@@ -73,8 +73,10 @@ func dockerfileForPreset(preset string) (string, string) {
 	switch preset {
 	case "laravel":
 		return templates.DockerfileLaravel(), "FrankenPHP + Laravel"
+	case "symfony":
+		return templates.DockerfileSymfony(), "FrankenPHP + Symfony"
 	case "nextjs":
-		return templates.DockerfileNextJS(), "Next.js"
+		return templates.DockerfileNextJS(), "Next.js standalone"
 	default:
 		return "", ""
 	}
