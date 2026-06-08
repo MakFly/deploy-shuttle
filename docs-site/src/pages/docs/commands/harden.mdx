@@ -14,7 +14,7 @@ allow-listed Actions and refuses anything else, even if you ask nicely.
 ## Usage
 
 ```bash
-deploy-shuttle harden [--dry-run | --apply [--yes]] [flags]
+shuttle harden [--dry-run | --apply [--yes]] [flags]
 ```
 
 Exactly one of `--dry-run` and `--apply` must be set.
@@ -26,7 +26,7 @@ Exactly one of `--dry-run` and `--apply` must be set.
 | `--dry-run` | required (mutually exclusive with `--apply`) | Print the plan; mutate nothing. |
 | `--apply` | required (mutually exclusive with `--dry-run`) | Apply only safe-auto-apply Actions. |
 | `--yes` | unset | Confirm `--apply` non-interactively. Required in CI. |
-| `--input <path>` | `.deployshuttle/latest-report.json` | doctor JSON to read from. |
+| `--input <path>` | `.shuttle/latest-report.json` | doctor JSON to read from. |
 | `--target <user@host[:port]>` | unset (local apply) | Remote target for `--apply`. Local-only without it. |
 | `--only <list>` | unset | Comma-separated category list, e.g. `firewall,secrets`. |
 | `--format console\|json` | `console` | `json` is meant for downstream tooling. |
@@ -35,13 +35,13 @@ Exactly one of `--dry-run` and `--apply` must be set.
 
 ```bash
 # Preview the plan from the latest local doctor scan.
-deploy-shuttle harden --dry-run
+shuttle harden --dry-run
 
 # Preview from a specific report.
-deploy-shuttle harden --dry-run --input report.json --format json
+shuttle harden --dry-run --input report.json --format json
 
 # Apply the safe Actions over SSH.
-deploy-shuttle harden --apply --target root@server --yes
+shuttle harden --apply --target root@server --yes
 ```
 
 ## Safe auto-apply allow-list
@@ -61,7 +61,7 @@ config file behind your back.
 ## What a plan looks like
 
 ```text
-DeployShuttle harden plan (dry-run)
+Shuttle harden plan (dry-run)
 
 [secrets] secrets.tighten-secret-perms (high) [SAFE-AUTO-APPLY]
   Tighten permissions on env / key / pem files.

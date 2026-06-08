@@ -1,0 +1,73 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "provision"
+description: "Bootstrap a bare VPS with Docker Swarm, Caddy, and UFW in one command."
+---
+
+`provision` connects to a server over SSH and installs the production
+infrastructure stack: Docker (with Swarm mode initialized), Caddy
+(reverse proxy with auto-TLS), and UFW (firewall with sane defaults).
+
+## Usage
+
+```bash
+shuttle provision [flags]
+```
+
+## Flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--config <path>` | nearest `shuttle.yml` | Configuration file. |
+| `--target <user@host[:port]>` | from config | Server to provision. |
+| `--format console\|json` | `console` | Output format. |
+
+## What gets installed
+
+### Docker Engine + Swarm
+
+- Docker Engine installed from the official repository.
+- Docker Swarm mode initialized (single-node manager).
+- Docker service enabled at boot.
+
+### Caddy
+
+- Caddy installed as a systemd service.
+- Configured as a reverse proxy for your app domain.
+- Auto-TLS via Let's Encrypt (automatic certificate provisioning and
+  renewal).
+- Admin API bound to localhost only (not exposed to the internet).
+- SIGUSR1 hot-reload support for zero-downtime config changes.
+
+### UFW (Firewall)
+
+- UFW installed and enabled with deny-by-default incoming policy.
+- Ports opened: 22 (SSH), 80 (HTTP), 443 (HTTPS), 2377 (Swarm
+  management), 7946 (Swarm node communication), 4789 (Swarm overlay
+  network).
+- Sensitive database ports (5432, 3306, 6379, 27017) remain blocked.
+
+## Examples
+
+```bash
+# Provision the server defined in shuttle.yml.
+shuttle provision
+
+# Provision a specific target.
+shuttle provision --target root@49.12.0.1
+
+# Provision with a custom config.
+shuttle provision --config staging.yml
+```
+
+## What the command expects
+
+- A bare Ubuntu server (22.04 or 24.04) or Debian 12.
+- SSH access as root or a sudo-enabled user.
+- The server's SSH host key in your `known_hosts` (or ssh-agent
+  configured).
+
+## After provisioning
+
+Run `shuttle doctor --target root@server` to verify the server scores
+well on the 43 readiness checks. Then deploy with `shuttle deploy`.

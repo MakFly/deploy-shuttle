@@ -1,28 +1,48 @@
 ---
 layout: "@/layouts/Docs.astro"
 title: "Commands"
-description: "The five commands that make up the day-to-day workflow."
+description: "All shuttle commands for the deploy, audit, and hardening workflows."
 ---
 
-DeployShuttle exposes a small surface. Every command is documented in
-this section.
+Shuttle exposes commands for two workflows: **deploy** (init, provision,
+deploy, rollback, secrets) and **audit** (doctor, harden, report). Every
+command is documented in this section.
 
 | Command | What it does |
 | --- | --- |
-| [`doctor`](/docs/commands/doctor) | Run the 43 readiness checks locally or over SSH. Prints a report and exits non-zero when the score drops below the threshold. |
-| [`harden`](/docs/commands/harden) | Build a remediation plan from the latest doctor report. Dry-run by default. `--apply` runs only the safe-auto-apply actions. |
-| [`report`](/docs/commands/report) | Render the latest doctor report as Markdown, HTML, or PDF. HTML / PDF are Pro-tier. |
-| [`init`](/docs/commands/init) | Generate `shuttle.yml` (and optionally `.deployshuttle.yml` via `--preset`) for a new project. |
-| [`license`](/docs/commands/license) | Activate, refresh, or check the status of your DeployShuttle Pro license. |
+| [`init`](/docs/commands/init) | Detect your stack, generate Dockerfile + docker-compose.yml + config. |
+| [`provision`](/docs/commands/provision) | Bootstrap a bare VPS with Docker Swarm + Caddy + UFW. |
+| [`deploy`](/docs/commands/deploy) | Build and deploy using Swarm, Compose, or Blue-Green strategy. |
+| [`rollback`](/docs/commands/rollback) | Rollback to the previous deployment. |
+| [`secrets`](/docs/commands/secrets) | Manage encrypted secrets locally and push as Docker Secrets. |
+| [`doctor`](/docs/commands/doctor) | Run the 43 readiness checks locally or over SSH. |
+| [`harden`](/docs/commands/harden) | Build a remediation plan from the latest doctor report. |
+| [`report`](/docs/commands/report) | Render the latest doctor report as Markdown, HTML, or PDF. |
+| [`license`](/docs/commands/license) | Activate, refresh, or check the status of your Pro license. |
+
+## Other commands
+
+```text
+shuttle status      Show container status across servers
+shuttle logs        Stream remote logs
+shuttle ssh         Open SSH session to server
+shuttle exec        Run command in remote container
+shuttle monitor     Live Docker resource usage
+shuttle badge       Generate score badge for README
+shuttle update      Self-update to latest version
+shuttle uninstall   Remove shuttle from this machine
+```
+
+Run `shuttle <command> --help` for usage details.
 
 ## Global flags
 
 Two flags are accepted by most commands:
 
-- `--format console|json` — output shape. `json` is what CI / scripts
+- `--format console|json` -- output shape. `json` is what CI / scripts
   consume.
-- `--config <path>` — point at an explicit `.deployshuttle.yml`. By
-  default the closest one in parent directories wins.
+- `--config <path>` -- point at an explicit `.shuttle.yml`. By default
+  the closest one in parent directories wins.
 
 ## Exit codes
 

@@ -1,14 +1,14 @@
 ---
 layout: "@/layouts/Docs.astro"
 title: "Install"
-description: "Get the deploy-shuttle binary on your machine in one command."
+description: "Get the shuttle binary on your machine in one command."
 ---
 
 The install script detects your OS / architecture, downloads the matching
 binary from the latest GitHub release, verifies the SHA-256 checksum, and
 drops the binary into `~/.local/bin`.
 
-## One-liner (Linux & macOS)
+## One-liner (Linux and macOS)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
@@ -21,48 +21,61 @@ on your `$PATH`.
 
 | OS / arch | Asset name |
 | --- | --- |
-| Linux x86-64 | `deploy-shuttle-linux-x64` |
-| Linux ARM64 (Hetzner CAX, AWS Graviton, Pi 4/5) | `deploy-shuttle-linux-arm64` |
-| macOS Intel | `deploy-shuttle-darwin-x64` |
-| macOS Apple Silicon | `deploy-shuttle-darwin-arm64` |
+| Linux x86-64 | `shuttle-linux-x64` |
+| Linux ARM64 (Hetzner CAX, AWS Graviton, Pi 4/5) | `shuttle-linux-arm64` |
+| macOS Intel | `shuttle-darwin-x64` |
+| macOS Apple Silicon | `shuttle-darwin-arm64` |
 
 For other targets, build from source:
 
 ```bash
 git clone https://github.com/MakFly/deploy-shuttle
 cd deploy-shuttle/go-cli
-go install ./cmd/deploy-shuttle
+go install ./cmd/shuttle
 ```
 
 ## Pin a specific version
 
 ```bash
-DEPLOY_SHUTTLE_VERSION=v1.0.1 \
+SHUTTLE_VERSION=v2.0.0 \
   curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
 ```
 
 ## Custom install directory
 
 ```bash
-DEPLOY_SHUTTLE_INSTALL_DIR=/usr/local/bin \
+SHUTTLE_INSTALL_DIR=/usr/local/bin \
   curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sudo sh
 ```
 
 ## Verify the install
 
 ```bash
-deploy-shuttle --version
-# deploy-shuttle version v1.0.1
+shuttle --version
+# shuttle version v2.0.0
 
-deploy-shuttle doctor --help
+shuttle doctor --help
+```
+
+## Auto-update
+
+Shuttle checks for new versions on startup (non-blocking, 3s timeout).
+When a newer release is available, it prints a one-line notice. To update:
+
+```bash
+shuttle update
 ```
 
 ## Uninstall
 
 ```bash
-rm "$(command -v deploy-shuttle)"
+shuttle uninstall
 ```
 
-The CLI does not write outside `~/.local/bin` by default, except for the
-optional license file at `~/.deployshuttle/license.json` and the latest
-report cache at `.deployshuttle/latest-report.json` inside your project.
+This removes the binary and the `~/.shuttle/` directory. If you prefer
+manual removal:
+
+```bash
+rm "$(command -v shuttle)"
+rm -rf ~/.shuttle
+```
