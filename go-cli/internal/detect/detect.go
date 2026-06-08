@@ -44,6 +44,12 @@ func Analyze(dir string) Stack {
 		s.HealthPath = "/up"
 		s.Workers = []string{`"*-queue"`, `"*-horizon"`, `"*-scheduler"`, `"*-worker"`}
 		s.Signals = append(s.Signals, "artisan + composer.json/laravel detected")
+	case detectSymfony(dir):
+		s.Preset = "symfony"
+		s.Framework = "Symfony"
+		s.Language = "PHP"
+		s.HealthPath = "/"
+		s.Signals = append(s.Signals, "bin/console + symfony detected")
 	case detectNodeAPI(dir):
 		s.Preset = "node-api"
 		s.Framework = "Node.js API"
@@ -104,6 +110,19 @@ func detectLaravel(dir string) bool {
 	}
 	if fileExists(dir, "composer.json") {
 		return grepFile(dir, "composer.json", "laravel")
+	}
+	return false
+}
+
+func detectSymfony(dir string) bool {
+	if !fileExists(dir, "bin/console") {
+		return false
+	}
+	if fileExists(dir, "symfony.lock") {
+		return true
+	}
+	if fileExists(dir, "composer.json") {
+		return grepFile(dir, "composer.json", "symfony/framework-bundle")
 	}
 	return false
 }
