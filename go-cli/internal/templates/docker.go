@@ -75,7 +75,10 @@ EXPOSE 8000
 HEALTHCHECK --start-period=30s --interval=10s --timeout=5s --retries=3 \
     CMD php -r 'exit(false === @file_get_contents("http://localhost:8000/up", context: stream_context_create(["http" => ["timeout" => 3]])) ? 1 : 0);'
 
-ENTRYPOINT ["php", "artisan", "octane:frankenphp"]
+COPY --link docker/docker-secrets-entrypoint.sh /usr/local/bin/docker-secrets-entrypoint
+RUN chmod +x /usr/local/bin/docker-secrets-entrypoint
+
+ENTRYPOINT ["docker-secrets-entrypoint", "php", "artisan", "octane:frankenphp"]
 CMD ["--host=0.0.0.0", "--port=8000", "--max-requests=500", "--workers=auto"]
 `
 }
@@ -135,8 +138,6 @@ COPY --link docker/conf.d/10-app.ini $PHP_INI_DIR/app.conf.d/
 HEALTHCHECK --start-period=60s --interval=10s --timeout=5s --retries=3 \
     CMD php -r 'exit(false === @file_get_contents("http://localhost:2019/metrics", context: stream_context_create(["http" => ["timeout" => 5]])) ? 1 : 0);'
 
-CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]
-
 # ── Build stage ───────────────────────────────────────────────
 FROM base AS builder
 
@@ -182,6 +183,11 @@ EOF
 USER www-data
 
 EXPOSE 8080
+
+COPY --link docker/docker-secrets-entrypoint.sh /usr/local/bin/docker-secrets-entrypoint
+RUN chmod +x /usr/local/bin/docker-secrets-entrypoint
+ENTRYPOINT ["docker-secrets-entrypoint"]
+CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]
 `
 }
 
