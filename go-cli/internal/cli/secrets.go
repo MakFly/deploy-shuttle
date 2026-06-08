@@ -115,6 +115,11 @@ func newSecretsCommand() *cobra.Command {
 				return nil
 			}
 			content := formatEnv(values)
+			keys := make([]string, 0, len(values))
+			for key := range values {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
 			for _, group := range cfg.Servers {
 				for _, host := range group.Hosts {
 					client, err := connectSSH(group, host)
@@ -126,12 +131,40 @@ func newSecretsCommand() *cobra.Command {
 					if mkdir.Code != 0 {
 						return fmt.Errorf("failed to create remote secrets directory on %s: %s", host, mkdir.Stderr)
 					}
+
+					// Create Docker Swarm native secrets (encrypted at rest, RAM-only in containers)
+					fmt.Printf("-> Creating Docker Swarm secrets on %s...\n", host)
+					created, updated := 0, 0
+					for _, key := range keys {
+						value := values[key]
+						secretName := cfg.App + "_" + strings.ToLower(key)
+						// Docker secrets are immutable: try create, if exists then rm+create
+						createCmd := fmt.Sprintf(
+							"printf '%%s' %s | docker secret create %s - 2>/dev/null || (docker secret rm %s 2>/dev/null && printf '%%s' %s | docker secret create %s -)",
+							shell.Escape(value), shell.Escape(secretName),
+							shell.Escape(secretName),
+							shell.Escape(value), shell.Escape(secretName),
+						)
+						res := client.Run(createCmd)
+						if res.Code != 0 {
+							return fmt.Errorf("failed to create Docker secret %s on %s: %s", secretName, host, res.Stderr)
+						}
+						// If stderr contains "removed" it was an update, otherwise a create
+						if strings.Contains(res.Stdout+res.Stderr, secretName) {
+							updated++
+						} else {
+							created++
+						}
+					}
+					fmt.Printf("✓ Docker Swarm secrets: %d created/updated on %s\n", len(keys), host)
+
+					// Also write .env.secrets as fallback for compose/blue-green strategies
 					secretsPath := remoteDir + "/.env.secrets"
 					res := client.UploadContent(content, secretsPath, 0o600)
 					if res.Code != 0 {
 						return fmt.Errorf("failed to push secrets to %s: %s", host, res.Stderr)
 					}
-					fmt.Printf("✓ Secrets pushed to %s:%s\n", host, secretsPath)
+					fmt.Printf("✓ Fallback .env.secrets pushed to %s:%s\n", host, secretsPath)
 				}
 			}
 			return nil

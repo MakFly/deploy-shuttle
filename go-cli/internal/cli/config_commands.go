@@ -269,6 +269,13 @@ func newInitCommand() *cobra.Command {
 				}
 				fmt.Println("✓ docker/opcache.ini created (OPcache production tuning)")
 			}
+			if stack.Preset == "laravel" || stack.Preset == "symfony" {
+				os.MkdirAll("docker", 0o755)
+				if err := os.WriteFile("docker/docker-secrets-entrypoint.sh", []byte(templates.SecretsEntrypoint()), 0o755); err != nil {
+					return err
+				}
+				fmt.Println("✓ docker/docker-secrets-entrypoint.sh created")
+			}
 			if stack.Preset == "symfony" {
 				os.MkdirAll("docker/conf.d", 0o755)
 				if err := os.WriteFile("docker/Caddyfile", []byte(templates.SymfonyCaddyfile()), 0o644); err != nil {

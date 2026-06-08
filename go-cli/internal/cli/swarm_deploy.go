@@ -34,6 +34,7 @@ type swarmStackFile struct {
 	Services map[string]swarmStackSvc `yaml:"services"`
 	Networks map[string]any           `yaml:"networks,omitempty"`
 	Volumes  map[string]any           `yaml:"volumes,omitempty"`
+	Secrets  map[string]any           `yaml:"secrets,omitempty"`
 }
 
 type swarmStackSvc struct {
@@ -48,6 +49,7 @@ type swarmStackSvc struct {
 	Deploy      *swarmDeploy      `yaml:"deploy,omitempty"`
 	Healthcheck any               `yaml:"healthcheck,omitempty"`
 	Labels      map[string]string `yaml:"labels,omitempty"`
+	Secrets     []any             `yaml:"secrets,omitempty"`
 }
 
 type swarmDeploy struct {
@@ -211,8 +213,25 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 		}
 	}
 
+	// Discover Docker Swarm secrets for this app
+	var swarmSecrets []string
+	secretPrefix := cfg.App + "_"
+	lsCmd := fmt.Sprintf("docker secret ls --filter name=%s --format '{{.Name}}'", shell.Escape(secretPrefix))
+	secretsRes := client.Run(lsCmd)
+	if secretsRes.Code == 0 && strings.TrimSpace(secretsRes.Stdout) != "" {
+		for _, line := range strings.Split(strings.TrimSpace(secretsRes.Stdout), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				swarmSecrets = append(swarmSecrets, line)
+			}
+		}
+		if len(swarmSecrets) > 0 {
+			fmt.Printf("-> Found %d Docker Swarm secrets for %s\n", len(swarmSecrets), cfg.App)
+		}
+	}
+
 	// Generate and upload Swarm stack YAML
-	stackYAML := generateSwarmStackYAML(parsed, cfg, buildServices, registryAddr, webPort)
+	stackYAML := generateSwarmStackYAML(parsed, cfg, buildServices, registryAddr, webPort, swarmSecrets)
 	stackPath := appDir + "/docker-stack.yml"
 	fmt.Println("-> Uploading docker-stack.yml...")
 	res = client.UploadContent(stackYAML, stackPath, 0o644)
@@ -386,7 +405,7 @@ func readRemoteSwarmState(client *ssh.Client, app string) swarmState {
 // generateSwarmStackYAML creates a Swarm-compatible stack YAML from the parsed
 // compose file, rewriting build services to use the ephemeral registry images
 // and adding Swarm deploy configuration for rolling updates.
-func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices []string, registryAddr string, webPort string) string {
+func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices []string, registryAddr string, webPort string, swarmSecrets ...[]string) string {
 	buildSet := map[string]bool{}
 	for _, s := range buildServices {
 		buildSet[s] = true
@@ -426,8 +445,8 @@ func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices [
 			Expose:      svc.Expose,
 			Command:     svc.Command,
 			Healthcheck: svc.Healthcheck,
-			Networks: []string{"caddy_network", "default"},
-			EnvFile:  []string{".env", ".env.secrets"},
+			Networks:    []string{"caddy_network", "default"},
+			EnvFile:     []string{".env", ".env.secrets"},
 		}
 
 		if buildSet[name] {
@@ -499,6 +518,39 @@ func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices [
 				continue
 			}
 			stack.Volumes[name] = v
+		}
+	}
+
+	// Add Docker Swarm native secrets if available
+	var secretNames []string
+	if len(swarmSecrets) > 0 {
+		secretNames = swarmSecrets[0]
+	}
+	if len(secretNames) > 0 {
+		stack.Secrets = map[string]any{}
+		secretPrefix := cfg.App + "_"
+		for _, secretName := range secretNames {
+			// Register as external at top level
+			stack.Secrets[secretName] = map[string]any{"external": true}
+		}
+		// Add secrets to build services (web service and other app services)
+		for name, svc := range stack.Services {
+			if !buildSet[name] {
+				continue
+			}
+			var svcSecrets []any
+			for _, secretName := range secretNames {
+				// Derive the target filename from the secret name:
+				// remove "<app>_" prefix and uppercase it
+				envKey := strings.ToUpper(strings.TrimPrefix(secretName, secretPrefix))
+				svcSecrets = append(svcSecrets, map[string]any{
+					"source": secretName,
+					"target": "/run/secrets/" + envKey,
+					"mode":   0o444,
+				})
+			}
+			svc.Secrets = svcSecrets
+			stack.Services[name] = svc
 		}
 	}
 
