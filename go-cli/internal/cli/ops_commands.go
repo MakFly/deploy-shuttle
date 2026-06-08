@@ -233,54 +233,16 @@ func newDeployCommand() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if cfg.Deploy.Strategy == "compose" {
+			switch cfg.Deploy.Strategy {
+			case "compose":
 				return deployCompose(cfg, skipBuild, dryRun)
-			}
-			if cfg.Deploy.Strategy == "blue-green" {
+			case "blue-green":
 				return deployBlueGreen(cfg, skipBuild, dryRun)
+			case "swarm":
+				return deploySwarm(cfg, skipBuild, dryRun)
+			default:
+				return deploySwarm(cfg, skipBuild, dryRun)
 			}
-			image := fmt.Sprintf("shuttle/%s:latest", cfg.App)
-			if !skipBuild {
-				if dryRun {
-					fmt.Printf("[dry-run] docker build -t %s -f %s %s\n", image, cfg.Build.Dockerfile, cfg.Build.Context)
-				} else {
-					build := exec.Command("docker", "build", "-t", image, "-f", cfg.Build.Dockerfile, cfg.Build.Context)
-					build.Stdout = os.Stdout
-					build.Stderr = os.Stderr
-					if err := build.Run(); err != nil {
-						return err
-					}
-				}
-			}
-			for _, group := range cfg.Servers {
-				for _, host := range group.Hosts {
-					client, err := connectSSH(group, host)
-					if err != nil {
-						return err
-					}
-					for name, service := range cfg.Services {
-						port := service.Port
-						container := fmt.Sprintf("%s_%s_0", cfg.App, name)
-						command := fmt.Sprintf("docker rm -f %s 2>/dev/null; docker run -d --restart always --name %s", shell.Escape(container), shell.Escape(container))
-						if port != 0 {
-							command += fmt.Sprintf(" -p 127.0.0.1:%d:%d", port, port)
-						}
-						command += " " + shell.Escape(image)
-						if service.Command != "" {
-							command += " sh -lc " + shell.Escape(service.Command)
-						}
-						if dryRun {
-							fmt.Printf("[dry-run] %s: %s\n", host, command)
-							continue
-						}
-						res := client.Run(command)
-						if res.Code != 0 {
-							return fmt.Errorf("deploy failed on %s: %s", host, res.Stderr)
-						}
-					}
-				}
-			}
-			return nil
 		},
 	}
 	addConfigFlags(cmd, &flags)
@@ -425,7 +387,7 @@ func newRollbackCommand() *cobra.Command {
 	var dryRun bool
 	cmd := &cobra.Command{
 		Use:   "rollback",
-		Short: "Rollback the application to a previous blue/green deployment",
+		Short: "Rollback the application to the previous deployment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cfg, err := loadWithFlags(flags)
 			if err != nil {
@@ -434,7 +396,14 @@ func newRollbackCommand() *cobra.Command {
 			if !dryRun && !yes {
 				return fmt.Errorf("pass --yes to confirm rollback (or use --dry-run to preview)")
 			}
-			return rollbackDeploy(cfg, dryRun)
+			switch cfg.Deploy.Strategy {
+			case "blue-green":
+				return rollbackDeploy(cfg, dryRun)
+			case "swarm":
+				return rollbackSwarm(cfg, dryRun)
+			default:
+				return rollbackSwarm(cfg, dryRun)
+			}
 		},
 	}
 	addConfigFlags(cmd, &flags)

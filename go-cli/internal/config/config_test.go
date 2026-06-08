@@ -13,8 +13,8 @@ func TestLoadMinimalConfig(t *testing.T) {
 	if cfg.Servers["default"].User != "deploy" {
 		t.Fatalf("expected deploy user")
 	}
-	if cfg.Deploy.Strategy != "blue-green" {
-		t.Fatalf("expected default blue-green strategy")
+	if cfg.Deploy.Strategy != "swarm" {
+		t.Fatalf("expected default swarm strategy, got %s", cfg.Deploy.Strategy)
 	}
 }
 

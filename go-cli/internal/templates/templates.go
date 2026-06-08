@@ -158,7 +158,7 @@ server:
   port: %d
 
 deploy:
-  strategy: compose
+  strategy: swarm
 
 services:
   web:
@@ -198,6 +198,53 @@ func ComposeDev(cfg *config.Config) string {
 		}
 	}
 	return b.String()
+}
+
+// SwarmStackTemplate returns a Swarm stack YAML template for a given app.
+// This is used by the init command to generate a sample docker-stack.yml.
+// The registryAddr is the ephemeral registry address (e.g. "127.0.0.1:5080").
+func SwarmStackTemplate(app, port, registryAddr string) string {
+	if port == "" {
+		port = "3000"
+	}
+	return fmt.Sprintf(`version: "3.8"
+services:
+  web:
+    image: %s/%s-web:latest
+    env_file: .env
+    networks:
+      - caddy_network
+      - default
+    deploy:
+      replicas: 1
+      update_config:
+        parallelism: 1
+        delay: 5s
+        order: start-first
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 5s
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      labels:
+        shuttle.app: %s
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://127.0.0.1:%s/"]
+      interval: 10s
+      timeout: 3s
+      start_period: 15s
+      retries: 3
+
+networks:
+  caddy_network:
+    external: true
+  default:
+    name: %s_network
+`, registryAddr, app, app, port, app)
 }
 
 func Domains(cfg *config.Config) []string {
