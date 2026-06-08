@@ -11,7 +11,7 @@ client as a PDF.
 ## Usage
 
 ```bash
-deploy-shuttle report --format <markdown|html|pdf> [flags]
+shuttle report --format <markdown|html|pdf> [flags]
 ```
 
 ## Flags
@@ -19,20 +19,20 @@ deploy-shuttle report --format <markdown|html|pdf> [flags]
 | Flag | Default | Description |
 | --- | --- | --- |
 | `--format markdown\|html\|pdf` | required | Output format. |
-| `--input <path>` | `.deployshuttle/latest-report.json` | doctor JSON. |
-| `--output <path>` | format-specific (`report.md`, `deployshuttle-report.html`, `report.pdf`) | Output file. |
+| `--input <path>` | `.shuttle/latest-report.json` | doctor JSON. |
+| `--output <path>` | format-specific (`report.md`, `shuttle-report.html`, `report.pdf`) | Output file. |
 
 ## Examples
 
 ```bash
 # Free: Markdown for handoff in PRs / Notion / chat.
-deploy-shuttle report --format markdown --output report.md
+shuttle report --format markdown --output report.md
 
 # Pro: self-contained HTML with executive summary.
-deploy-shuttle report --format html --output report.html
+shuttle report --format html --output report.html
 
 # Agency: white-label PDF for the client.
-deploy-shuttle report --format pdf --output report.pdf
+shuttle report --format pdf --output report.pdf
 ```
 
 ## What the report contains
@@ -42,7 +42,7 @@ Every format includes:
 - Target, score, level, generated-at timestamp.
 - Executive summary (one paragraph derived from severities + counts).
 - Findings grouped by severity with remediation steps.
-- Accepted risks (checks ignored via `.deployshuttle.yml`, with rationale).
+- Accepted risks (checks ignored via `.shuttle.yml`, with rationale).
 - Compact evidence per finding (no raw stack traces in client view).
 - Next-actions block (the recommended `harden`/`doctor` follow-ups).
 

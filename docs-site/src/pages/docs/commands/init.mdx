@@ -1,55 +1,90 @@
 ---
 layout: "@/layouts/Docs.astro"
 title: "init"
-description: "Generate a shuttle.yml deploy config and an opinionated readiness preset."
+description: "Detect your stack and generate Dockerfile, docker-compose.yml, and deploy config."
 ---
 
-`init` produces the deploy config (`shuttle.yml`) and, when `--preset` is
-supplied, an opinionated `.deployshuttle.yml` so `doctor` does not flag
-stack-specific noise on day one.
+`init` is an interactive command that inspects your project, detects the
+stack (Laravel, Symfony, Next.js, Node API), and generates everything you
+need to deploy: a production Dockerfile, a docker-compose.yml, a
+.dockerignore, and the `shuttle.yml` deploy config.
+
+When `--preset` is supplied, it also writes an opinionated `.shuttle.yml`
+so `doctor` does not flag stack-specific noise on day one.
 
 ## Usage
 
 ```bash
-deploy-shuttle init [flags]
+shuttle init [flags]
 ```
+
+## What gets generated
+
+| File | Purpose |
+| --- | --- |
+| `Dockerfile` | Production-ready, multi-stage build for your detected stack. |
+| `docker-compose.yml` | Service definition with healthcheck, restart policy, and Caddy labels. |
+| `.dockerignore` | Excludes node_modules, .git, .env, and other non-build files. |
+| `shuttle.yml` | Deploy config: app name, domain, server, strategy. |
+| `.shuttle.yml` | Readiness config (with `--preset`): check ignores and allow-lists. |
+
+## Stack detection
+
+`init` looks at your project files to determine the stack:
+
+| Stack | Detection | Dockerfile |
+| --- | --- | --- |
+| Laravel | `artisan` + `composer.json` | FrankenPHP + Octane (multi-stage) |
+| Symfony | `bin/console` + `symfony.lock` | FrankenPHP native worker mode |
+| Next.js | `next.config.*` | Node 22 standalone output |
+| Node API | `package.json` (fallback) | Custom Node build |
+
+### FrankenPHP Dockerfiles
+
+For Laravel and Symfony, `init` generates FrankenPHP-based Dockerfiles
+with production defaults:
+
+- **Laravel**: FrankenPHP + Octane with worker mode, Composer install
+  with `--no-dev`, asset build, opcache, health endpoint at `/up`.
+- **Symfony**: FrankenPHP native `php_server` worker mode, Composer
+  install with `--no-dev --optimize-autoloader`, opcache.
 
 ## Flags
 
 | Flag | Default | Description |
 | --- | --- | --- |
-| `--app <name>` | `myapp` | Application name written to `shuttle.yml`. |
-| `--domain <host>` | `myapp.example.com` | Public domain. Used by readiness checks (TLS, HSTS, health endpoint). |
+| `--app <name>` | detected or `myapp` | Application name written to `shuttle.yml`. |
+| `--domain <host>` | `myapp.example.com` | Public domain. Used by readiness checks and Caddy config. |
 | `--host <ip>` | `203.0.113.10` | Default deploy host. |
 | `--user <name>` | `deploy` | SSH user. |
-| `--preset <name>` | unset | Generate a `.deployshuttle.yml` for the named stack. One of `nextjs`, `laravel`, `node-api`, `docker-swarm`. |
-| `--force` | unset | Overwrite an existing `shuttle.yml` or `.deployshuttle.yml`. |
+| `--preset <name>` | unset | Generate a `.shuttle.yml` for the named stack. One of `nextjs`, `laravel`, `node-api`, `docker-swarm`. |
+| `--force` | unset | Overwrite existing generated files. |
 
 ## Stack presets
 
 Each preset writes a curated readiness config:
 
-- **`nextjs`** — `app.healthcheckPath: /api/health`, ignores
+- **`nextjs`** -- `app.healthcheckPath: /api/health`, ignores
   `adminer.ip_restriction_missing`.
-- **`laravel`** — `healthcheckPath: /up`, marks `*-queue`, `*-horizon`,
+- **`laravel`** -- `healthcheckPath: /up`, marks `*-queue`, `*-horizon`,
   `*-scheduler`, `*-worker` as worker services.
-- **`node-api`** — `healthcheckPath: /health`, ignores Adminer.
-- **`docker-swarm`** — Swarm-style worker patterns (`*_worker`,
+- **`node-api`** -- `healthcheckPath: /health`, ignores Adminer.
+- **`docker-swarm`** -- Swarm-style worker patterns (`*_worker`,
   `*_consumer`, `*_scheduler`, `*_cron`), allow-lists `dozzle*` and
   `portainer_agent*` Docker socket mounts.
 
 ## Examples
 
 ```bash
-# Generate shuttle.yml only.
-deploy-shuttle init --app shop --domain shop.example.com
+# Interactive mode -- detects stack, prompts for details.
+shuttle init
 
-# Generate both shuttle.yml and a Laravel-tuned .deployshuttle.yml.
-deploy-shuttle init --preset laravel --domain shop.example.com
+# Non-interactive with explicit values.
+shuttle init --app shop --domain shop.example.com --host 49.12.0.1
 
-# Re-generate, overwriting both files.
-deploy-shuttle init --preset nextjs --force
+# Generate both deploy config and a Laravel-tuned readiness config.
+shuttle init --preset laravel --domain shop.example.com
+
+# Re-generate, overwriting existing files.
+shuttle init --preset nextjs --force
 ```
-
-The output `.deployshuttle.yml` is heavily commented so you can adjust the
-ignore list and worker patterns to your container naming.

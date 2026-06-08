@@ -1,0 +1,65 @@
+---
+layout: "@/layouts/Docs.astro"
+title: "rollback"
+description: "Revert to the previous deployment for any strategy."
+---
+
+`rollback` reverts your application to its previous deployment state.
+The mechanism varies by strategy but the CLI surface is the same for all
+three.
+
+## Usage
+
+```bash
+shuttle rollback [flags]
+```
+
+## Flags
+
+| Flag | Default | Description |
+| --- | --- | --- |
+| `--yes` | unset | Confirm rollback non-interactively. Required in CI. |
+| `--config <path>` | nearest `shuttle.yml` | Configuration file. |
+| `--target <user@host[:port]>` | from config | Server to rollback on. |
+| `--format console\|json` | `console` | Output format. |
+
+## Rollback per strategy
+
+### Swarm
+
+Docker Swarm tracks the previous service specification. `rollback` calls
+`docker service rollback` which reverts to the previous image and
+configuration. The rollback follows the same start-first update order,
+so there is no downtime.
+
+### Blue-Green
+
+Rollback swaps the Caddy upstream back to the previously active slot.
+Since both slots remain running after a deploy, the switch is instant --
+Caddy reloads its config via SIGUSR1 with no dropped connections.
+
+### Compose
+
+Rollback re-deploys the previous image tag recorded in the deploy state
+file. This is a `docker compose up -d` with the old image, so there is
+a brief downtime during container replacement.
+
+## Examples
+
+```bash
+# Interactive rollback -- prompts for confirmation.
+shuttle rollback
+
+# Non-interactive (for CI or scripts).
+shuttle rollback --yes
+
+# Rollback on a specific server.
+shuttle rollback --target deploy@app.example.com --yes
+```
+
+## Deploy state
+
+Each `shuttle deploy` records the current state (image tag, strategy,
+timestamp) before applying the new deployment. `rollback` reads this
+state to determine what to revert to. The state is stored on the remote
+server under `/opt/shuttle/<app>/`.

@@ -23,12 +23,12 @@ score / level / report path as outputs.
 | Input | Default | Description |
 | --- | --- | --- |
 | `target` | `''` (local) | SSH target as `user@host[:port]`. Omit to scan the runner itself. |
-| `config` | `''` | Path to a `.deployshuttle.yml`. |
+| `config` | `''` | Path to a `.shuttle.yml`. |
 | `fail-below` | `'75'` | Fail the job when the score drops strictly below this. |
-| `output` | `.deployshuttle/latest-report.json` | Where to write the JSON report. |
+| `output` | `.shuttle/latest-report.json` | Where to write the JSON report. |
 | `ssh-private-key` | `''` | PEM-encoded SSH private key. |
 | `ssh-known-hosts` | `''` | known_hosts content. When omitted with a target, the Action runs `ssh-keyscan` automatically. |
-| `version` | `latest` | deploy-shuttle version to install. Pin to `v1.0.1` for reproducible runs. |
+| `version` | `latest` | shuttle version to install. Pin to a specific version for reproducible runs. |
 
 ## Outputs
 
@@ -53,16 +53,15 @@ jobs:
   doctor:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - name: Run DeployShuttle Doctor
+      - name: Run Shuttle Doctor
         id: doctor
         uses: MakFly/deploy-shuttle@v1
         with:
           target: ${{ secrets.SSH_TARGET }}
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
           fail-below: '80'
-          version: 'v1.0.1'
 
       - name: Upload report
         if: always()
@@ -74,9 +73,9 @@ jobs:
 
 ## Where the binary is installed
 
-The Action installs `/usr/local/bin/deploy-shuttle` (using passwordless
-`sudo` on GitHub-hosted runners). Subsequent steps in the same job can
-invoke `deploy-shuttle` directly without resolving its path.
+The Action installs `/usr/local/bin/shuttle` (using passwordless `sudo`
+on GitHub-hosted runners). Subsequent steps in the same job can invoke
+`shuttle` directly without resolving its path.
 
 ## Self-hosted runners
 

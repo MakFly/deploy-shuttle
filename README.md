@@ -1,18 +1,21 @@
 <div align="center">
 
-# DeployShuttle
+# Shuttle
 
-**Production readiness CLI for Docker apps on VPS**
+**Audit, harden and deploy Docker apps on VPS**
 
-Audit, harden and deploy Docker workloads running on any Linux VPS.
-One command gives you a security score, a shareable report, and a hardening plan — before client handoff.
+One CLI to go from code to production on any VPS.
+Security scoring, zero-downtime deploys, Docker Swarm native.
 
 [![Go](https://img.shields.io/badge/Go-1.23-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/badge/license-proprietary-blue)](#license)
 [![GitHub Action](https://img.shields.io/badge/action-MakFly%2Fdeploy--shuttle-2088FF?logo=githubactions&logoColor=white)](#github-action)
 
 ```bash
-shuttle doctor --target root@server
+# Init -> Provision -> Deploy
+shuttle init
+shuttle provision
+shuttle deploy
 ```
 
 </div>
@@ -21,32 +24,30 @@ shuttle doctor --target root@server
 
 ## Table of Contents
 
-- [Why DeployShuttle](#why-deployshuttle)
+- [Why Shuttle](#why-shuttle)
 - [Features](#features)
 - [Quick Start](#quick-start)
   - [Install](#install)
-  - [Audit a Server](#audit-a-server)
-  - [Generate a Report](#generate-a-shareable-report)
-  - [Harden a Server](#plan-and-apply-hardening)
+  - [From Code to Production](#from-code-to-production)
+  - [Audit an Existing Server](#audit-an-existing-server)
+- [Deploy Strategies](#deploy-strategies)
+- [Secrets Management](#secrets-management)
+- [Supported Stacks](#supported-stacks)
 - [CI / CD Integration](#cicd-integration)
-  - [GitHub Action](#github-action)
-  - [CLI in CI](#cli-in-any-ci)
 - [Configuration](#configuration)
-  - [Stack Presets](#stack-presets)
-  - [Cloudflare Integration](#cloudflare-integration)
 - [Check Catalog](#check-catalog)
+- [Commands](#commands)
 - [Architecture](#architecture)
 - [Supported Platforms](#supported-platforms)
-- [Other Commands](#other-commands)
 - [Development](#development)
-- [Roadmap](#roadmap)
+- [Versioning](#versioning)
 - [License](#license)
 
 ---
 
-## Why DeployShuttle
+## Why Shuttle
 
-You can ship a Docker app to a **$5 VPS** in an afternoon — but the gap between "it works" and "it's production-ready" is a maze of small, easy-to-miss security and reliability issues:
+You can ship a Docker app to a **$5 VPS** in an afternoon -- but the gap between "it works" and "it's production-ready" is a maze of small, easy-to-miss security and reliability issues:
 
 | Problem | Risk |
 |---|---|
@@ -56,22 +57,42 @@ You can ship a Docker app to a **$5 VPS** in an afternoon — but the gap betwee
 | `.env` files world-readable or tracked by Git | Credential leak |
 | Caddy admin API exposed to the internet | Remote takeover |
 | Workloads with no restart policy or healthcheck | Silent downtime |
+| Manual deploys with `docker compose up -d` | Downtime on every push |
 
-**DeployShuttle closes that gap.** It does not replace your deploy tooling — it produces the **production readiness report you hand to a client** before you call the project done.
+**Shuttle closes that gap.** It detects your stack, generates production Dockerfiles, provisions a VPS with Docker Swarm and Caddy, deploys with zero-downtime rolling updates, and gives you a 43-check security score you can hand to a client.
 
 ---
 
 ## Features
 
-- **43 automated security and reliability checks** — system, SSH, Docker, firewall, secrets, reverse proxy, TLS, DNS, monitoring, backups, compose, Cloudflare
-- **Deterministic scoring** — 0-100 readiness score with severity-weighted deductions (critical / high / medium / low / info)
-- **Local or remote scan** — same check suite runs on your machine or over SSH with a single `--target` flag
-- **Shareable reports** — Markdown, self-contained HTML, or PDF output for client handoffs, PRs, or audits
-- **Dry-run hardening** — concrete remediation plan with ready-to-run commands; `--apply` only executes safe, idempotent actions
-- **CI gate** — fail pipelines when the score drops below a threshold; first-class GitHub Action included
-- **Stack presets** — opinionated configs for Next.js, Laravel, Node API, Docker Swarm — fewer false positives on day one
-- **Cloudflare guardrails** — opt-in SSL mode, WAF, DNS, and proxy checks against your Cloudflare zone
-- **Zero dependencies** — single static Go binary, no runtime, no Docker required on the auditor side
+### Production Readiness
+
+- **43 automated security and reliability checks** -- system, SSH, Docker, firewall, secrets, reverse proxy, TLS, DNS, monitoring, backups, compose, Cloudflare
+- **Deterministic scoring** -- 0-100 readiness score with severity-weighted deductions (critical / high / medium / low / info)
+- **Local or remote scan** -- same check suite runs on your machine or over SSH with a single `--target` flag
+- **Shareable reports** -- Markdown, self-contained HTML, or PDF output for client handoffs, PRs, or audits
+- **Dry-run hardening** -- concrete remediation plan with ready-to-run commands; `--apply` only executes safe, idempotent actions
+- **CI gate** -- fail pipelines when the score drops below a threshold; first-class GitHub Action included
+
+### Deployment
+
+- **3 strategies** -- Swarm (rolling updates), Compose, Blue-Green
+- **Docker Swarm native** with Caddy reverse proxy and auto-TLS via Let's Encrypt
+- **Zero-downtime deploys** via start-first rolling updates
+- **FrankenPHP production Dockerfiles** for Laravel (Octane) and Symfony (worker mode)
+- **Docker Secrets** -- encrypted at rest in Swarm Raft log, RAM-only in containers
+- **Rollback support** for all strategies
+- **Caddy SIGUSR1 hot-reload** for instant upstream switching (blue-green)
+
+### Developer Experience
+
+- **Interactive `shuttle init`** -- detects your stack (Laravel, Symfony, Next.js, Node API), generates Dockerfile + docker-compose.yml + .dockerignore
+- **`shuttle provision`** -- bootstraps a bare VPS with Docker Swarm + Caddy + UFW in one command
+- **Auto-update checks** on startup with `shuttle update`
+- **Score badge** for README with `shuttle badge`
+- **Stack presets** -- opinionated configs for common stacks, fewer false positives on day one
+- **Cloudflare guardrails** -- opt-in SSL mode, WAF, DNS, and proxy checks against your Cloudflare zone
+- **Zero dependencies** -- single static Go binary, no runtime, no Docker required on the auditor side
 
 ---
 
@@ -89,26 +110,40 @@ Pre-built targets: `linux-x64`, `linux-arm64` (Hetzner CAX, AWS Graviton, Raspbe
 
 Or download manually from [Releases](https://github.com/MakFly/deploy-shuttle/releases) and place it on your `$PATH`.
 
-### Audit a Server
+### From Code to Production
 
 ```bash
-# Local scan (current machine):
-shuttle doctor
+cd my-laravel-app
 
-# Remote scan over SSH (uses your SSH agent):
+# 1. Init -- detects Laravel, generates Dockerfile + docker-compose.yml + .dockerignore
+shuttle init
+
+# 2. Provision -- bootstraps VPS (Docker Swarm + Caddy + UFW)
+shuttle provision
+
+# 3. Deploy -- build, push, rolling update
+shuttle deploy
+
+# -> https://my-app.fr is live with TLS
+```
+
+### Audit an Existing Server
+
+```bash
+# Remote scan over SSH:
 shuttle doctor --target root@203.0.113.10
 
-# Custom SSH port:
-shuttle doctor --target root@203.0.113.10:7022
+# Generate a client-facing HTML report:
+shuttle report --format html --output report.html
 
-# Save the JSON report for downstream tooling:
-shuttle doctor --target root@server --output .shuttle/latest-report.json
+# Plan and apply hardening:
+shuttle harden --apply --target root@203.0.113.10 --yes
 ```
 
 **Example output:**
 
 ```text
-DeployShuttle Doctor Report
+Shuttle Doctor Report
 Target: root@203.0.113.10:7022
 Score: 70/100 - Risky
 
@@ -121,37 +156,80 @@ Medium:
   [x] Docker workloads do not run as root - 15 workloads run as root.
 ```
 
-### Generate a Shareable Report
+---
 
-```bash
-# Markdown — good for PRs and engineering audits:
-shuttle report --format markdown --output report.md
+## Deploy Strategies
 
-# HTML — good for clients, self-contained, opens in any browser:
-shuttle report --format html --output report.html
+### Swarm (default)
 
-# PDF — good for handoff packs, uses the optional React PDF renderer:
-shuttle report --format pdf --output report.pdf
+```yaml
+deploy:
+  strategy: swarm
 ```
 
-By default `report` reads `.shuttle/latest-report.json`. Pass `--input <file>` for a different doctor JSON.
+- Docker stack deploy with rolling updates
+- start-first (zero-downtime)
+- auto-rollback on failure
+- `shuttle rollback --yes` for manual rollback
 
-### Plan and Apply Hardening
+### Blue-Green
 
-```bash
-# Dry-run plan — never touches the server:
-shuttle harden --dry-run
-
-# Apply only safe-auto-apply actions (locally):
-shuttle harden --apply --yes
-
-# Apply over SSH on the audited target:
-shuttle harden --apply --target root@203.0.113.10 --yes
+```yaml
+deploy:
+  strategy: blue-green
 ```
 
-The dry-run plan converts each open finding into a concrete proposed action with the source check ID, rationale, and either ready-to-run commands or manual steps. `--apply` only executes commands that are **idempotent, scoped, and reversible**.
+- Two slots (blue/green) alternating
+- Caddy upstream switch via SIGUSR1 hot-reload
+- Instant rollback (slot swap)
 
-Current safe allow-list: `chmod 600 .env` and `ufw deny <port>/tcp`.
+### Compose
+
+```yaml
+deploy:
+  strategy: compose
+```
+
+- Simple `docker compose up`
+- Best for staging/dev environments
+- State tracking + rollback
+
+---
+
+## Secrets Management
+
+### Docker Secrets (Swarm)
+
+```bash
+shuttle secrets set APP_KEY "base64:xxx"
+shuttle secrets set DB_PASSWORD "secret"
+shuttle secrets push
+# -> Encrypted in Swarm Raft log, RAM-only in containers
+```
+
+Secrets are stored encrypted locally with Argon2id + XChaCha20-Poly1305, then pushed as Docker Secrets to the Swarm cluster. Containers read them from `/run/secrets/` -- never written to disk on the host.
+
+### Env File Split (Compose / Blue-Green)
+
+```bash
+# .env        -> config values (committed)
+# .env.secrets -> secrets (chmod 600, never committed)
+```
+
+The `doctor` check suite verifies `.env` permissions and Git tracking automatically.
+
+---
+
+## Supported Stacks
+
+| Stack | Dockerfile | Worker Mode | Health Endpoint |
+|---|---|---|---|
+| Laravel | FrankenPHP + Octane | Octane workers | `/up` |
+| Symfony | FrankenPHP native | `php_server` worker | Caddy metrics |
+| Next.js | Node 22 standalone | -- | `/` |
+| Node API | Custom | -- | `/health` |
+
+`shuttle init` detects the stack from your project files and generates the appropriate Dockerfile, docker-compose.yml, and .dockerignore.
 
 ---
 
@@ -176,10 +254,10 @@ jobs:
 
 | Input | Required | Default | Description |
 |---|---|---|---|
-| `target` | no | — | SSH target (`user@host` or `user@host:port`). Omit to scan the runner. |
-| `ssh-private-key` | no | — | SSH private key (PEM) for remote scans. |
-| `ssh-known-hosts` | no | — | Known hosts content. Auto-detected via `ssh-keyscan` when omitted. |
-| `config` | no | — | Path to `.shuttle.yml`. |
+| `target` | no | -- | SSH target (`user@host` or `user@host:port`). Omit to scan the runner. |
+| `ssh-private-key` | no | -- | SSH private key (PEM) for remote scans. |
+| `ssh-known-hosts` | no | -- | Known hosts content. Auto-detected via `ssh-keyscan` when omitted. |
+| `config` | no | -- | Path to `.shuttle.yml`. |
 | `fail-below` | no | `75` | Fail the job when the score is strictly below this threshold. |
 | `output` | no | `.shuttle/latest-report.json` | JSON report path. |
 | `version` | no | `latest` | `shuttle` version to install. |
@@ -194,18 +272,21 @@ The Action writes a job summary with the readiness level and exits non-zero on a
 - run: shuttle doctor --target ${{ secrets.SSH_TARGET }} --fail-below 80
 ```
 
-Works in GitHub Actions, GitLab CI, CircleCI, Jenkins — anywhere a Linux runner can run a static binary over SSH.
+Works in GitHub Actions, GitLab CI, CircleCI, Jenkins -- anywhere a Linux runner can run a static binary over SSH.
 
 ---
 
 ## Configuration
 
-Drop a `.shuttle.yml` at the project root to ignore checks, allow-list workloads, or tune behavior:
+Drop a `.shuttle.yml` at the project root to tune readiness checks, deployment strategy, and server config:
 
 ```yaml
 app:
   domain: app.example.com
   healthcheckPath: /health
+
+deploy:
+  strategy: swarm
 
 checks:
   profile: [docker, caddy]
@@ -226,7 +307,7 @@ docker:
 
 ### Stack Presets
 
-`init --preset` writes an opinionated `.shuttle.yml` for common stacks — fewer false positives on day one:
+`init --preset` writes an opinionated `.shuttle.yml` for common stacks -- fewer false positives on day one:
 
 ```bash
 shuttle init --preset nextjs       --domain app.example.com
@@ -271,38 +352,66 @@ The token needs **read scopes** on `Zone`, `DNS`, and `Zone Settings`. When the 
 | **Compose** | 5 | Prod file exists, env files present, no `:latest` tags, resource limits, sensitive bind mounts |
 | **Cloudflare** | 5 | SSL mode, Always HTTPS, WAF, DNS records, proxy status |
 
-Severity levels: **critical** (−20), **high** (−10), **medium** (−5), **low** (−2), **info** (0).
+Severity levels: **critical** (-20), **high** (-10), **medium** (-5), **low** (-2), **info** (0).
 
 Full reference with check IDs and remediation hints: [`docs/check-catalog.md`](docs/check-catalog.md)
+
+---
+
+## Commands
+
+```text
+shuttle init        Detect stack, generate Dockerfile + docker-compose.yml + config
+shuttle provision   Bootstrap VPS: Docker Swarm + Caddy + UFW
+shuttle deploy      Build and deploy (swarm / compose / blue-green)
+shuttle rollback    Rollback to previous deployment
+shuttle doctor      Run production readiness audit (43 checks)
+shuttle report      Generate Markdown / HTML / PDF report
+shuttle harden      Plan and apply security hardening
+shuttle badge       Generate score badge for README
+shuttle secrets     Manage encrypted secrets (set, get, list, remove, push)
+shuttle status      Show container status across servers
+shuttle logs        Stream remote logs
+shuttle ssh         Open SSH session to server
+shuttle exec        Run command in remote container
+shuttle monitor     Live Docker resource usage
+shuttle update      Self-update to latest version
+shuttle uninstall   Remove shuttle from this machine
+shuttle license     Manage Pro license activation
+```
+
+Run `shuttle <command> --help` for usage details.
 
 ---
 
 ## Architecture
 
 ```text
-              ┌─────────────────────────────────────────────────┐
-              │                  shuttle CLI                    │
-              │                                                 │
-              │  ┌──────────┐  ┌──────────┐  ┌──────────────┐  │
-              │  │  doctor  │  │  report  │  │    harden    │  │
-              │  └────┬─────┘  └────┬─────┘  └──────┬───────┘  │
-              └───────│─────────────│───────────────│──────────┘
-                      │             │               │
-            shell     │   JSON      │     JSON      │
-            calls     │   report    │     report    │
-                      ▼             ▼               ▼
-              ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
-              │ execx.Local  │ │  MD / HTML / │ │  Planner +   │
-              │ execx.SSH    │ │  PDF render  │ │  safe apply  │
-              └──────────────┘ └──────────────┘ └──────────────┘
+              ┌──────────────────────────────────────────────────────────────┐
+              │                        shuttle CLI                           │
+              │                                                              │
+              │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐  │
+              │  │  doctor  │  │  report  │  │  harden  │  │   deploy   │  │
+              │  └────┬─────┘  └────┬─────┘  └────┬─────┘  └──────┬─────┘  │
+              └───────│─────────────│─────────────│───────────────│─────────┘
+                      │             │             │               │
+            shell     │   JSON      │    JSON     │    SSH +      │
+            calls     │   report    │    report   │    Docker     │
+                      ▼             ▼             ▼               ▼
+              ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+              │ execx.Local  │ │  MD / HTML / │ │  Planner +   │ │ Swarm /      │
+              │ execx.SSH    │ │  PDF render  │ │  safe apply  │ │ Compose /    │
+              └──────────────┘ └──────────────┘ └──────────────┘ │ Blue-Green   │
+                                                                  └──────────────┘
 ```
 
 | Component | Role |
 |---|---|
-| **doctor** | Runs the check suite over a local shell or SSH session. Outputs a scored JSON report. |
+| **doctor** | Runs the 43-check suite over a local shell or SSH session. Outputs a scored JSON report. |
 | **report** | Reads the JSON and renders Markdown, HTML, or PDF for sharing. |
 | **harden** | Reads the JSON, plans remediation actions, and (with `--apply`) executes only allow-listed commands. |
-| **execx** | Unified shell abstraction — `Local` for the current machine, `SSH` for remote targets. |
+| **deploy** | Builds the Docker image, pushes to registry, and deploys via the configured strategy. |
+| **execx** | Unified shell abstraction -- `Local` for the current machine, `SSH` for remote targets. |
 
 Architecture and security details: [`plans/06-architecture-security.md`](plans/06-architecture-security.md)
 
@@ -318,19 +427,6 @@ Architecture and security details: [`plans/06-architecture-security.md`](plans/0
 | macOS ARM64 | `darwin-arm64` | Apple Silicon (M1/M2/M3/M4) |
 
 **Audited targets:** Ubuntu 22.04, Ubuntu 24.04, Debian 12.
-
----
-
-## Other Commands
-
-DeployShuttle includes a deployment toolkit alongside its readiness features:
-
-```text
-init  new  dev  provision  deploy  rollback  destroy
-logs  ssh  status  exec  lock  secrets  license  validate  ci  monitor
-```
-
-Run `shuttle <command> --help` for usage. The primary workflow is `doctor` → `report` → `harden`.
 
 ---
 
@@ -358,21 +454,19 @@ Build release binaries:
 sh scripts/build-go.sh
 ```
 
-CI runs: `gofmt` check → `go vet ./...` → `go test ./...`
+CI runs: `gofmt` check -> `go vet ./...` -> `go test ./...`
 
 ---
 
-## Roadmap
+## Versioning
 
-DeployShuttle is in active development. Planned additions include:
+```bash
+sh scripts/release.sh patch   # v2.0.0 -> v2.0.1
+sh scripts/release.sh minor   # -> v2.1.0
+sh scripts/release.sh major   # -> v3.0.0
+```
 
-- Additional `harden` actions (UFW baseline, Caddy admin lockdown)
-- `cloudflare.origin_exposed` check (direct A records leaking origin IP)
-- Persistent volume checks for database containers
-- Backup recency, restore drill, and offsite verification
-- Log rotation and uptime checks
-
-Full roadmap, PRD, scoring model, and launch plan: [`plans/`](plans/README.md)
+The script validates tests, builds the binary with version injected via ldflags, installs to `~/.local/bin/shuttle`, and creates an annotated git tag. Push triggers the GitHub release workflow that cross-compiles for all platforms.
 
 ---
 

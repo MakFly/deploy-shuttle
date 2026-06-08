@@ -1,35 +1,43 @@
 ---
 layout: "@/layouts/Docs.astro"
 title: "Introduction"
-description: "What DeployShuttle is, who it is for, and where to start."
+description: "What Shuttle is, who it is for, and where to start."
 ---
 
-DeployShuttle is a CLI-first **production-readiness** tool for Docker apps
-on VPS. It connects to a server (locally or over SSH), runs **43 checks**
-across 12 categories, computes a deterministic 0-100 score, and either
-prints a console report or generates a Markdown / HTML / PDF report you
-can hand to a client.
+Shuttle is a CLI-first tool that takes you from code to production on any
+VPS. It detects your stack, generates production Dockerfiles, provisions a
+server with Docker Swarm and Caddy, deploys with zero-downtime rolling
+updates, and runs **43 checks** across 12 categories to give you a
+deterministic 0-100 readiness score.
 
-It does **not** replace your deploy tooling. It tells you whether the box
-underneath is safe enough to host the deploy.
+One CLI. Init, provision, deploy, audit, harden.
 
 ## Who this is for
 
 - Freelance and agency developers shipping client apps on Hetzner / OVH /
   Contabo / Scaleway VPS.
 - Indie hackers running side-projects on cheap arm64 boxes.
-- Teams that want a CI gate that fails the build when the target server
+- Teams that want zero-downtime deploys without Kubernetes overhead.
+- Anyone who needs a CI gate that fails the build when the target server
   is below a readiness threshold.
 
-## Three commands you will actually use
+## Three commands to production
 
 ```bash
-deploy-shuttle doctor --target root@server
-deploy-shuttle harden --target root@server --dry-run
-deploy-shuttle report --format html --output report.html
+shuttle init
+shuttle provision
+shuttle deploy
 ```
 
-Each one is documented in the [Commands](/docs/commands) section.
+## Audit and harden
+
+```bash
+shuttle doctor --target root@server
+shuttle harden --target root@server --dry-run
+shuttle report --format html --output report.html
+```
+
+Each command is documented in the [Commands](/docs/commands) section.
 
 ## What gets checked
 
@@ -43,13 +51,15 @@ A full inventory lives in the [Check catalog](/docs/checks). Highlights:
   mounts, missing resource limits).
 - Backup detection (artifacts + cron jobs).
 
-## Free vs Pro
+## What gets deployed
 
-The free CLI covers everything you need to scan and ship. **Pro** unlocks
-the hosted HTML / PDF reports you hand to clients and the remote
-`harden --apply` workflow. See [Pricing](/pricing).
+- 3 strategies: Swarm (rolling updates), Compose, Blue-Green.
+- FrankenPHP Dockerfiles for Laravel and Symfony.
+- Docker Secrets encrypted at rest, RAM-only in containers.
+- Auto-TLS via Caddy + Let's Encrypt.
+- Rollback support for all strategies.
 
 ## Next
 
 - [Install](/docs/install) the CLI in your terminal.
-- Run the [Quickstart](/docs/quickstart) for a 90-second first scan.
+- Run the [Quickstart](/docs/quickstart) to go from code to production.
