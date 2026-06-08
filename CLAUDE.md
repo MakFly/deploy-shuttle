@@ -81,7 +81,7 @@ The Go CLI uses Cobra. Root command is created by `internal/cli/root.go`.
 
 Current commands include:
 
-- `init`
+- `init` (supports `--pro`, `--with-db`, `--with-redis`, `--with-queue`, `--with-scheduler`, `--with-mailpit` for Pro templates)
 - `new`
 - `dev`
 - `provision`
@@ -129,6 +129,8 @@ Reference implementation only. Do not add new product work there unless explicit
 - **Secrets**: local secrets use a passphrase-protected envelope with Argon2id and XChaCha20-Poly1305 in `.shuttle/secrets.enc`; CI/non-interactive shells must set `SHUTTLE_SECRETS_PASSPHRASE`.
 - **Remote paths**: runtime helpers keep app state under `/opt/shuttle/<app>/`.
 - **Readiness checks**: add doctor checks in `go-cli/internal/readiness/` and keep scoring deterministic.
+- **Pro templates**: `init --pro` and `--with-*` flags generate multi-service compose (DB, Redis, workers). Gated by `license.Require("init --pro")`. Service blocks in `templates/compose_services.go`, assembly in `templates/compose_pro.go`.
+- **Pricing**: 199€ TTC one-time, single Pro tier. No Agency tier.
 - **Compatibility**: old TS behavior is reference material only; if Go behavior is intentionally partial, document that clearly in `README.md` or `plans/08-execution-tracker.md`.
 
 ## Style

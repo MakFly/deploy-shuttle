@@ -9,6 +9,7 @@ import (
 
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/config"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/detect"
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/license"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/templates"
 	"github.com/spf13/cobra"
 )
@@ -125,6 +126,12 @@ func newInitCommand() *cobra.Command {
 	var email string
 	var skipDetect bool
 	var withCI bool
+	var withDB string
+	var withRedis bool
+	var withQueue bool
+	var withScheduler bool
+	var withMailpit bool
+	var pro bool
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Detect your stack and generate configuration",
@@ -228,6 +235,31 @@ func newInitCommand() *cobra.Command {
 
 			fmt.Println()
 
+			// --- Pro flag expansion ---
+			if pro {
+				if withDB == "" {
+					withDB = "postgres"
+				}
+				withRedis = true
+				withQueue = true
+				withScheduler = true
+				withMailpit = true
+				withCI = true
+			}
+
+			hasPro := withDB != "" || withRedis || withQueue || withScheduler || withMailpit
+			if hasPro {
+				if err := templates.ValidateProFlags(stack.Preset, withDB, withQueue, withScheduler); err != nil {
+					return err
+				}
+				if err := license.Require("init --pro"); err != nil {
+					return err
+				}
+				if withQueue && !withRedis {
+					fmt.Println("  ⚠ --with-queue works best with --with-redis (queue driver needs a broker)")
+				}
+			}
+
 			// --- Determine service port ---
 			servicePort := servicePortForPreset(stack.Preset)
 
@@ -292,7 +324,22 @@ func newInitCommand() *cobra.Command {
 			}
 
 			// --- docker-compose.yml ---
-			composeContent := templates.ComposeTemplate(app, stack.Preset, servicePort)
+			var composeContent string
+			if hasPro {
+				opts := templates.ProComposeOptions{
+					App:       app,
+					Preset:    stack.Preset,
+					Port:      servicePort,
+					DB:        withDB,
+					Redis:     withRedis,
+					Queue:     withQueue,
+					Scheduler: withScheduler,
+					Mailpit:   withMailpit,
+				}
+				composeContent = templates.ProComposeTemplate(opts)
+			} else {
+				composeContent = templates.ComposeTemplate(app, stack.Preset, servicePort)
+			}
 			if composeContent != "" {
 				if _, err := os.Stat("docker-compose.yml"); err == nil && !force {
 					fmt.Println("docker-compose.yml already exists (use --force to overwrite)")
@@ -300,7 +347,14 @@ func newInitCommand() *cobra.Command {
 					if err := os.WriteFile("docker-compose.yml", []byte(composeContent), 0o644); err != nil {
 						return err
 					}
-					fmt.Println("✓ docker-compose.yml created")
+					if hasPro {
+						fmt.Printf("✓ docker-compose.yml created (Pro: %s)\n", strings.Join(templates.ServiceNames(templates.ProComposeOptions{
+							Preset: stack.Preset, DB: withDB, Redis: withRedis,
+							Queue: withQueue, Scheduler: withScheduler, Mailpit: withMailpit,
+						}), ", "))
+					} else {
+						fmt.Println("✓ docker-compose.yml created")
+					}
 				}
 			}
 
@@ -336,6 +390,24 @@ func newInitCommand() *cobra.Command {
 				}
 			}
 
+			// --- .env.example ---
+			var envContent string
+			if hasPro {
+				envContent = templates.EnvExamplePro(stack.Preset, withDB)
+			} else {
+				envContent = templates.EnvExample(stack.Preset)
+			}
+			if envContent != "" {
+				if _, err := os.Stat(".env.example"); err == nil && !force {
+					fmt.Println(".env.example already exists (use --force to overwrite)")
+				} else {
+					if err := os.WriteFile(".env.example", []byte(envContent), 0o644); err != nil {
+						return err
+					}
+					fmt.Println("✓ .env.example created")
+				}
+			}
+
 			// --- CI workflow ---
 			if withCI {
 				ciDir := filepath.Join(".github", "workflows")
@@ -346,7 +418,12 @@ func newInitCommand() *cobra.Command {
 					if err := os.MkdirAll(ciDir, 0o755); err != nil {
 						return err
 					}
-					workflow := generateCIWorkflow()
+					var workflow string
+					if hasPro {
+						workflow = templates.CIWorkflowPro(stack.Preset, withDB)
+					} else {
+						workflow = templates.CIWorkflow(stack.Preset)
+					}
 					if err := os.WriteFile(ciFile, []byte(workflow), 0o644); err != nil {
 						return err
 					}
@@ -371,31 +448,13 @@ func newInitCommand() *cobra.Command {
 	cmd.Flags().StringVar(&preset, "preset", "", "override auto-detection with a specific preset ("+strings.Join(templates.ReadinessPresets, "|")+")")
 	cmd.Flags().BoolVar(&skipDetect, "no-detect", false, "skip stack detection")
 	cmd.Flags().BoolVar(&withCI, "ci", false, "also generate a GitHub Actions workflow")
+	cmd.Flags().StringVar(&withDB, "with-db", "", "add database service (postgres|mysql) [Pro]")
+	cmd.Flags().BoolVar(&withRedis, "with-redis", false, "add Redis service [Pro]")
+	cmd.Flags().BoolVar(&withQueue, "with-queue", false, "add queue worker service [Pro]")
+	cmd.Flags().BoolVar(&withScheduler, "with-scheduler", false, "add scheduler service [Pro]")
+	cmd.Flags().BoolVar(&withMailpit, "with-mailpit", false, "add Mailpit dev mail service [Pro]")
+	cmd.Flags().BoolVar(&pro, "pro", false, "enable all Pro services with sensible defaults")
 	return cmd
-}
-
-func generateCIWorkflow() string {
-	return `name: DeployShuttle Readiness
-on:
-  push:
-    branches: [main]
-  pull_request:
-  workflow_dispatch:
-
-jobs:
-  doctor:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install shuttle
-        run: curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
-
-      - name: Run readiness scan
-        run: shuttle doctor --fail-below 75
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-`
 }
 
 func newNewCommand() *cobra.Command {

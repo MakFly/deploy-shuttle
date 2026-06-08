@@ -81,6 +81,118 @@ func TestInitRejectsUnknownPreset(t *testing.T) {
 	})
 }
 
+func TestInitCreatesEnvExample(t *testing.T) {
+	withTempDir(t, func(dir string) {
+		cmd := newInitCommand()
+		cmd.SetOut(new(bytes.Buffer))
+		cmd.SetArgs([]string{"--preset", "laravel", "--domain", "demo.example.com", "--force"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("init failed: %v", err)
+		}
+		body, err := os.ReadFile(filepath.Join(dir, ".env.example"))
+		if err != nil {
+			t.Fatalf("read .env.example: %v", err)
+		}
+		if !strings.Contains(string(body), "DB_CONNECTION") {
+			t.Fatal("laravel .env.example should contain DB_CONNECTION")
+		}
+	})
+}
+
+func TestInitProBypassesOnDevBuild(t *testing.T) {
+	// Dev builds have no embedded pubkey, so license.Require is a no-op.
+	// This test verifies --pro succeeds on dev builds (the common case).
+	withTempDir(t, func(dir string) {
+		cmd := newInitCommand()
+		cmd.SetOut(new(bytes.Buffer))
+		cmd.SetArgs([]string{"--preset", "laravel", "--pro", "--domain", "demo.example.com", "--force"})
+		err := cmd.Execute()
+		if err != nil {
+			t.Fatalf("--pro should succeed on dev build: %v", err)
+		}
+		body, _ := os.ReadFile(filepath.Join(dir, "docker-compose.yml"))
+		if !strings.Contains(string(body), "postgres") {
+			t.Error("pro compose should contain postgres")
+		}
+	})
+}
+
+func TestInitProDevBuildBypasses(t *testing.T) {
+	withTempDir(t, func(dir string) {
+		cmd := newInitCommand()
+		cmd.SetOut(new(bytes.Buffer))
+		cmd.SetArgs([]string{"--preset", "laravel", "--pro", "--domain", "demo.example.com", "--force"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("init --pro should succeed on dev build: %v", err)
+		}
+		body, err := os.ReadFile(filepath.Join(dir, "docker-compose.yml"))
+		if err != nil {
+			t.Fatalf("read compose: %v", err)
+		}
+		content := string(body)
+		if !strings.Contains(content, "postgres") {
+			t.Error("pro compose should contain postgres service")
+		}
+		if !strings.Contains(content, "redis") {
+			t.Error("pro compose should contain redis service")
+		}
+		if !strings.Contains(content, "queue") {
+			t.Error("pro compose should contain queue service")
+		}
+	})
+}
+
+func TestInitWithDBOnlyPostgres(t *testing.T) {
+	withTempDir(t, func(dir string) {
+		cmd := newInitCommand()
+		cmd.SetOut(new(bytes.Buffer))
+		cmd.SetArgs([]string{"--preset", "laravel", "--with-db", "postgres", "--domain", "demo.example.com", "--force"})
+		if err := cmd.Execute(); err != nil {
+			t.Fatalf("init --with-db postgres failed: %v", err)
+		}
+		body, _ := os.ReadFile(filepath.Join(dir, "docker-compose.yml"))
+		content := string(body)
+		if !strings.Contains(content, "postgres") {
+			t.Error("should have postgres service")
+		}
+		if strings.Contains(content, "redis") {
+			t.Error("should not have redis when not requested")
+		}
+	})
+}
+
+func TestInitWithQueueOnNextjsFails(t *testing.T) {
+	withTempDir(t, func(dir string) {
+		cmd := newInitCommand()
+		cmd.SetOut(new(bytes.Buffer))
+		cmd.SetErr(new(bytes.Buffer))
+		cmd.SetArgs([]string{"--preset", "nextjs", "--with-queue", "--domain", "demo.example.com"})
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatal("expected error for --with-queue on nextjs")
+		}
+		if !strings.Contains(err.Error(), "laravel and symfony") {
+			t.Fatalf("unexpected error message: %v", err)
+		}
+	})
+}
+
+func TestInitWithDBInvalidValueFails(t *testing.T) {
+	withTempDir(t, func(dir string) {
+		cmd := newInitCommand()
+		cmd.SetOut(new(bytes.Buffer))
+		cmd.SetErr(new(bytes.Buffer))
+		cmd.SetArgs([]string{"--preset", "laravel", "--with-db", "sqlite", "--domain", "demo.example.com"})
+		err := cmd.Execute()
+		if err == nil {
+			t.Fatal("expected error for --with-db sqlite")
+		}
+		if !strings.Contains(err.Error(), "postgres") {
+			t.Fatalf("error should mention valid options: %v", err)
+		}
+	})
+}
+
 func TestInitForceOverwritesExistingDeployshuttleYAML(t *testing.T) {
 	withTempDir(t, func(dir string) {
 		if err := os.WriteFile(filepath.Join(dir, ".shuttle.yml"), []byte("version: 1\n# stale\n"), 0o644); err != nil {

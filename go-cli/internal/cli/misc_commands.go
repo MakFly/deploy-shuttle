@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/templates"
 	"github.com/spf13/cobra"
 )
 
@@ -17,17 +18,7 @@ func newCICommand() *cobra.Command {
 			if err := os.MkdirAll(dir, 0o755); err != nil {
 				return err
 			}
-			content := `name: DeployShuttle
-on:
-  workflow_dispatch:
-jobs:
-  doctor:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: shuttle doctor --format json --fail-below 75
-`
-			return os.WriteFile(filepath.Join(dir, "shuttle.yml"), []byte(content), 0o644)
+			return os.WriteFile(filepath.Join(dir, "shuttle.yml"), []byte(templates.CIWorkflow("")), 0o644)
 		},
 	})
 	return root
