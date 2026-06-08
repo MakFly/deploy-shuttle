@@ -57,11 +57,11 @@ func newValidateCommand() *cobra.Command {
 // servicePortForPreset returns the default container port for a given preset.
 func servicePortForPreset(preset string) string {
 	switch preset {
-	case "laravel", "symfony":
+	case "laravel":
+		return "8000"
+	case "symfony":
 		return "8080"
-	case "nextjs":
-		return "3000"
-	case "node-api":
+	case "nextjs", "node-api":
 		return "3000"
 	default:
 		return "8080"
@@ -255,6 +255,29 @@ func newInitCommand() *cobra.Command {
 						fmt.Printf("✓ Dockerfile created (%s)\n", dockerfileLabel)
 					}
 				}
+			}
+
+			// --- Framework config files ---
+			if stack.Preset == "laravel" {
+				os.MkdirAll("docker", 0o755)
+				if err := os.WriteFile("docker/opcache.ini", []byte(templates.LaravelOpcacheIni()), 0o644); err != nil {
+					return err
+				}
+				fmt.Println("✓ docker/opcache.ini created (OPcache production tuning)")
+			}
+			if stack.Preset == "symfony" {
+				os.MkdirAll("docker/conf.d", 0o755)
+				if err := os.WriteFile("docker/Caddyfile", []byte(templates.SymfonyCaddyfile()), 0o644); err != nil {
+					return err
+				}
+				if err := os.WriteFile("docker/conf.d/10-app.ini", []byte(templates.SymfonyBaseIni()), 0o644); err != nil {
+					return err
+				}
+				if err := os.WriteFile("docker/conf.d/20-app.prod.ini", []byte(templates.SymfonyProdIni()), 0o644); err != nil {
+					return err
+				}
+				fmt.Println("✓ docker/Caddyfile created (FrankenPHP worker mode)")
+				fmt.Println("✓ docker/conf.d/*.ini created (OPcache + PHP production tuning)")
 			}
 
 			// --- docker-compose.yml ---
