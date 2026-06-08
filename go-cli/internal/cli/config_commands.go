@@ -83,7 +83,7 @@ func dockerfileForPreset(preset string) (string, string) {
 }
 
 // initShuttleYML generates the shuttle.yml content with Caddy routing.
-func initShuttleYML(app, domain, host, user string, port int, email, servicePort string) string {
+func initShuttleYML(app, domain, host, user string, port int, email, servicePort, strategy string) string {
 	if port == 0 {
 		port = 22
 	}
@@ -97,7 +97,7 @@ func initShuttleYML(app, domain, host, user string, port int, email, servicePort
 	fmt.Fprintf(&b, "  port: %d\n", port)
 	b.WriteString("\n")
 	b.WriteString("deploy:\n")
-	b.WriteString("  strategy: blue-green\n")
+	fmt.Fprintf(&b, "  strategy: %s\n", strategy)
 	b.WriteString("  timeout: 120\n")
 	b.WriteString("  retain: 3\n")
 	b.WriteString("  compose_files:\n")
@@ -212,9 +212,13 @@ func newInitCommand() *cobra.Command {
 				user = defaultUser
 			}
 
-			// deploy strategy (informational, always blue-green)
+			// deploy strategy
+			strategy := "swarm"
 			if !cmd.Flags().Changed("host") || !cmd.Flags().Changed("app") {
-				_ = promptChoice("Deploy strategy", []string{"blue-green", "compose", "swarm"}, 0)
+				strategy = promptChoice("Deploy strategy", []string{"swarm (recommended)", "compose", "blue-green"}, 0)
+			}
+			if strings.HasPrefix(strategy, "swarm") {
+				strategy = "swarm"
 			}
 
 			// email
@@ -235,7 +239,7 @@ func newInitCommand() *cobra.Command {
 					return err
 				}
 				_ = os.WriteFile(filepath.Join(".shuttle", ".gitkeep"), []byte{}, 0o644)
-				content := initShuttleYML(app, domain, host, user, port, email, servicePort)
+				content := initShuttleYML(app, domain, host, user, port, email, servicePort, strategy)
 				if err := os.WriteFile("shuttle.yml", []byte(content), 0o644); err != nil {
 					return err
 				}

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -66,6 +67,8 @@ func deployCompose(cfg *config.Config, skipBuild bool, dryRun bool) error {
 	}
 
 	fmt.Printf("Found %d services to build: %s\n", len(buildServices), strings.Join(buildServices, ", "))
+	fmt.Println("Strategy: compose (docker compose up)")
+
 
 	registryAddr := fmt.Sprintf("127.0.0.1:%d", registryPort)
 
@@ -203,6 +206,28 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 			fmt.Printf("⚠ Caddy reload failed: %s\n", res.Stderr)
 		}
 	}
+
+	// Save state
+	version := detectVersion()
+	statePath := runtime.StatePath(cfg.App)
+	oldStateRes := client.Run(fmt.Sprintf("cat %s 2>/dev/null", shell.Escape(statePath)))
+	newState := composeState{
+		Version:    version,
+		DeployedAt: time.Now().UTC().Format(time.RFC3339),
+		Strategy:   "compose",
+	}
+	if oldStateRes.Code == 0 && strings.TrimSpace(oldStateRes.Stdout) != "" {
+		var old composeState
+		if json.Unmarshal([]byte(oldStateRes.Stdout), &old) == nil {
+			newState.Previous = &composeState{
+				Version:    old.Version,
+				DeployedAt: old.DeployedAt,
+			}
+		}
+	}
+	stateJSON, _ := json.MarshalIndent(newState, "", "  ")
+	fmt.Printf("→ Saving state to %s...\n", statePath)
+	client.UploadContent(string(stateJSON)+"\n", statePath, 0o644)
 
 	// Prune old images
 	fmt.Println("→ Pruning old images...")

@@ -401,6 +401,8 @@ func newRollbackCommand() *cobra.Command {
 				return rollbackDeploy(cfg, dryRun)
 			case "swarm":
 				return rollbackSwarm(cfg, dryRun)
+			case "compose":
+				return rollbackCompose(cfg, dryRun)
 			default:
 				return rollbackSwarm(cfg, dryRun)
 			}
