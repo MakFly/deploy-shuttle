@@ -153,20 +153,32 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 		return fmt.Errorf("mkdir slot dir on %s: %s", host, res.Stderr)
 	}
 
-	// Upload .env to slot directory
+	// Upload .env to app root (shared between blue/green slots)
 	envFile := cfg.Deploy.EnvFile
 	if envFile == "" {
 		envFile = ".env"
 	}
 	if _, err := os.Stat(envFile); err == nil {
-		fmt.Printf("-> Uploading %s to %s...\n", envFile, targetSlot)
+		fmt.Println("-> Uploading .env (shared)...")
 		envContent, err := os.ReadFile(envFile)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", envFile, err)
 		}
-		res = client.UploadContent(string(envContent), slotDir+".env", 0o600)
+		res = client.UploadContent(string(envContent), appDir+"/.env", 0o644)
 		if res.Code != 0 {
 			return fmt.Errorf("upload .env to %s: %s", host, res.Stderr)
+		}
+	}
+	// Upload .env.secrets if it exists locally (non-committed secrets)
+	if _, err := os.Stat(".env.secrets"); err == nil {
+		fmt.Println("-> Uploading .env.secrets (shared, chmod 600)...")
+		secretsContent, err := os.ReadFile(".env.secrets")
+		if err != nil {
+			return fmt.Errorf("read .env.secrets: %w", err)
+		}
+		res = client.UploadContent(string(secretsContent), appDir+"/.env.secrets", 0o600)
+		if res.Code != 0 {
+			return fmt.Errorf("upload .env.secrets to %s: %s", host, res.Stderr)
 		}
 	}
 
@@ -393,8 +405,8 @@ func generateBlueGreenCompose(cf *composeFile, cfg *config.Config, buildServices
 			Restart:       svc.Restart,
 			Command:       svc.Command,
 			Healthcheck:   svc.Healthcheck,
-			Networks:      []string{"default", "caddy_network"},
-			EnvFile:       ".env",
+			Networks: []string{"default", "caddy_network"},
+			EnvFile:  []string{"../.env", "../.env.secrets"},
 		}
 
 		if buildSet[name] {

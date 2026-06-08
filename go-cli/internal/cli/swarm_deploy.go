@@ -39,7 +39,7 @@ type swarmStackFile struct {
 type swarmStackSvc struct {
 	Image       string            `yaml:"image"`
 	Environment any               `yaml:"environment,omitempty"`
-	EnvFile     string            `yaml:"env_file,omitempty"`
+	EnvFile     any               `yaml:"env_file,omitempty"`
 	Volumes     []string          `yaml:"volumes,omitempty"`
 	Expose      []string          `yaml:"expose,omitempty"`
 	Networks    []string          `yaml:"networks,omitempty"`
@@ -183,20 +183,31 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 		return fmt.Errorf("mkdir on %s: %s", host, res.Stderr)
 	}
 
-	// Upload .env
+	// Upload .env (config) + .env.secrets (secrets)
 	envFile := cfg.Deploy.EnvFile
 	if envFile == "" {
 		envFile = ".env"
 	}
 	if _, err := os.Stat(envFile); err == nil {
-		fmt.Printf("-> Uploading %s...\n", envFile)
+		fmt.Println("-> Uploading .env...")
 		envContent, err := os.ReadFile(envFile)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", envFile, err)
 		}
-		res = client.UploadContent(string(envContent), appDir+"/.env", 0o600)
+		res = client.UploadContent(string(envContent), appDir+"/.env", 0o644)
 		if res.Code != 0 {
 			return fmt.Errorf("upload .env to %s: %s", host, res.Stderr)
+		}
+	}
+	if _, err := os.Stat(".env.secrets"); err == nil {
+		fmt.Println("-> Uploading .env.secrets (chmod 600)...")
+		secretsContent, err := os.ReadFile(".env.secrets")
+		if err != nil {
+			return fmt.Errorf("read .env.secrets: %w", err)
+		}
+		res = client.UploadContent(string(secretsContent), appDir+"/.env.secrets", 0o600)
+		if res.Code != 0 {
+			return fmt.Errorf("upload .env.secrets to %s: %s", host, res.Stderr)
 		}
 	}
 
@@ -415,8 +426,8 @@ func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices [
 			Expose:      svc.Expose,
 			Command:     svc.Command,
 			Healthcheck: svc.Healthcheck,
-			Networks:    []string{"caddy_network", "default"},
-			EnvFile:     ".env",
+			Networks: []string{"caddy_network", "default"},
+			EnvFile:  []string{".env", ".env.secrets"},
 		}
 
 		if buildSet[name] {

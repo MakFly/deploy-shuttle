@@ -148,7 +148,7 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 		return fmt.Errorf("mkdir on %s: %s", host, res.Stderr)
 	}
 
-	// Step 6: Upload .env
+	// Step 6: Upload .env (config) + .env.secrets (secrets)
 	envFile := cfg.Deploy.EnvFile
 	if envFile == "" {
 		envFile = ".env"
@@ -159,9 +159,20 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 		if err != nil {
 			return fmt.Errorf("read %s: %w", envFile, err)
 		}
-		res := client.UploadContent(string(envContent), remoteDir+"/.env", 0o600)
+		res := client.UploadContent(string(envContent), remoteDir+"/.env", 0o644)
 		if res.Code != 0 {
 			return fmt.Errorf("upload .env to %s: %s", host, res.Stderr)
+		}
+	}
+	if _, err := os.Stat(".env.secrets"); err == nil {
+		fmt.Println("→ Uploading .env.secrets (chmod 600)...")
+		secretsContent, err := os.ReadFile(".env.secrets")
+		if err != nil {
+			return fmt.Errorf("read .env.secrets: %w", err)
+		}
+		res := client.UploadContent(string(secretsContent), remoteDir+"/.env.secrets", 0o600)
+		if res.Code != 0 {
+			return fmt.Errorf("upload .env.secrets to %s: %s", host, res.Stderr)
 		}
 	}
 
@@ -408,8 +419,8 @@ func generateProdCompose(cf *composeFile, cfg *config.Config, buildServices []st
 			Restart:     svc.Restart,
 			Command:     svc.Command,
 			Healthcheck: svc.Healthcheck,
-			Networks:    []string{"caddy_network"},
-			EnvFile:     ".env",
+			Networks: []string{"caddy_network"},
+			EnvFile:  []string{".env", ".env.secrets"},
 		}
 
 		if buildSet[name] {

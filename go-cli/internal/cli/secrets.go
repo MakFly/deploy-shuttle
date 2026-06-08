@@ -126,11 +126,12 @@ func newSecretsCommand() *cobra.Command {
 					if mkdir.Code != 0 {
 						return fmt.Errorf("failed to create remote secrets directory on %s: %s", host, mkdir.Stderr)
 					}
-					res := client.UploadContent(content, remoteDir+"/.env", 0o600)
+					secretsPath := remoteDir + "/.env.secrets"
+					res := client.UploadContent(content, secretsPath, 0o600)
 					if res.Code != 0 {
 						return fmt.Errorf("failed to push secrets to %s: %s", host, res.Stderr)
 					}
-					fmt.Printf("Secrets pushed to %s:%s/.env\n", host, remoteDir)
+					fmt.Printf("✓ Secrets pushed to %s:%s\n", host, secretsPath)
 				}
 			}
 			return nil
