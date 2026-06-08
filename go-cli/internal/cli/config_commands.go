@@ -54,6 +54,64 @@ func newValidateCommand() *cobra.Command {
 	return cmd
 }
 
+// servicePortForPreset returns the default container port for a given preset.
+func servicePortForPreset(preset string) string {
+	switch preset {
+	case "laravel":
+		return "8000"
+	case "nextjs":
+		return "3000"
+	case "node-api":
+		return "3000"
+	default:
+		return "3000"
+	}
+}
+
+// dockerfileForPreset returns the Dockerfile content for the detected preset.
+func dockerfileForPreset(preset string) (string, string) {
+	switch preset {
+	case "laravel":
+		return templates.DockerfileLaravel(), "FrankenPHP + Laravel"
+	case "nextjs":
+		return templates.DockerfileNextJS(), "Next.js"
+	default:
+		return "", ""
+	}
+}
+
+// initShuttleYML generates the shuttle.yml content with Caddy routing.
+func initShuttleYML(app, domain, host, user string, port int, email, servicePort string) string {
+	if port == 0 {
+		port = 22
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "app: %s\n", app)
+	fmt.Fprintf(&b, "domain: %s\n", domain)
+	b.WriteString("\n")
+	b.WriteString("server:\n")
+	fmt.Fprintf(&b, "  host: %s\n", host)
+	fmt.Fprintf(&b, "  user: %s\n", user)
+	fmt.Fprintf(&b, "  port: %d\n", port)
+	b.WriteString("\n")
+	b.WriteString("deploy:\n")
+	b.WriteString("  strategy: blue-green\n")
+	b.WriteString("  timeout: 120\n")
+	b.WriteString("  retain: 3\n")
+	b.WriteString("  compose_files:\n")
+	b.WriteString("    - docker-compose.yml\n")
+	b.WriteString("\n")
+	b.WriteString("caddy:\n")
+	b.WriteString("  conf_dir: /opt/shuttle/caddy/conf.d\n")
+	b.WriteString("  reload_command: \"docker kill --signal=SIGUSR1 $(docker ps -qf name=shuttle_caddy)\"\n")
+	if email != "" {
+		fmt.Fprintf(&b, "  email: %s\n", email)
+	}
+	b.WriteString("  routes:\n")
+	fmt.Fprintf(&b, "    \"%s\": \"web:%s\"\n", domain, servicePort)
+	return b.String()
+}
+
 func newInitCommand() *cobra.Command {
 	var force bool
 	var app string
@@ -62,6 +120,7 @@ func newInitCommand() *cobra.Command {
 	var user string
 	var port int
 	var preset string
+	var email string
 	var skipDetect bool
 	var withCI bool
 	cmd := &cobra.Command{
@@ -69,9 +128,13 @@ func newInitCommand() *cobra.Command {
 		Short: "Detect your stack and generate configuration",
 		Long: "Analyze the current project to detect the technology stack, then generate:\n" +
 			"  - shuttle.yml (deploy config)\n" +
+			"  - Dockerfile (if a preset matches)\n" +
+			"  - docker-compose.yml\n" +
+			"  - .dockerignore\n" +
 			"  - .shuttle.yml (readiness config with the right preset)\n" +
 			"  - optionally, a GitHub Actions workflow (--ci)\n\n" +
-			"Use --preset to override auto-detection. Supported presets: " +
+			"Run without flags for interactive mode. Use flags to skip prompts (for CI/scripting).\n" +
+			"Supported presets: " +
 			strings.Join(templates.ReadinessPresets, ", ") + ".",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			dir, _ := os.Getwd()
@@ -84,35 +147,83 @@ func newInitCommand() *cobra.Command {
 				}
 				stack = detect.Stack{Preset: preset, Framework: preset}
 			} else if !skipDetect {
+				fmt.Println("\nDetecting stack...")
 				stack = detect.Analyze(dir)
 				if stack.Preset != "" {
-					fmt.Printf("Detected stack: %s\n", stack.Framework)
-					for _, sig := range stack.Signals {
-						fmt.Printf("  • %s\n", sig)
+					fmt.Printf("  ✓ %s detected", stack.Framework)
+					if len(stack.Signals) > 0 {
+						fmt.Printf(" (%s)", stack.Signals[0])
 					}
-					fmt.Printf("  → preset: %s\n\n", stack.Preset)
+					fmt.Println()
 				} else {
-					fmt.Println("Could not auto-detect stack. Using generic config.")
-					fmt.Println("Tip: use --preset to specify manually.")
+					fmt.Println("  Could not auto-detect stack. Using generic config.")
+					fmt.Println("  Tip: use --preset to specify manually.")
 				}
+				fmt.Println()
 			}
 
-			// --- Defaults ---
+			// --- Compute defaults ---
+			defaultApp := filepath.Base(dir)
+			defaultDomain := defaultApp + ".example.com"
+			defaultUser := "root"
+			defaultPort := 22
+
+			// --- Interactive prompts (skip if flag is provided) ---
+			// app
+			if !cmd.Flags().Changed("app") {
+				app = promptString("App name", defaultApp)
+			}
 			if app == "" {
-				app = filepath.Base(dir)
+				app = defaultApp
+			}
+
+			// domain
+			if !cmd.Flags().Changed("domain") {
+				defaultDomain = app + ".example.com"
+				domain = promptString("Domain", defaultDomain)
 			}
 			if domain == "" {
-				domain = app + ".example.com"
+				domain = defaultDomain
+			}
+
+			// host
+			if !cmd.Flags().Changed("host") {
+				host = promptString("Server host", "")
 			}
 			if host == "" {
 				host = "203.0.113.10"
 			}
+
+			// port
+			if !cmd.Flags().Changed("port") {
+				port = promptInt("SSH port", defaultPort)
+			}
+			if port == 0 {
+				port = defaultPort
+			}
+
+			// user
+			if !cmd.Flags().Changed("user") {
+				user = promptString("SSH user", defaultUser)
+			}
 			if user == "" {
-				user = "deploy"
+				user = defaultUser
 			}
-			if stack.HealthPath != "" && domain == app+".example.com" {
-				// keep domain placeholder
+
+			// deploy strategy (informational, always blue-green)
+			if !cmd.Flags().Changed("host") || !cmd.Flags().Changed("app") {
+				_ = promptChoice("Deploy strategy", []string{"blue-green", "compose", "swarm"}, 0)
 			}
+
+			// email
+			if !cmd.Flags().Changed("email") {
+				email = promptString("Email (for Let's Encrypt)", "")
+			}
+
+			fmt.Println()
+
+			// --- Determine service port ---
+			servicePort := servicePortForPreset(stack.Preset)
 
 			// --- shuttle.yml ---
 			if _, err := os.Stat("shuttle.yml"); err == nil && !force {
@@ -122,10 +233,52 @@ func newInitCommand() *cobra.Command {
 					return err
 				}
 				_ = os.WriteFile(filepath.Join(".shuttle", ".gitkeep"), []byte{}, 0o644)
-				if err := os.WriteFile("shuttle.yml", []byte(templates.ShuttleYML(app, domain, host, user, port)), 0o644); err != nil {
+				content := initShuttleYML(app, domain, host, user, port, email, servicePort)
+				if err := os.WriteFile("shuttle.yml", []byte(content), 0o644); err != nil {
 					return err
 				}
 				fmt.Println("✓ shuttle.yml created")
+			}
+
+			// --- Dockerfile ---
+			if stack.Preset != "" {
+				dockerfileContent, dockerfileLabel := dockerfileForPreset(stack.Preset)
+				if dockerfileContent != "" {
+					if _, err := os.Stat("Dockerfile"); err == nil && !force {
+						fmt.Println("Dockerfile already exists (use --force to overwrite)")
+					} else {
+						if err := os.WriteFile("Dockerfile", []byte(dockerfileContent), 0o644); err != nil {
+							return err
+						}
+						fmt.Printf("✓ Dockerfile created (%s)\n", dockerfileLabel)
+					}
+				}
+			}
+
+			// --- docker-compose.yml ---
+			composeContent := templates.ComposeTemplate(app, stack.Preset, servicePort)
+			if composeContent != "" {
+				if _, err := os.Stat("docker-compose.yml"); err == nil && !force {
+					fmt.Println("docker-compose.yml already exists (use --force to overwrite)")
+				} else {
+					if err := os.WriteFile("docker-compose.yml", []byte(composeContent), 0o644); err != nil {
+						return err
+					}
+					fmt.Println("✓ docker-compose.yml created")
+				}
+			}
+
+			// --- .dockerignore ---
+			ignoreContent := templates.Dockerignore(stack.Preset)
+			if ignoreContent != "" {
+				if _, err := os.Stat(".dockerignore"); err == nil && !force {
+					fmt.Println(".dockerignore already exists (use --force to overwrite)")
+				} else {
+					if err := os.WriteFile(".dockerignore", []byte(ignoreContent), 0o644); err != nil {
+						return err
+					}
+					fmt.Println("✓ .dockerignore created")
+				}
 			}
 
 			// --- .shuttle.yml ---
@@ -167,13 +320,8 @@ func newInitCommand() *cobra.Command {
 
 			// --- Summary ---
 			fmt.Println("\nNext steps:")
-			fmt.Println("  1. Edit shuttle.yml with your server details")
-			if effectivePreset != "" {
-				fmt.Println("  2. Review .shuttle.yml (adjust ignore rules if needed)")
-				fmt.Println("  3. Run: shuttle doctor")
-			} else {
-				fmt.Println("  2. Run: shuttle doctor")
-			}
+			fmt.Println("  1. shuttle provision    (bootstrap your VPS)")
+			fmt.Println("  2. shuttle deploy       (build and ship)")
 			return nil
 		},
 	}
@@ -183,6 +331,7 @@ func newInitCommand() *cobra.Command {
 	cmd.Flags().StringVar(&host, "host", "", "server host")
 	cmd.Flags().StringVar(&user, "user", "", "server user")
 	cmd.Flags().IntVar(&port, "port", 22, "server SSH port")
+	cmd.Flags().StringVar(&email, "email", "", "email for Let's Encrypt")
 	cmd.Flags().StringVar(&preset, "preset", "", "override auto-detection with a specific preset ("+strings.Join(templates.ReadinessPresets, "|")+")")
 	cmd.Flags().BoolVar(&skipDetect, "no-detect", false, "skip stack detection")
 	cmd.Flags().BoolVar(&withCI, "ci", false, "also generate a GitHub Actions workflow")
