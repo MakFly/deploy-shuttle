@@ -65,6 +65,8 @@ type Deploy struct {
 type Hooks struct {
 	PreDeploy  []string `yaml:"pre_deploy,omitempty" json:"pre_deploy"`
 	PostDeploy []string `yaml:"post_deploy,omitempty" json:"post_deploy"`
+	Pre        []string `yaml:"pre,omitempty" json:"-"`
+	Post       []string `yaml:"post,omitempty" json:"-"`
 }
 
 type Blue struct {
@@ -239,6 +241,13 @@ func applyDefaults(cfg *Config) {
 		cfg.Deploy.Concurrency = 5
 	}
 	cfg.Deploy.AutoRollback = true
+	// Normalize hook aliases: "pre"/"post" → "pre_deploy"/"post_deploy"
+	if len(cfg.Deploy.Hooks.Pre) > 0 && len(cfg.Deploy.Hooks.PreDeploy) == 0 {
+		cfg.Deploy.Hooks.PreDeploy = cfg.Deploy.Hooks.Pre
+	}
+	if len(cfg.Deploy.Hooks.Post) > 0 && len(cfg.Deploy.Hooks.PostDeploy) == 0 {
+		cfg.Deploy.Hooks.PostDeploy = cfg.Deploy.Hooks.Post
+	}
 	if (cfg.Deploy.Strategy == "compose" || cfg.Deploy.Strategy == "swarm" || cfg.Deploy.Strategy == "blue-green") && len(cfg.Deploy.ComposeFiles) == 0 {
 		cfg.Deploy.ComposeFiles = []string{"docker-compose.yml"}
 	}

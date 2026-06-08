@@ -55,6 +55,11 @@ func deployBlueGreen(cfg *config.Config, skipBuild bool, dryRun bool) error {
 	fmt.Printf("Found %d services to build: %s\n", len(buildServices), strings.Join(buildServices, ", "))
 	fmt.Println("Strategy: blue-green (zero-downtime)")
 
+	// Run pre-deploy hooks
+	if err := runLocalHooks("pre-deploy", cfg.Deploy.Hooks.PreDeploy, dryRun); err != nil {
+		return err
+	}
+
 	registryAddr := fmt.Sprintf("127.0.0.1:%d", registryPort)
 
 	// Step 1: Build images locally
@@ -101,6 +106,11 @@ func deployBlueGreen(cfg *config.Config, skipBuild bool, dryRun bool) error {
 				return err
 			}
 		}
+	}
+
+	// Run post-deploy hooks
+	if err := runLocalHooks("post-deploy", cfg.Deploy.Hooks.PostDeploy, dryRun); err != nil {
+		return err
 	}
 
 	fmt.Println("\n-> Blue-green deploy complete (zero-downtime)")
@@ -232,8 +242,19 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	// Switch Caddy upstream to new slot
 	if len(cfg.Caddy.Routes) > 0 {
 		fmt.Printf("-> Switching Caddy upstream to %s slot...\n", targetSlot)
+
+		// Remove any conflicting caddy files for this app before writing ours
+		canonicalName := fmt.Sprintf("50-%s.caddy", cfg.App)
+		cleanCmd := fmt.Sprintf(
+			`for f in %s/*%s*.caddy; do [ -f "$f" ] && [ "$(basename "$f")" != %s ] && echo "Removing conflicting: $f" && rm "$f"; done`,
+			shell.Escape(cfg.Caddy.ConfDir), cfg.App, shell.Escape(canonicalName))
+		cleanRes := client.Run(cleanCmd)
+		if cleanRes.Stdout != "" {
+			fmt.Print(cleanRes.Stdout)
+		}
+
 		caddyConf := generateBlueGreenCaddyConf(cfg, targetSlot)
-		caddyPath := fmt.Sprintf("%s/50-%s.caddy", cfg.Caddy.ConfDir, cfg.App)
+		caddyPath := fmt.Sprintf("%s/%s", cfg.Caddy.ConfDir, canonicalName)
 		res = client.UploadContent(caddyConf, caddyPath, 0o644)
 		if res.Code != 0 {
 			return fmt.Errorf("upload caddy config to %s: %s", host, res.Stderr)

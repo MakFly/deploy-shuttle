@@ -99,6 +99,10 @@ func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
 	fmt.Printf("Found %d services to build: %s\n", len(buildServices), strings.Join(buildServices, ", "))
 	fmt.Println("Strategy: swarm (docker stack deploy with rolling updates)")
 
+	if err := runLocalHooks("pre-deploy", cfg.Deploy.Hooks.PreDeploy, dryRun); err != nil {
+		return err
+	}
+
 	registryAddr := fmt.Sprintf("127.0.0.1:%d", registryPort)
 
 	// Step 1: Build images locally
@@ -150,6 +154,10 @@ func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
 				return err
 			}
 		}
+	}
+
+	if err := runLocalHooks("post-deploy", cfg.Deploy.Hooks.PostDeploy, dryRun); err != nil {
+		return err
 	}
 
 	fmt.Println("\n-> Swarm deploy complete (rolling updates)")
