@@ -226,7 +226,7 @@ func applyDefaults(cfg *Config) {
 		cfg.Build.Context = "."
 	}
 	if cfg.Deploy.Strategy == "" {
-		cfg.Deploy.Strategy = "blue-green"
+		cfg.Deploy.Strategy = "swarm"
 	}
 	if cfg.Deploy.Timeout == 0 {
 		cfg.Deploy.Timeout = 120
@@ -238,7 +238,7 @@ func applyDefaults(cfg *Config) {
 		cfg.Deploy.Concurrency = 5
 	}
 	cfg.Deploy.AutoRollback = true
-	if cfg.Deploy.Strategy == "compose" && len(cfg.Deploy.ComposeFiles) == 0 {
+	if (cfg.Deploy.Strategy == "compose" || cfg.Deploy.Strategy == "swarm" || cfg.Deploy.Strategy == "blue-green") && len(cfg.Deploy.ComposeFiles) == 0 {
 		cfg.Deploy.ComposeFiles = []string{"docker-compose.yml"}
 	}
 	if cfg.Proxy.Driver == "" {
