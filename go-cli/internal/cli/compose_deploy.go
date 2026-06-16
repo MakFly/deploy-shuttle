@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/config"
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/output"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/runtime"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/shell"
 	"gopkg.in/yaml.v3"
@@ -66,8 +67,8 @@ func deployCompose(cfg *config.Config, skipBuild bool, dryRun bool) error {
 		return fmt.Errorf("no services with build: found in %s", composeFiles[0])
 	}
 
-	fmt.Printf("Found %d services to build: %s\n", len(buildServices), strings.Join(buildServices, ", "))
-	fmt.Println("Strategy: compose (docker compose up)")
+	output.Header("Found %d services to build: %s", len(buildServices), strings.Join(buildServices, ", "))
+	output.Detail("Strategy: compose (docker compose up)")
 
 	if err := runLocalHooks("pre-deploy", cfg.Deploy.Hooks.PreDeploy, dryRun); err != nil {
 		return err
@@ -79,7 +80,8 @@ func deployCompose(cfg *config.Config, skipBuild bool, dryRun bool) error {
 	if !skipBuild {
 		for _, svc := range buildServices {
 			imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, svc)
-			fmt.Printf("\n→ Building %s...\n", svc)
+			fmt.Println()
+			output.Step("Building %s...", svc)
 			if err := buildServiceImage(parsed, svc, imageTag, dryRun); err != nil {
 				return fmt.Errorf("build %s: %w", svc, err)
 			}
@@ -94,16 +96,17 @@ func deployCompose(cfg *config.Config, skipBuild bool, dryRun bool) error {
 	}
 
 	// Step 2: Start ephemeral registry
-	fmt.Printf("\n→ Starting ephemeral registry on :%d...\n", registryPort)
+	fmt.Println()
+	output.Step("Starting ephemeral registry on :%d...", registryPort)
 	if err := startRegistry(); err != nil {
 		return fmt.Errorf("start registry: %w", err)
 	}
-	defer stopRegistry()
+	defer stopRegistry(cfg.Deploy.PruneBuildCache != "off")
 
 	// Step 3: Push images to local registry
 	for _, svc := range buildServices {
 		imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, svc)
-		fmt.Printf("→ Pushing %s to local registry...\n", svc)
+		output.Step("Pushing %s to local registry...", svc)
 		if err := dockerPush(imageTag); err != nil {
 			return fmt.Errorf("push %s: %w", svc, err)
 		}
@@ -122,7 +125,11 @@ func deployCompose(cfg *config.Config, skipBuild bool, dryRun bool) error {
 		return err
 	}
 
-	fmt.Println("\n✓ Deploy complete")
+	// Reclaim local disk: prune the Docker build cache used by this deploy.
+	pruneLocalBuildCache(cfg)
+
+	fmt.Println()
+	output.OK("Deploy complete")
 	return nil
 }
 
@@ -133,16 +140,17 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 	}
 
 	remoteDir := runtime.AppDir(cfg.App)
-	fmt.Printf("\n→ Deploying to %s@%s:%d (%s)...\n", group.User, host, group.Port, remoteDir)
+	fmt.Println()
+	output.Step("Deploying to %s@%s:%d (%s)...", group.User, host, group.Port, remoteDir)
 
 	// Step 4: SSH reverse tunnel
-	fmt.Println("→ Opening SSH tunnel...")
+	output.Step("Opening SSH tunnel...")
 	tunnel, err := startSSHTunnel(host, group.User, group.Port, registryPort)
 	if err != nil {
 		return fmt.Errorf("SSH tunnel: %w", err)
 	}
 	defer func() {
-		fmt.Println("→ Closing SSH tunnel...")
+		output.Step("Closing SSH tunnel...")
 		tunnel.Process.Kill()
 		tunnel.Wait()
 	}()
@@ -161,7 +169,7 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 		envFile = ".env"
 	}
 	if _, err := os.Stat(envFile); err == nil {
-		fmt.Printf("→ Uploading %s...\n", envFile)
+		output.Step("Uploading %s...", envFile)
 		envContent, err := os.ReadFile(envFile)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", envFile, err)
@@ -172,7 +180,7 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 		}
 	}
 	if _, err := os.Stat(".env.secrets"); err == nil {
-		fmt.Println("→ Uploading .env.secrets (chmod 600)...")
+		output.Step("Uploading .env.secrets (chmod 600)...")
 		secretsContent, err := os.ReadFile(".env.secrets")
 		if err != nil {
 			return fmt.Errorf("read .env.secrets: %w", err)
@@ -185,21 +193,21 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 
 	// Step 7: Generate + upload production compose
 	prodCompose := generateProdCompose(parsed, cfg, buildServices, registryAddr)
-	fmt.Println("→ Uploading docker-compose.yml...")
+	output.Step("Uploading docker-compose.yml...")
 	res = client.UploadContent(prodCompose, remoteDir+"/docker-compose.yml", 0o644)
 	if res.Code != 0 {
 		return fmt.Errorf("upload compose to %s: %s", host, res.Stderr)
 	}
 
 	// Step 8: Pull + up
-	fmt.Println("→ Pulling images on VPS...")
+	output.Step("Pulling images on VPS...")
 	composeCmd := fmt.Sprintf("cd %s && docker compose pull", shell.Escape(remoteDir))
 	res = client.Run(composeCmd)
 	if res.Code != 0 {
 		return fmt.Errorf("docker compose pull on %s: %s", host, res.Stderr)
 	}
 
-	fmt.Println("→ Starting services...")
+	output.Step("Starting services...")
 	composeCmd = fmt.Sprintf("cd %s && docker compose up -d --remove-orphans", shell.Escape(remoteDir))
 	res = client.Run(composeCmd)
 	if res.Code != 0 {
@@ -211,17 +219,17 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 
 	// Step 9: Caddy conf.d
 	if len(cfg.Caddy.Routes) > 0 {
-		fmt.Println("→ Generating Caddy config...")
+		output.Step("Generating Caddy config...")
 		caddyConf := generateCaddyConf(cfg)
 		caddyPath := fmt.Sprintf("%s/50-%s.caddy", cfg.Caddy.ConfDir, cfg.App)
 		res = client.UploadContent(caddyConf, caddyPath, 0o644)
 		if res.Code != 0 {
 			return fmt.Errorf("upload caddy config to %s: %s", host, res.Stderr)
 		}
-		fmt.Println("→ Reloading Caddy...")
+		output.Step("Reloading Caddy...")
 		res = client.Run(cfg.Caddy.ReloadCommand)
 		if res.Code != 0 {
-			fmt.Printf("⚠ Caddy reload failed: %s\n", res.Stderr)
+			output.Attn("Caddy reload failed: %s", res.Stderr)
 		}
 	}
 
@@ -244,11 +252,11 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 		}
 	}
 	stateJSON, _ := json.MarshalIndent(newState, "", "  ")
-	fmt.Printf("→ Saving state to %s...\n", statePath)
+	output.Step("Saving state to %s...", statePath)
 	client.UploadContent(string(stateJSON)+"\n", statePath, 0o644)
 
 	// Prune old images
-	fmt.Println("→ Pruning old images...")
+	output.Step("Pruning old images...")
 	client.Run("docker image prune -f")
 
 	return nil
@@ -327,10 +335,24 @@ func buildServiceImage(cf *composeFile, serviceName string, imageTag string, dry
 }
 
 func startRegistry() error {
+	// Check if the registry is already running (reuse for layer cache)
+	inspectCmd := exec.Command("docker", "inspect", "-f", "{{.State.Running}}", registryContainer)
+	if out, err := inspectCmd.Output(); err == nil && strings.TrimSpace(string(out)) == "true" {
+		return waitForRegistry()
+	}
+
 	exec.Command("docker", "rm", "-f", registryContainer).Run()
+
+	// Use a named volume for persistent layer cache across deploys
+	exec.Command("docker", "volume", "create", registryContainer+"-data").Run()
+
 	cmd := exec.Command("docker", "run", "-d",
 		"--name", registryContainer,
 		"-p", fmt.Sprintf("127.0.0.1:%d:5000", registryPort),
+		"-v", registryContainer+"-data:/var/lib/registry",
+		// Allow blob deletion so stopRegistry can garbage-collect orphaned
+		// layers (old :latest overwrites) and keep the volume bounded.
+		"-e", "REGISTRY_STORAGE_DELETE_ENABLED=true",
 		"registry:2",
 	)
 	cmd.Stdout = os.Stdout
@@ -361,9 +383,45 @@ func waitForRegistry() error {
 	return fmt.Errorf("registry did not become ready: %w", lastErr)
 }
 
-func stopRegistry() {
-	fmt.Println("→ Stopping ephemeral registry...")
-	exec.Command("docker", "rm", "-f", registryContainer).Run()
+func stopRegistry(gc bool) {
+	// Garbage-collect orphaned layers (blobs from overwritten :latest tags) so
+	// the named volume stays bounded across deploys. Skipped when build-cache
+	// pruning is disabled, to preserve the layer cache untouched.
+	if gc {
+		output.Step("Garbage-collecting local registry...")
+		exec.Command("docker", "exec", registryContainer,
+			"registry", "garbage-collect", "-m",
+			"/etc/docker/registry/config.yml").Run()
+	}
+	output.Step("Stopping ephemeral registry...")
+	// Stop but don't remove — keeps layer cache in the named volume for next deploy
+	exec.Command("docker", "stop", registryContainer).Run()
+}
+
+// pruneLocalBuildCache reclaims local disk used by the Docker build cache after
+// a successful deploy. Behaviour is driven by cfg.Deploy.PruneBuildCache:
+//
+//	off    — do nothing
+//	capped — cap total build-cache size (keeps recent layers for fast rebuilds)
+//	all    — wipe the entire build cache
+//
+// Dangling images left by overwritten :latest tags are pruned in every active mode.
+func pruneLocalBuildCache(cfg *config.Config) {
+	switch cfg.Deploy.PruneBuildCache {
+	case "", "off":
+		return
+	case "all":
+		output.Step("Pruning local build cache (all)...")
+		exec.Command("docker", "builder", "prune", "-af").Run()
+	default: // "capped"
+		keep := cfg.Deploy.BuildCacheKeep
+		if keep == "" {
+			keep = "5GB"
+		}
+		output.Step("Pruning local build cache (keep %s)...", keep)
+		exec.Command("docker", "builder", "prune", "-f", "--max-used-space", keep).Run()
+	}
+	exec.Command("docker", "image", "prune", "-f").Run()
 }
 
 func dockerPush(imageTag string) error {
@@ -426,8 +484,8 @@ func generateProdCompose(cf *composeFile, cfg *config.Config, buildServices []st
 			Restart:     svc.Restart,
 			Command:     svc.Command,
 			Healthcheck: svc.Healthcheck,
-			Networks: []string{"caddy_network"},
-			EnvFile:  []string{".env", ".env.secrets"},
+			Networks:    []string{"caddy_network"},
+			EnvFile:     []string{".env", ".env.secrets"},
 		}
 
 		if buildSet[name] {

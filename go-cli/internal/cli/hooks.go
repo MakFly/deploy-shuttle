@@ -4,19 +4,22 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/output"
 )
 
 func runLocalHooks(phase string, hooks []string, dryRun bool) error {
 	if len(hooks) == 0 {
 		return nil
 	}
-	fmt.Printf("-> Running %s hooks (%d)...\n", phase, len(hooks))
+	fmt.Println()
+	output.Step("Running %s hooks (%d)...", phase, len(hooks))
 	for _, h := range hooks {
 		if dryRun {
-			fmt.Printf("  [dry-run] %s\n", h)
+			output.Detail("[dry-run] %s", h)
 			continue
 		}
-		fmt.Printf("  $ %s\n", h)
+		output.Cmd("%s", h)
 		cmd := exec.Command("sh", "-c", h)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr

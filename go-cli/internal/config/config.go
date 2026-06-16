@@ -60,6 +60,13 @@ type Deploy struct {
 	Raw          []string `yaml:"-" json:"-"`
 	ComposeFiles []string `yaml:"compose_files,omitempty" json:"compose_files,omitempty"`
 	EnvFile      string   `yaml:"env_file,omitempty" json:"env_file,omitempty"`
+	// PruneBuildCache controls cleanup of the local Docker build cache after a
+	// successful deploy: "off" (never), "capped" (cap total cache size, keeps
+	// recent layers for fast rebuilds) or "all" (wipe everything). Default "capped".
+	PruneBuildCache string `yaml:"prune_build_cache,omitempty" json:"prune_build_cache,omitempty"`
+	// BuildCacheKeep is the max build-cache size kept when PruneBuildCache is
+	// "capped" (e.g. "5GB", "512MB"). Default "5GB".
+	BuildCacheKeep string `yaml:"build_cache_keep,omitempty" json:"build_cache_keep,omitempty"`
 }
 
 type Hooks struct {
@@ -239,6 +246,12 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Deploy.Concurrency == 0 {
 		cfg.Deploy.Concurrency = 5
+	}
+	if cfg.Deploy.PruneBuildCache == "" {
+		cfg.Deploy.PruneBuildCache = "capped"
+	}
+	if cfg.Deploy.BuildCacheKeep == "" {
+		cfg.Deploy.BuildCacheKeep = "5GB"
 	}
 	cfg.Deploy.AutoRollback = true
 	// Normalize hook aliases: "pre"/"post" → "pre_deploy"/"post_deploy"

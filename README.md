@@ -360,6 +360,11 @@ app:
 
 deploy:
   strategy: swarm
+  # Reclaim local disk after each successful deploy by pruning the Docker
+  # build cache left by `docker build`. off | capped | all (default: capped).
+  prune_build_cache: capped
+  # Max build-cache size kept when prune_build_cache is "capped" (default: 5GB).
+  build_cache_keep: 5GB
 
 checks:
   profile: [docker, caddy]
@@ -377,6 +382,7 @@ docker:
 
 - `app.domain` + `app.healthcheckPath` unlock TLS and health-endpoint checks; without them those probes are skipped cleanly.
 - The config path appears in every report and JSON output so reviewers can verify which exceptions were granted.
+- `deploy.prune_build_cache` keeps local disk in check: builds run on your machine/CI and BuildKit caches every layer. `capped` (default) bounds the cache to `build_cache_keep` while keeping recent layers for fast rebuilds, `all` wipes it (slower next build), `off` disables cleanup. Dangling `:latest` images and the local registry's orphaned layers are reclaimed in the same pass (unless `off`). The remote VPS is unaffected — it only pulls.
 
 ### Stack Presets
 

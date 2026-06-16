@@ -3,12 +3,15 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/config"
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/output"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/runtime"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/shell"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/ssh"
@@ -52,8 +55,8 @@ func deployBlueGreen(cfg *config.Config, skipBuild bool, dryRun bool) error {
 		return fmt.Errorf("no services with build: found in %s", composeFiles[0])
 	}
 
-	fmt.Printf("Found %d services to build: %s\n", len(buildServices), strings.Join(buildServices, ", "))
-	fmt.Println("Strategy: blue-green (zero-downtime)")
+	output.Header("Found %d services to build: %s", len(buildServices), strings.Join(buildServices, ", "))
+	output.Detail("Strategy: blue-green (zero-downtime)")
 
 	// Run pre-deploy hooks
 	if err := runLocalHooks("pre-deploy", cfg.Deploy.Hooks.PreDeploy, dryRun); err != nil {
@@ -62,13 +65,35 @@ func deployBlueGreen(cfg *config.Config, skipBuild bool, dryRun bool) error {
 
 	registryAddr := fmt.Sprintf("127.0.0.1:%d", registryPort)
 
-	// Step 1: Build images locally
+	// Step 1: Build images locally (parallel)
 	if !skipBuild {
-		for _, svc := range buildServices {
-			imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, svc)
-			fmt.Printf("\n-> Building %s...\n", svc)
-			if err := buildServiceImage(parsed, svc, imageTag, dryRun); err != nil {
-				return fmt.Errorf("build %s: %w", svc, err)
+		if len(buildServices) == 1 {
+			imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, buildServices[0])
+			fmt.Println()
+			output.Step("Building %s...", buildServices[0])
+			if err := buildServiceImage(parsed, buildServices[0], imageTag, dryRun); err != nil {
+				return fmt.Errorf("build %s: %w", buildServices[0], err)
+			}
+		} else {
+			fmt.Println()
+			output.Step("Building %d services in parallel...", len(buildServices))
+			var wg sync.WaitGroup
+			errs := make(chan error, len(buildServices))
+			for _, svc := range buildServices {
+				wg.Add(1)
+				go func(s string) {
+					defer wg.Done()
+					imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, s)
+					output.Step("Building %s...", s)
+					if err := buildServiceImage(parsed, s, imageTag, dryRun); err != nil {
+						errs <- fmt.Errorf("build %s: %w", s, err)
+					}
+				}(svc)
+			}
+			wg.Wait()
+			close(errs)
+			if err, ok := <-errs; ok {
+				return err
 			}
 		}
 	}
@@ -84,18 +109,39 @@ func deployBlueGreen(cfg *config.Config, skipBuild bool, dryRun bool) error {
 	}
 
 	// Step 2: Start ephemeral registry
-	fmt.Printf("\n-> Starting ephemeral registry on :%d...\n", registryPort)
+	fmt.Println()
+	output.Step("Starting ephemeral registry on :%d...", registryPort)
 	if err := startRegistry(); err != nil {
 		return fmt.Errorf("start registry: %w", err)
 	}
-	defer stopRegistry()
+	defer stopRegistry(cfg.Deploy.PruneBuildCache != "off")
 
-	// Step 3: Push images to local registry
-	for _, svc := range buildServices {
-		imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, svc)
-		fmt.Printf("-> Pushing %s to local registry...\n", svc)
+	// Step 3: Push images to local registry (parallel)
+	if len(buildServices) == 1 {
+		imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, buildServices[0])
+		output.Step("Pushing %s to local registry...", buildServices[0])
 		if err := dockerPush(imageTag); err != nil {
-			return fmt.Errorf("push %s: %w", svc, err)
+			return fmt.Errorf("push %s: %w", buildServices[0], err)
+		}
+	} else {
+		output.Step("Pushing %d images to local registry in parallel...", len(buildServices))
+		var wg sync.WaitGroup
+		errs := make(chan error, len(buildServices))
+		for _, svc := range buildServices {
+			wg.Add(1)
+			go func(s string) {
+				defer wg.Done()
+				imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, s)
+				output.Step("Pushing %s to local registry...", s)
+				if err := dockerPush(imageTag); err != nil {
+					errs <- fmt.Errorf("push %s: %w", s, err)
+				}
+			}(svc)
+		}
+		wg.Wait()
+		close(errs)
+		if err, ok := <-errs; ok {
+			return err
 		}
 	}
 
@@ -113,7 +159,11 @@ func deployBlueGreen(cfg *config.Config, skipBuild bool, dryRun bool) error {
 		return err
 	}
 
-	fmt.Println("\n-> Blue-green deploy complete (zero-downtime)")
+	// Reclaim local disk: prune the Docker build cache used by this deploy.
+	pruneLocalBuildCache(cfg)
+
+	fmt.Println()
+	output.OK("Blue-green deploy complete (zero-downtime)")
 	return nil
 }
 
@@ -124,21 +174,36 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	}
 
 	appDir := runtime.AppDir(cfg.App)
-	fmt.Printf("\n-> Deploying (blue-green) to %s@%s:%d (%s)...\n", group.User, host, group.Port, appDir)
+	fmt.Println()
+	output.Step("Deploying (blue-green) to %s@%s:%d (%s)...", group.User, host, group.Port, appDir)
 
 	// SSH reverse tunnel
-	fmt.Println("-> Opening SSH tunnel...")
+	output.Step("Opening SSH tunnel...")
 	tunnel, err := startSSHTunnel(host, group.User, group.Port, registryPort)
 	if err != nil {
 		return fmt.Errorf("SSH tunnel: %w", err)
 	}
 	defer func() {
-		fmt.Println("-> Closing SSH tunnel...")
+		output.Step("Closing SSH tunnel...")
 		tunnel.Process.Kill()
 		tunnel.Wait()
 	}()
 
-	time.Sleep(2 * time.Second)
+	// Wait for SSH tunnel to be ready (TCP dial probe instead of blind sleep)
+	tunnelAddr := fmt.Sprintf("127.0.0.1:%d", registryPort)
+	tunnelReady := false
+	for i := 0; i < 20; i++ {
+		conn, err := net.DialTimeout("tcp", tunnelAddr, 200*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			tunnelReady = true
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if !tunnelReady {
+		output.Attn("SSH tunnel may not be ready, proceeding anyway")
+	}
 
 	// Ensure app directory exists
 	res := client.Run(fmt.Sprintf("mkdir -p %s", shell.Escape(appDir)))
@@ -154,7 +219,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	}
 	targetSlot := oppositeSlot(activeSlot)
 
-	fmt.Printf("-> Current active slot: %s, deploying to: %s\n", activeSlot, targetSlot)
+	output.Step("Current active slot: %s, deploying to: %s", activeSlot, targetSlot)
 
 	// Create slot directory
 	slotDir := runtime.BlueGreenDir(cfg.App, targetSlot)
@@ -169,7 +234,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 		envFile = ".env"
 	}
 	if _, err := os.Stat(envFile); err == nil {
-		fmt.Println("-> Uploading .env (shared)...")
+		output.Step("Uploading .env (shared)...")
 		envContent, err := os.ReadFile(envFile)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", envFile, err)
@@ -181,7 +246,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	}
 	// Upload .env.secrets if it exists locally (non-committed secrets)
 	if _, err := os.Stat(".env.secrets"); err == nil {
-		fmt.Println("-> Uploading .env.secrets (shared, chmod 600)...")
+		output.Step("Uploading .env.secrets (shared, chmod 600)...")
 		secretsContent, err := os.ReadFile(".env.secrets")
 		if err != nil {
 			return fmt.Errorf("read .env.secrets: %w", err)
@@ -194,7 +259,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 
 	// Generate and upload blue-green compose file
 	prodCompose := generateBlueGreenCompose(parsed, cfg, buildServices, registryAddr, targetSlot)
-	fmt.Printf("-> Uploading docker-compose.yml to %s slot...\n", targetSlot)
+	output.Step("Uploading docker-compose.yml to %s slot...", targetSlot)
 	res = client.UploadContent(prodCompose, slotDir+"docker-compose.yml", 0o644)
 	if res.Code != 0 {
 		return fmt.Errorf("upload compose to %s: %s", host, res.Stderr)
@@ -202,7 +267,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 
 	// Pull images on the target slot
 	projectName := fmt.Sprintf("%s-%s", cfg.App, targetSlot)
-	fmt.Printf("-> Pulling images for %s...\n", projectName)
+	output.Step("Pulling images for %s...", projectName)
 	pullCmd := fmt.Sprintf("cd %s && docker compose -p %s pull",
 		shell.Escape(slotDir), shell.Escape(projectName))
 	res = client.Run(pullCmd)
@@ -211,7 +276,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	}
 
 	// Start the new slot
-	fmt.Printf("-> Starting %s slot...\n", targetSlot)
+	output.Step("Starting %s slot...", targetSlot)
 	upCmd := fmt.Sprintf("cd %s && docker compose -p %s up -d --remove-orphans",
 		shell.Escape(slotDir), shell.Escape(projectName))
 	res = client.Run(upCmd)
@@ -220,7 +285,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	}
 
 	// Wait for healthcheck
-	fmt.Printf("-> Waiting for healthcheck on %s slot...\n", targetSlot)
+	output.Step("Waiting for healthcheck on %s slot...", targetSlot)
 	readinessDelay := cfg.Deploy.BlueGreen.ReadinessDelay
 	if readinessDelay <= 0 {
 		readinessDelay = 5
@@ -232,7 +297,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 
 	if err := waitForHealthy(client, projectName, buildServices, cfg.App, targetSlot, timeout, readinessDelay); err != nil {
 		// Rollback: stop the failed slot
-		fmt.Printf("-> Healthcheck failed, stopping %s slot...\n", targetSlot)
+		output.Attn("Healthcheck failed, stopping %s slot...", targetSlot)
 		stopCmd := fmt.Sprintf("cd %s && docker compose -p %s down",
 			shell.Escape(slotDir), shell.Escape(projectName))
 		client.Run(stopCmd)
@@ -241,7 +306,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 
 	// Switch Caddy upstream to new slot
 	if len(cfg.Caddy.Routes) > 0 {
-		fmt.Printf("-> Switching Caddy upstream to %s slot...\n", targetSlot)
+		output.Step("Switching Caddy upstream to %s slot...", targetSlot)
 
 		// Remove any conflicting caddy files for this app before writing ours
 		canonicalName := fmt.Sprintf("50-%s.caddy", cfg.App)
@@ -259,10 +324,10 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 		if res.Code != 0 {
 			return fmt.Errorf("upload caddy config to %s: %s", host, res.Stderr)
 		}
-		fmt.Println("-> Reloading Caddy...")
+		output.Step("Reloading Caddy...")
 		res = client.Run(cfg.Caddy.ReloadCommand)
 		if res.Code != 0 {
-			fmt.Printf("WARNING: Caddy reload failed: %s\n", res.Stderr)
+			output.Attn("Caddy reload failed: %s", res.Stderr)
 		}
 	}
 
@@ -273,17 +338,17 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	}
 
 	if currentState.Active != "" {
-		fmt.Printf("-> Draining old slot (%s) for %ds...\n", activeSlot, drainTimeout)
+		output.Step("Draining old slot (%s) for %ds...", activeSlot, drainTimeout)
 		time.Sleep(time.Duration(drainTimeout) * time.Second)
 
 		oldSlotDir := runtime.BlueGreenDir(cfg.App, activeSlot)
 		oldProjectName := fmt.Sprintf("%s-%s", cfg.App, activeSlot)
-		fmt.Printf("-> Stopping old slot (%s)...\n", activeSlot)
+		output.Step("Stopping old slot (%s)...", activeSlot)
 		stopCmd := fmt.Sprintf("cd %s && docker compose -p %s down",
 			shell.Escape(oldSlotDir), shell.Escape(oldProjectName))
 		res = client.Run(stopCmd)
 		if res.Code != 0 {
-			fmt.Printf("WARNING: failed to stop old slot: %s\n", res.Stderr)
+			output.Attn("failed to stop old slot: %s", res.Stderr)
 		}
 	}
 
@@ -307,14 +372,14 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	}
 
 	statePath := runtime.StatePath(cfg.App)
-	fmt.Printf("-> Saving state to %s...\n", statePath)
+	output.Step("Saving state to %s...", statePath)
 	res = client.UploadContent(string(stateJSON)+"\n", statePath, 0o644)
 	if res.Code != 0 {
 		return fmt.Errorf("upload state to %s: %s", host, res.Stderr)
 	}
 
 	// Prune old images
-	fmt.Println("-> Pruning old images...")
+	output.Step("Pruning old images...")
 	client.Run("docker image prune -f")
 
 	return nil
@@ -348,7 +413,7 @@ func waitForHealthy(client *ssh.Client, projectName string, services []string, a
 
 	for _, svc := range services {
 		containerName := fmt.Sprintf("%s-%s-%s", app, slot, svc)
-		fmt.Printf("   Checking container %s...\n", containerName)
+		output.Detail("Checking container %s...", containerName)
 
 		for {
 			if time.Now().After(deadline) {
@@ -364,7 +429,7 @@ func waitForHealthy(client *ssh.Client, projectName string, services []string, a
 
 			switch status {
 			case "healthy":
-				fmt.Printf("   %s is healthy\n", containerName)
+				output.OK("%s is healthy", containerName)
 				goto nextService
 			case "unhealthy":
 				return fmt.Errorf("container %s is unhealthy", containerName)
@@ -376,7 +441,7 @@ func waitForHealthy(client *ssh.Client, projectName string, services []string, a
 				)
 				runRes := client.Run(runningCmd)
 				if strings.TrimSpace(runRes.Stdout) == "true" {
-					fmt.Printf("   %s is running (no healthcheck defined)\n", containerName)
+					output.OK("%s is running (no healthcheck defined)", containerName)
 					goto nextService
 				}
 			}
@@ -426,8 +491,8 @@ func generateBlueGreenCompose(cf *composeFile, cfg *config.Config, buildServices
 			Restart:       svc.Restart,
 			Command:       svc.Command,
 			Healthcheck:   svc.Healthcheck,
-			Networks: []string{"default", "caddy_network"},
-			EnvFile:  []string{"../.env", "../.env.secrets"},
+			Networks:      []string{"default", "caddy_network"},
+			EnvFile:       []string{"../.env", "../.env.secrets"},
 		}
 
 		if buildSet[name] {

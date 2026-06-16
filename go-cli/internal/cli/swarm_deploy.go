@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/config"
+	"github.com/MakFly/deploy-shuttle/go-cli/internal/output"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/runtime"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/shell"
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/ssh"
@@ -96,8 +97,8 @@ func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
 		return fmt.Errorf("no services with build: found in %s", composeFiles[0])
 	}
 
-	fmt.Printf("Found %d services to build: %s\n", len(buildServices), strings.Join(buildServices, ", "))
-	fmt.Println("Strategy: swarm (docker stack deploy with rolling updates)")
+	output.Header("Found %d services to build: %s", len(buildServices), strings.Join(buildServices, ", "))
+	output.Detail("Strategy: swarm (docker stack deploy with rolling updates)")
 
 	if err := runLocalHooks("pre-deploy", cfg.Deploy.Hooks.PreDeploy, dryRun); err != nil {
 		return err
@@ -109,7 +110,8 @@ func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
 	if !skipBuild {
 		for _, svc := range buildServices {
 			imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, svc)
-			fmt.Printf("\n-> Building %s...\n", svc)
+			fmt.Println()
+			output.Step("Building %s...", svc)
 			if err := buildServiceImage(parsed, svc, imageTag, dryRun); err != nil {
 				return fmt.Errorf("build %s: %w", svc, err)
 			}
@@ -132,16 +134,17 @@ func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
 	}
 
 	// Step 2: Start ephemeral registry
-	fmt.Printf("\n-> Starting ephemeral registry on :%d...\n", registryPort)
+	fmt.Println()
+	output.Step("Starting ephemeral registry on :%d...", registryPort)
 	if err := startRegistry(); err != nil {
 		return fmt.Errorf("start registry: %w", err)
 	}
-	defer stopRegistry()
+	defer stopRegistry(cfg.Deploy.PruneBuildCache != "off")
 
 	// Step 3: Push images to local registry
 	for _, svc := range buildServices {
 		imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, svc)
-		fmt.Printf("-> Pushing %s to local registry...\n", svc)
+		output.Step("Pushing %s to local registry...", svc)
 		if err := dockerPush(imageTag); err != nil {
 			return fmt.Errorf("push %s: %w", svc, err)
 		}
@@ -160,7 +163,11 @@ func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
 		return err
 	}
 
-	fmt.Println("\n-> Swarm deploy complete (rolling updates)")
+	// Reclaim local disk: prune the Docker build cache used by this deploy.
+	pruneLocalBuildCache(cfg)
+
+	fmt.Println()
+	output.OK("Swarm deploy complete (rolling updates)")
 	return nil
 }
 
@@ -171,16 +178,17 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 	}
 
 	appDir := runtime.AppDir(cfg.App)
-	fmt.Printf("\n-> Deploying (swarm) to %s@%s:%d (%s)...\n", group.User, host, group.Port, appDir)
+	fmt.Println()
+	output.Step("Deploying (swarm) to %s@%s:%d (%s)...", group.User, host, group.Port, appDir)
 
 	// SSH reverse tunnel
-	fmt.Println("-> Opening SSH tunnel...")
+	output.Step("Opening SSH tunnel...")
 	tunnel, err := startSSHTunnel(host, group.User, group.Port, registryPort)
 	if err != nil {
 		return fmt.Errorf("SSH tunnel: %w", err)
 	}
 	defer func() {
-		fmt.Println("-> Closing SSH tunnel...")
+		output.Step("Closing SSH tunnel...")
 		tunnel.Process.Kill()
 		tunnel.Wait()
 	}()
@@ -199,7 +207,7 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 		envFile = ".env"
 	}
 	if _, err := os.Stat(envFile); err == nil {
-		fmt.Println("-> Uploading .env...")
+		output.Step("Uploading .env...")
 		envContent, err := os.ReadFile(envFile)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", envFile, err)
@@ -210,7 +218,7 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 		}
 	}
 	if _, err := os.Stat(".env.secrets"); err == nil {
-		fmt.Println("-> Uploading .env.secrets (chmod 600)...")
+		output.Step("Uploading .env.secrets (chmod 600)...")
 		secretsContent, err := os.ReadFile(".env.secrets")
 		if err != nil {
 			return fmt.Errorf("read .env.secrets: %w", err)
@@ -234,21 +242,21 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 			}
 		}
 		if len(swarmSecrets) > 0 {
-			fmt.Printf("-> Found %d Docker Swarm secrets for %s\n", len(swarmSecrets), cfg.App)
+			output.Step("Found %d Docker Swarm secrets for %s", len(swarmSecrets), cfg.App)
 		}
 	}
 
 	// Generate and upload Swarm stack YAML
 	stackYAML := generateSwarmStackYAML(parsed, cfg, buildServices, registryAddr, webPort, swarmSecrets)
 	stackPath := appDir + "/docker-stack.yml"
-	fmt.Println("-> Uploading docker-stack.yml...")
+	output.Step("Uploading docker-stack.yml...")
 	res = client.UploadContent(stackYAML, stackPath, 0o644)
 	if res.Code != 0 {
 		return fmt.Errorf("upload stack YAML to %s: %s", host, res.Stderr)
 	}
 
 	// Pull images via compose (uses the tunnel)
-	fmt.Println("-> Pulling images on VPS...")
+	output.Step("Pulling images on VPS...")
 	pullCmd := fmt.Sprintf("cd %s && docker compose -f docker-stack.yml pull", shell.Escape(appDir))
 	res = client.Run(pullCmd)
 	if res.Code != 0 {
@@ -256,7 +264,7 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 	}
 
 	// Deploy stack
-	fmt.Printf("-> Deploying stack %s...\n", cfg.App)
+	output.Step("Deploying stack %s...", cfg.App)
 	deployCmd := fmt.Sprintf("docker stack deploy -c %s --with-registry-auth --detach %s",
 		shell.Escape(stackPath), shell.Escape(cfg.App))
 	res = client.Run(deployCmd)
@@ -268,24 +276,24 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 	}
 
 	// Wait for service convergence
-	fmt.Println("-> Waiting for service convergence...")
+	output.Step("Waiting for service convergence...")
 	if err := waitForSwarmConvergence(client, cfg.App, cfg.Deploy.Timeout); err != nil {
 		return fmt.Errorf("service convergence failed: %w", err)
 	}
 
 	// Caddy conf.d
 	if len(cfg.Caddy.Routes) > 0 {
-		fmt.Println("-> Generating Caddy config...")
+		output.Step("Generating Caddy config...")
 		caddyConf := generateSwarmCaddyConf(cfg)
 		caddyPath := fmt.Sprintf("%s/50-%s.caddy", cfg.Caddy.ConfDir, cfg.App)
 		res = client.UploadContent(caddyConf, caddyPath, 0o644)
 		if res.Code != 0 {
 			return fmt.Errorf("upload caddy config to %s: %s", host, res.Stderr)
 		}
-		fmt.Println("-> Reloading Caddy...")
+		output.Step("Reloading Caddy...")
 		res = client.Run(cfg.Caddy.ReloadCommand)
 		if res.Code != 0 {
-			fmt.Printf("WARNING: Caddy reload failed: %s\n", res.Stderr)
+			output.Attn("Caddy reload failed: %s", res.Stderr)
 		}
 	}
 
@@ -312,14 +320,14 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 	}
 
 	statePath := runtime.StatePath(cfg.App)
-	fmt.Printf("-> Saving state to %s...\n", statePath)
+	output.Step("Saving state to %s...", statePath)
 	res = client.UploadContent(string(stateJSON)+"\n", statePath, 0o644)
 	if res.Code != 0 {
 		return fmt.Errorf("upload state to %s: %s", host, res.Stderr)
 	}
 
 	// Prune old images
-	fmt.Println("-> Pruning old images...")
+	output.Step("Pruning old images...")
 	client.Run("docker image prune -f")
 
 	return nil
