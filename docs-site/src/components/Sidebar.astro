@@ -1,8 +1,10 @@
 ---
 import { docsNav } from "@/lib/nav";
 const path = Astro.url.pathname.replace(/\/$/, "") || "/";
-const isActive = (href: string) =>
-  href === path || href === path + "/" || (href !== "/" && path.startsWith(href + "/"));
+// Exact match only: every docs page has its own sidebar entry, so prefix
+// matching would light up ancestors too (/docs on /docs/quickstart,
+// /docs/commands on every command page).
+const isActive = (href: string) => href.replace(/\/$/, "") === path;
 ---
 <nav aria-label="Docs navigation" class="space-y-7">
   {docsNav.map((section) => (
