@@ -1,6 +1,6 @@
 # DeployShuttle — dev shortcuts. Run `make help` for the list.
 
-.PHONY: help site site-build site-preview test build
+.PHONY: help site site-build site-preview test build stripe-mock e2e-license
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -20,3 +20,9 @@ test: ## CI parity: gofmt + go vet + go test, then license-server tests
 
 build: ## Build the shuttle binary (dist/)
 	sh scripts/build-go.sh
+
+stripe-mock: ## Start the dev-only fake Stripe (http://localhost:4242/pay)
+	bun run stripe-mock/server.ts
+
+e2e-license: ## Full purchase→email→activate→refund E2E against infra-postgres/mailpit
+	sh scripts/e2e-license.sh
