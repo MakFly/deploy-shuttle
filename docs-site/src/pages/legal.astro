@@ -1,0 +1,60 @@
+---
+import Root from "@/layouts/Root.astro";
+
+// TODO(seller): fill in real values before going live. A French seller must
+// publish these (LCEN art. 6-III): identity, SIREN/SIRET, address, contact,
+// hosting provider.
+const legal = {
+  entity: "[LEGAL ENTITY NAME — e.g. auto-entrepreneur or company name]",
+  siren: "[SIREN/SIRET]",
+  address: "[REGISTERED ADDRESS]",
+  email: "[CONTACT EMAIL]",
+  director: "[PUBLICATION DIRECTOR]",
+  host: "[HOSTING PROVIDER — name, address, phone]",
+};
+---
+<Root title="Legal Notice - DeployShuttle">
+  <section>
+    <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 space-y-8">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">Legal Notice</h1>
+        <p class="mt-2 text-sm text-muted-foreground">Mentions légales — last updated: 02-07-2026</p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">Publisher</h2>
+        <p class="text-sm text-muted-foreground">
+          {legal.entity}<br />
+          SIREN/SIRET: {legal.siren}<br />
+          {legal.address}<br />
+          Contact: {legal.email}<br />
+          Publication director: {legal.director}
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">Hosting</h2>
+        <p class="text-sm text-muted-foreground">{legal.host}</p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">Personal data</h2>
+        <p class="text-sm text-muted-foreground">
+          This site does not use tracking cookies. Purchases are processed by
+          Stripe (payment data) and license emails are sent via Resend; in
+          both cases only the data strictly needed to deliver and manage your
+          license is processed (email address, license key, machine
+          fingerprint hash). To exercise your GDPR rights, contact
+          {legal.email}.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">Sales terms</h2>
+        <p class="text-sm text-muted-foreground">
+          See the <a href="/terms" class="underline hover:text-foreground">Terms of Sale</a>.
+        </p>
+      </div>
+    </div>
+  </section>
+</Root>

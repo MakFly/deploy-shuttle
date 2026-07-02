@@ -1,6 +1,11 @@
 ---
 import Root from "@/layouts/Root.astro";
 
+// Stripe Payment Link for the one-time Pro purchase. Set at build time:
+//   PUBLIC_STRIPE_PAYMENT_LINK=https://buy.stripe.com/... bun run build
+// When unset, the buy button renders as a "coming soon" chip.
+const stripePaymentLink = import.meta.env.PUBLIC_STRIPE_PAYMENT_LINK ?? "";
+
 type Tier = {
   name: string;
   price: string;
@@ -23,69 +28,48 @@ const tiers: Tier[] = [
       "harden --dry-run (review every fix)",
       "Console + Markdown reports",
       "init --preset (4 stacks)",
+      "deploy / provision / rollback / secrets",
       "GitHub Action integration",
       "linux-x64 + arm64, macOS x64 + arm64",
     ],
   },
   {
     name: "Pro",
-    price: "29 EUR",
-    cadence: "/ month",
-    blurb: "For freelances who hand off to clients. Hosted reports + safe auto-apply.",
+    price: "199 EUR",
+    cadence: "one-time",
+    blurb:
+      "Pay once, yours forever. The deliverables and the full-stack templates for freelances who hand off to clients.",
     highlight: true,
+    cta: stripePaymentLink
+      ? { label: "Get Pro — 199 EUR", href: stripePaymentLink }
+      : undefined,
     features: [
       "Everything in Free",
+      "init --pro (full-stack compose templates)",
+      "--with-db, --with-redis, --with-queue, --with-scheduler, --with-mailpit",
       "HTML report (executive summary, accepted-risk section)",
+      "PDF report (client handoff)",
       "harden --apply (chmod 600, ufw deny — allow-listed only)",
-      "Hosted shareable report links (coming with cloud)",
+      "Lifetime updates",
       "Email support",
     ],
   },
-  {
-    name: "Agency",
-    price: "99 EUR",
-    cadence: "/ month",
-    blurb: "For agencies running client VPS at scale. White-label PDFs + workspaces.",
-    features: [
-      "Everything in Pro",
-      "PDF report (white-label cover)",
-      "Multi-server inventory (coming)",
-      "Client workspaces (coming)",
-      "Scheduled scans + email alerts (coming)",
-      "Priority support",
-    ],
-  },
 ];
-
-const earlyBird = {
-  title: "Lifetime Early Bird",
-  blurb:
-    "First 50 supporters get DeployShuttle Pro for life. Helps fund the cloud dashboard build.",
-  price: "199 EUR",
-  cadence: "one-time",
-};
-
-const oneShot = {
-  title: "Production Readiness Audit",
-  blurb:
-    "I personally run doctor + harden against your VPS, write a 1-pager with the prioritized fixes, and send it back within 48 hours.",
-  price: "99 EUR",
-  cadence: "one-shot",
-};
 ---
 <Root title="Pricing - DeployShuttle">
   <section class="border-b border-border">
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center">
-      <h1 class="text-4xl sm:text-5xl font-bold tracking-tight">Free to scan. Pay for the deliverables.</h1>
+      <h1 class="text-4xl sm:text-5xl font-bold tracking-tight">Free to scan. Pay once for the deliverables.</h1>
       <p class="mt-4 mx-auto max-w-2xl text-muted-foreground">
-        The CLI is free forever. The hosted reports and the auto-apply
-        on a remote server are how the project funds itself.
+        The CLI is free forever. Pro is a single 199 EUR purchase — no
+        subscription — that unlocks the client-ready reports, the
+        full-stack templates, and the remote auto-apply.
       </p>
     </div>
   </section>
 
   <section class="border-b border-border">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 grid gap-6 md:grid-cols-3">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12 grid gap-6 md:grid-cols-2">
       {tiers.map((t) => (
         <div class:list={[
           "rounded-xl border p-6 flex flex-col",
@@ -94,7 +78,7 @@ const oneShot = {
           <div class="flex items-baseline gap-2">
             <h2 class="text-xl font-semibold">{t.name}</h2>
             {t.highlight && (
-              <span class="text-xs text-muted-foreground rounded-full border border-border px-2 py-0.5">most popular</span>
+              <span class="text-xs text-muted-foreground rounded-full border border-border px-2 py-0.5">pay once</span>
             )}
           </div>
           <div class="mt-3 flex items-baseline gap-1">
@@ -124,30 +108,11 @@ const oneShot = {
             </a>
           ) : (
             <span class="mt-8 inline-flex h-10 items-center justify-center rounded-md border border-border bg-muted px-4 text-sm font-medium text-muted-foreground">
-              Payment links coming soon
+              Payment link coming soon
             </span>
           )}
         </div>
       ))}
-    </div>
-  </section>
-
-  <section class="border-b border-border bg-muted/20">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12 grid gap-6 md:grid-cols-2">
-      <div class="rounded-xl border border-border p-6 flex flex-col">
-        <p class="text-xs uppercase tracking-wider text-muted-foreground">Limited offer</p>
-        <h3 class="mt-2 text-xl font-semibold">{earlyBird.title}</h3>
-        <p class="mt-1 text-sm text-muted-foreground">{earlyBird.blurb}</p>
-        <p class="mt-4 text-2xl font-bold">{earlyBird.price} <span class="text-sm font-normal text-muted-foreground">{earlyBird.cadence}</span></p>
-        <span class="mt-6 inline-flex h-10 items-center justify-center rounded-md border border-border bg-muted px-4 text-sm font-medium text-muted-foreground">Payment links coming soon</span>
-      </div>
-      <div class="rounded-xl border border-border p-6 flex flex-col">
-        <p class="text-xs uppercase tracking-wider text-muted-foreground">Done-for-you</p>
-        <h3 class="mt-2 text-xl font-semibold">{oneShot.title}</h3>
-        <p class="mt-1 text-sm text-muted-foreground">{oneShot.blurb}</p>
-        <p class="mt-4 text-2xl font-bold">{oneShot.price} <span class="text-sm font-normal text-muted-foreground">{oneShot.cadence}</span></p>
-        <span class="mt-6 inline-flex h-10 items-center justify-center rounded-md border border-border bg-muted px-4 text-sm font-medium text-muted-foreground">Payment links coming soon</span>
-      </div>
     </div>
   </section>
 
@@ -159,9 +124,18 @@ const oneShot = {
           <dt class="font-medium">Is the CLI really free?</dt>
           <dd class="mt-1 text-sm text-muted-foreground">
             Yes. Local doctor, doctor --target over SSH, the harden dry-run,
-            init presets, the Markdown report, and the GitHub Action are all
-            free. Pro gates only the deliverables (HTML / PDF) and the
+            init presets, the Markdown report, deploy/provision, and the
+            GitHub Action are all free. Pro gates only the deliverables
+            (HTML / PDF reports), the full-stack Pro templates, and the
             destructive remote auto-apply.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium">Is Pro a subscription?</dt>
+          <dd class="mt-1 text-sm text-muted-foreground">
+            No. Pro is a one-time 199 EUR purchase. Your license never
+            expires and includes lifetime updates of the CLI. If the price
+            changes later, existing licenses are unaffected.
           </dd>
         </div>
         <div>
@@ -178,6 +152,14 @@ const oneShot = {
             0600). The Cloudflare API token is read from an environment
             variable and never touched by disk. doctor scans run over SSH
             with your normal agent; we do not exfiltrate anything.
+          </dd>
+        </div>
+        <div>
+          <dt class="font-medium">Refunds?</dt>
+          <dd class="mt-1 text-sm text-muted-foreground">
+            The license key is delivered immediately after payment. See the
+            <a href="/terms" class="underline hover:text-foreground">terms of sale</a>
+            for the refund policy.
           </dd>
         </div>
       </dl>

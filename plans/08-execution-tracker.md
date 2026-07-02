@@ -969,3 +969,56 @@ Safety rules:
 - No destructive mutation.
 - No automatic SSH changes in the first slice.
 - Print commands/suggestions clearly and explain which finding generated each action.
+
+## Current Slice - One-Time Pricing + Stripe One-Time Licensing
+
+**Status:** Implemented
+**Started:** 2026-07-02
+**Plan sources:**
+
+- `plans/05-cloud-pricing-launch.md` (section 2, decided pricing)
+- user decision: single Pro tier, 199 EUR TTC one-time, Stripe checkout
+
+### Scope
+
+Align every pricing surface on the decided model (Free + Pro 199 EUR
+one-time, perpetual license) and convert the license server from Stripe
+subscriptions to a one-time Payment Link flow.
+
+### Changes
+
+- `docs-site/src/pages/pricing.astro`: removed Pro 29/mo, Agency 99/mo,
+  Lifetime Early Bird, and the 99 EUR done-for-you audit blocks. Now two
+  tiers only: Free + Pro 199 EUR one-time. Buy CTA reads
+  `PUBLIC_STRIPE_PAYMENT_LINK` at build time (falls back to a
+  "coming soon" chip when unset). FAQ updated (one-time, refunds link).
+- `license-server/`: webhook now handles `checkout.session.completed`
+  (mode `payment`, paid → perpetual license, `expires_at = null`) and
+  `charge.refunded` (revoke). Removed `customer.subscription.updated` /
+  `deleted` handling and the monthly/yearly price env vars. DB column
+  `stripe_subscription_id` renamed to `stripe_payment_intent_id`,
+  `stripe_customer_id` now nullable (Payment Links may not create a
+  customer). README + `.env.example` updated. Activation/refresh JWT
+  flow unchanged (14-day offline grace, perpetual entitlement).
+- `plans/05`: section 2 rewritten as the decided pricing.
+- `plans/10-vault-saas.md`: marked FROZEN, post-traction.
+- `CLAUDE.md`: readiness check count corrected 21 -> 43.
+- Note: the 2026-05-02 stop note above says "Astro docs were removed";
+  `docs-site/` (Astro) has since been re-added and is the active landing
+  + docs + pricing surface.
+
+### Completion Checklist
+
+- [x] license-server `bun run typecheck` passes.
+- [x] license-server `bun test` passes (5 tests).
+- [x] No pricing surface still mentions monthly/Agency tiers.
+
+### Pending (operational, user-side)
+
+- Create the Stripe product + one-time 199 EUR price + Payment Link.
+- Create the webhook endpoint (`checkout.session.completed`,
+  `charge.refunded`) and set `STRIPE_WEBHOOK_SECRET`.
+- Deploy license-server (Fly.io) + set `PUBLIC_STRIPE_PAYMENT_LINK` at
+  docs-site build time.
+- Deploy docs-site on the production domain (client.go defaults to
+  `https://license.deployshuttle.io` — the domain must be owned).

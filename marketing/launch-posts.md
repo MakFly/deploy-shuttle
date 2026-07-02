@@ -143,7 +143,7 @@ curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/
 shuttle doctor --target root@ton-serveur
 
 Open-source pour le CLI. Les rapports HTML/PDF brandes pour les
-livrables client arrivent en payant (early-bird en cours).
+livrables client sont dans le tier Pro (199 EUR une fois, licence a vie).
 
 Lien : https://github.com/MakFly/deploy-shuttle
 
@@ -158,7 +158,7 @@ verifies a la main aujourd'hui pour ton workflow de livraison.
 - "j'ai shippe" en titre = tu sors un truc, pas une etude
 - Question ouverte qui appelle des reponses concretes (algo LinkedIn aime)
 - Pas de shilling, pas de "revolutionary", pas de "je suis fier"
-- Mention "early-bird" sans lien direct = teasing sans agressivite
+- Mention du tier Pro sans lien direct = teasing sans agressivite
 
 **Posting hygiene**:
 - Mardi ou jeudi, 8h30 ou 13h CET
@@ -194,13 +194,13 @@ https://github.com/MakFly/deploy-shuttle
 - [ ] Noter les checks demandes -> issue GitHub avec label `from-launch`
 - [ ] Ajouter "As seen on Hacker News" en haut du README si HN > 50 points
 
-**Pre-revenue funnel a tester**
+**Funnel de vente (pricing decide 02-07-2026 : Pro unique 199 EUR one-time)**
 
-- Stripe Payment Link "Production Readiness Audit - 99 EUR" (toi qui scan
-  manuellement leur VPS et ecrit le rapport en .md). Cible : 5 ventes en
-  2 semaines = 495 EUR + validation que les gens paient pour le rapport.
-- Stripe Payment Link "Pro Lifetime Early Bird - 199 EUR" limite a 50.
-  Cible : 2 ventes = 398 EUR + validation que les gens paient pour le tier.
+- Stripe Payment Link "DeployShuttle Pro - 199 EUR one-time" branche sur
+  la pricing page (`PUBLIC_STRIPE_PAYMENT_LINK` au build du docs-site).
+  Cible : 2 ventes la premiere semaine = validation que les gens paient
+  pour le tier. Pas d'offre Early Bird separee, pas d'audit manuel a
+  99 EUR sur la page — le prix EST l'offre.
 
 **Si HN/Reddit > 50 upvotes total**
 

@@ -1,5 +1,11 @@
 # Shuttle Vault — SaaS Secrets Manager
 
+> **Status: FROZEN (2026-07-02).** Post-traction only. This is a second
+> product (cloud infra, zero-knowledge storage, on-call) grafted onto a
+> first product that has no distribution yet. Do not start any Vault work
+> before the Pro one-time offer has paying customers and a working
+> acquisition channel. Nothing in this file is implemented.
+
 ## Vision
 
 Un vault cloud léger, conçu pour les développeurs VPS — pas Hashicorp (overkill), pas des `.env` sur disque (insecure). Un middle-ground qui s'intègre nativement avec `shuttle`.

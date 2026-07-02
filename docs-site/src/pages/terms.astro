@@ -1,0 +1,90 @@
+---
+import Root from "@/layouts/Root.astro";
+
+// TODO(seller): replace the placeholders below with the real legal entity
+// before going live (name, SIREN, address, contact email).
+const seller = {
+  name: "[LEGAL ENTITY NAME]",
+  email: "[CONTACT EMAIL]",
+};
+---
+<Root title="Terms of Sale - DeployShuttle">
+  <section>
+    <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 space-y-8">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">Terms of Sale</h1>
+        <p class="mt-2 text-sm text-muted-foreground">Last updated: 02-07-2026</p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">1. Product</h2>
+        <p class="text-sm text-muted-foreground">
+          DeployShuttle Pro is a software license for the DeployShuttle CLI.
+          It unlocks the Pro features (full-stack templates, HTML and PDF
+          reports, remote auto-apply) described on the
+          <a href="/pricing" class="underline hover:text-foreground">pricing page</a>.
+          The free CLI remains usable without any purchase.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">2. Price and payment</h2>
+        <p class="text-sm text-muted-foreground">
+          DeployShuttle Pro costs 199 EUR (all taxes included), payable once.
+          There is no subscription and no recurring charge. Payment is
+          processed by Stripe; we never see or store your card details.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">3. Delivery</h2>
+        <p class="text-sm text-muted-foreground">
+          Your license key is generated automatically after payment and sent
+          to the email address used at checkout, usually within minutes.
+          Activate it with <code>shuttle license activate &lt;key&gt;</code>.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">4. License</h2>
+        <p class="text-sm text-muted-foreground">
+          The license is perpetual, personal, and non-transferable. It
+          activates one machine fingerprint at a time; you can deactivate
+          and re-activate freely. It includes lifetime updates of the CLI.
+          Reselling or sharing license keys is prohibited and voids the
+          license.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">5. Right of withdrawal and refunds</h2>
+        <p class="text-sm text-muted-foreground">
+          The license key is digital content delivered immediately after
+          payment. By purchasing, you expressly consent to immediate delivery
+          and acknowledge that you thereby waive the 14-day right of
+          withdrawal provided by EU consumer law (art. L221-28 of the French
+          Consumer Code). If the product does not work as documented and we
+          cannot fix it, contact {seller.email} — we will make it right.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">6. Warranty and liability</h2>
+        <p class="text-sm text-muted-foreground">
+          The software is provided as-is. <code>harden --apply</code> only
+          runs allow-listed, reviewed actions, but you remain responsible for
+          your servers and for reviewing every proposed change (a dry-run is
+          always available). Our liability is limited to the amount paid.
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">7. Seller</h2>
+        <p class="text-sm text-muted-foreground">
+          {seller.name} — contact: {seller.email}. Full company details on the
+          <a href="/legal" class="underline hover:text-foreground">legal notice</a> page.
+        </p>
+      </div>
+    </div>
+  </section>
+</Root>

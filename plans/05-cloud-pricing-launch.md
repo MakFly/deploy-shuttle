@@ -30,52 +30,37 @@ When added, it should include:
 - monthly readiness reports;
 - multi-server inventory.
 
-## 2. Pricing Hypothesis
+## 2. Pricing — DECIDED (2026-07-02)
 
-### CLI
+Model: Spin-style single one-time purchase. Stripe Payment Link, no
+subscription, no Agency tier, no one-shot report SKU.
 
-Free/open-core:
+### Free (open-core CLI)
 
-- `doctor`;
-- console report;
-- basic hardening suggestions;
-- local config generation.
+- `doctor` (local + `--target` over SSH), all 43 checks;
+- `.shuttle.yml` readiness config;
+- console + Markdown reports;
+- `harden --dry-run`;
+- `init --preset` basic templates;
+- `deploy` / `provision` / `rollback` / `secrets`;
+- GitHub Action.
 
-### Paid one-shot
+### Pro — 199 EUR TTC one-time, perpetual license
 
-```txt
-Production Readiness Report - 19 EUR
-```
+- `init --pro` full-stack templates + `--with-*` flags;
+- HTML report;
+- PDF report;
+- `harden --apply`;
+- lifetime updates, email support.
 
-Includes:
+Checkout flow: Stripe Payment Link → license-server webhook
+(`checkout.session.completed`, mode `payment`) → perpetual license key
+emailed → `shuttle license activate <key>`. A `charge.refunded` webhook
+revokes the license.
 
-- hosted HTML report;
-- shareable link;
-- 30-day history.
-
-### Subscription
-
-```txt
-Solo - 9 EUR/month
-1 server
-scheduled scans
-email alerts
-hosted reports
-
-Pro - 29 EUR/month
-5 servers
-deploy history
-backup monitoring
-Cloudflare checks
-GitHub Action integration
-
-Agency - 79 EUR/month
-25 servers
-client workspaces
-white-label reports
-team access
-audit logs
-```
+Earlier hypotheses (19 EUR one-shot report; Solo 9 / Pro 29 / Agency 79
+monthly) are superseded. The cloud tiers in section 1 remain future,
+post-traction options and must not appear on the pricing page.
 
 ## 3. Competitive Differentiation
 
