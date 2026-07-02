@@ -14,7 +14,7 @@ LS_PORT=3999
 LOOKUP_KEY=shuttle_pro_test_199
 # v2: the link now carries the optional "GitHub username" custom field.
 LINK_FILE="$ROOT/.shuttle/stripe-test-link-v2"
-PAY_TIMEOUT=300   # seconds to wait for the human payment
+PAY_TIMEOUT="${PAY_TIMEOUT:-300}"   # seconds to wait for the human payment
 WORK="$(mktemp -d)"
 
 PIDS=()
