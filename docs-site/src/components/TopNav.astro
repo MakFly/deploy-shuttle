@@ -1,44 +1,65 @@
 ---
 import Logo from "./Logo.astro";
 import ThemeToggle from "./ThemeToggle.astro";
-import { topNav } from "@/lib/nav";
+import { chrome, getLocale, localizePath } from "@/i18n";
+
 const path = Astro.url.pathname;
-const isActive = (href: string) =>
-  href === "/" ? path === "/" : path === href || path.startsWith(href + "/");
+const locale = getLocale(path);
+const t = chrome[locale];
+
+const nav = [
+  { title: t.docs, href: "/docs/quickstart", base: "/docs" },
+  { title: t.pricing, href: localizePath("/pricing", locale), base: "/pricing" },
+];
+const isActive = (base: string) =>
+  path === base || path.startsWith(base + "/") || path === `/fr${base}` || path.startsWith(`/fr${base}/`);
+const otherLocale = locale === "en" ? "fr" : "en";
+const switchHref = localizePath(path, otherLocale);
 ---
-<header class="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-  <div class="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
+<header class="sticky top-0 z-40 w-full border-b border-border/60 bg-background/70 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+  <div class="mx-auto flex h-12 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
     <Logo />
-    <nav class="hidden md:flex items-center gap-5 text-sm">
-      {topNav.map((link) => (
+    <nav class="hidden md:flex items-center gap-6 text-[13px]">
+      {nav.map((link) => (
         <a
           href={link.href}
-          target={link.external ? "_blank" : undefined}
-          rel={link.external ? "noreferrer" : undefined}
           class:list={[
             "transition-colors hover:text-foreground",
-            isActive(link.href) ? "text-foreground" : "text-muted-foreground",
+            isActive(link.base) ? "text-foreground" : "text-muted-foreground",
           ]}
         >
           {link.title}
         </a>
       ))}
+      <a
+        href="https://github.com/MakFly/deploy-shuttle"
+        target="_blank"
+        rel="noreferrer"
+        class="text-muted-foreground transition-colors hover:text-foreground"
+      >
+        {t.github}
+      </a>
     </nav>
     <div class="ml-auto flex items-center gap-2">
       <a
-        href="https://github.com/MakFly/deploy-shuttle"
-        class="hidden sm:inline-flex h-9 items-center justify-center rounded-md border border-border bg-background px-3 text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        target="_blank"
-        rel="noreferrer"
+        href={switchHref}
+        aria-label={otherLocale === "fr" ? "Version française" : "English version"}
+        class="inline-flex h-8 items-center justify-center rounded-full border border-border bg-background px-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
       >
-        Star on GitHub
+        {otherLocale.toUpperCase()}
       </a>
       <ThemeToggle />
+      <a
+        href={localizePath("/pricing", locale)}
+        class="hidden sm:inline-flex h-8 items-center justify-center rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+      >
+        {locale === "fr" ? "Obtenir Pro" : "Get Pro"}
+      </a>
       <button
         type="button"
         data-mobile-toggle
-        aria-label="Open menu"
-        class="md:hidden inline-flex h-9 w-9 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
+        aria-label={t.openMenu}
+        class="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
       >
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>

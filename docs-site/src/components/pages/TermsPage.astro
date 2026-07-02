@@ -1,0 +1,113 @@
+---
+import Root from "@/layouts/Root.astro";
+import type { Locale } from "@/i18n";
+import { localizePath } from "@/i18n";
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+
+// TODO(seller): replace the placeholders below with the real legal entity
+// before going live (name, SIREN, address, contact email).
+const seller = {
+  name: "[LEGAL ENTITY NAME]",
+  email: "[CONTACT EMAIL]",
+};
+
+const copy = {
+  en: {
+    title: "Terms of Sale - DeployShuttle",
+    h1: "Terms of Sale",
+    updated: "Last updated: 02-07-2026",
+    legalLabel: "legal notice",
+    sections: [
+      {
+        h: "1. Product",
+        p: "DeployShuttle Pro is a software license for the DeployShuttle CLI. It unlocks the Pro features (full-stack templates, HTML and PDF reports, remote auto-apply) described on the pricing page. The free CLI remains usable without any purchase.",
+      },
+      {
+        h: "2. Price and payment",
+        p: "DeployShuttle Pro costs 199 EUR (all taxes included), payable once. There is no subscription and no recurring charge. Payment is processed by Stripe; we never see or store your card details.",
+      },
+      {
+        h: "3. Delivery",
+        p: "Your license key is generated automatically after payment and sent to the email address used at checkout, usually within minutes. Activate it with shuttle license activate <key>.",
+      },
+      {
+        h: "4. License",
+        p: "The license is perpetual, personal, and non-transferable. It activates one machine fingerprint at a time; you can deactivate and re-activate freely. It includes lifetime updates of the CLI. Reselling or sharing license keys is prohibited and voids the license.",
+      },
+      {
+        h: "5. Right of withdrawal and refunds",
+        p: `The license key is digital content delivered immediately after payment. By purchasing, you expressly consent to immediate delivery and acknowledge that you thereby waive the 14-day right of withdrawal provided by EU consumer law (art. L221-28 of the French Consumer Code). If the product does not work as documented and we cannot fix it, contact ${seller.email} — we will make it right.`,
+      },
+      {
+        h: "6. Warranty and liability",
+        p: "The software is provided as-is. harden --apply only runs allow-listed, reviewed actions, but you remain responsible for your servers and for reviewing every proposed change (a dry-run is always available). Our liability is limited to the amount paid.",
+      },
+      {
+        h: "7. Seller",
+        p: `${seller.name} — contact: ${seller.email}. Full company details on the legal notice page.`,
+      },
+    ],
+  },
+  fr: {
+    title: "Conditions Générales de Vente - DeployShuttle",
+    h1: "Conditions Générales de Vente",
+    updated: "Dernière mise à jour : 02-07-2026",
+    legalLabel: "mentions légales",
+    sections: [
+      {
+        h: "1. Produit",
+        p: "DeployShuttle Pro est une licence logicielle pour le CLI DeployShuttle. Elle débloque les fonctionnalités Pro (templates full-stack, rapports HTML et PDF, auto-apply distant) décrites sur la page tarifs. Le CLI gratuit reste utilisable sans aucun achat.",
+      },
+      {
+        h: "2. Prix et paiement",
+        p: "DeployShuttle Pro coûte 199 EUR TTC, payable une seule fois. Il n'y a ni abonnement ni prélèvement récurrent. Le paiement est traité par Stripe ; nous ne voyons ni ne stockons jamais vos données de carte.",
+      },
+      {
+        h: "3. Livraison",
+        p: "Votre clé de licence est générée automatiquement après le paiement et envoyée à l'adresse email utilisée au checkout, généralement en quelques minutes. Activez-la avec shuttle license activate <clé>.",
+      },
+      {
+        h: "4. Licence",
+        p: "La licence est perpétuelle, personnelle et non transférable. Elle active une empreinte machine à la fois ; vous pouvez désactiver et réactiver librement. Elle inclut les mises à jour du CLI à vie. La revente ou le partage de clés de licence est interdit et annule la licence.",
+      },
+      {
+        h: "5. Droit de rétractation et remboursements",
+        p: `La clé de licence est un contenu numérique livré immédiatement après le paiement. En achetant, vous consentez expressément à la livraison immédiate et reconnaissez renoncer au droit de rétractation de 14 jours prévu par le droit de la consommation (art. L221-28 du Code de la consommation). Si le produit ne fonctionne pas comme documenté et que nous ne pouvons pas le corriger, contactez ${seller.email} — nous trouverons une solution.`,
+      },
+      {
+        h: "6. Garantie et responsabilité",
+        p: "Le logiciel est fourni en l'état. harden --apply n'exécute que des actions allow-listées et relues, mais vous restez responsable de vos serveurs et de la relecture de chaque changement proposé (un dry-run est toujours disponible). Notre responsabilité est limitée au montant payé.",
+      },
+      {
+        h: "7. Vendeur",
+        p: `${seller.name} — contact : ${seller.email}. Coordonnées complètes sur la page mentions légales.`,
+      },
+    ],
+  },
+}[locale];
+
+const legalHref = localizePath("/legal", locale);
+---
+<Root title={copy.title}>
+  <section>
+    <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 space-y-8">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">{copy.h1}</h1>
+        <p class="mt-2 text-sm text-muted-foreground">{copy.updated}</p>
+      </div>
+      {copy.sections.map((s) => (
+        <div class="space-y-2">
+          <h2 class="text-xl font-semibold">{s.h}</h2>
+          <p class="text-sm text-muted-foreground">{s.p}</p>
+        </div>
+      ))}
+      <p class="text-sm text-muted-foreground">
+        → <a href={legalHref} class="underline hover:text-foreground">{copy.legalLabel}</a>
+      </p>
+    </div>
+  </section>
+</Root>

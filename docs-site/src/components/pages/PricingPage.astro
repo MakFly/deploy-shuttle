@@ -1,0 +1,236 @@
+---
+import Root from "@/layouts/Root.astro";
+import type { Locale } from "@/i18n";
+import { localizePath } from "@/i18n";
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+
+// Stripe Payment Link for the one-time Pro purchase. Set at build time:
+//   PUBLIC_STRIPE_PAYMENT_LINK=https://buy.stripe.com/... bun run build
+// When unset, the buy button renders as a "coming soon" chip.
+const stripePaymentLink = import.meta.env.PUBLIC_STRIPE_PAYMENT_LINK ?? "";
+
+const copy = {
+  en: {
+    title: "Pricing - DeployShuttle",
+    h1: "Free to scan. Pay once for the deliverables.",
+    sub: "The CLI is free forever. Pro is a single 199 EUR purchase — no subscription — that unlocks the client-ready reports, the full-stack templates, and the remote auto-apply.",
+    payOnce: "pay once",
+    oneTime: "one-time",
+    comingSoon: "Payment link coming soon",
+    free: {
+      name: "Free",
+      price: "0 EUR",
+      blurb: "The CLI that scans, scores, and tells you what to fix. No account.",
+      cta: "Install",
+      features: [
+        "doctor (local + --target over SSH)",
+        "All 43 production-readiness checks",
+        "harden --dry-run (review every fix)",
+        "Console + Markdown reports",
+        "init --preset (4 stacks)",
+        "deploy / provision / rollback / secrets",
+        "GitHub Action integration",
+        "linux-x64 + arm64, macOS x64 + arm64",
+      ],
+    },
+    pro: {
+      name: "Pro",
+      price: "199 EUR",
+      blurb: "Pay once, yours forever. The deliverables and the full-stack templates for freelances who hand off to clients.",
+      cta: "Get Pro — 199 EUR",
+      features: [
+        "Everything in Free",
+        "init --pro (full-stack compose templates)",
+        "--with-db, --with-redis, --with-queue, --with-scheduler, --with-mailpit",
+        "HTML report (executive summary, accepted-risk section)",
+        "PDF report (client handoff)",
+        "harden --apply (chmod 600, ufw deny — allow-listed only)",
+        "Lifetime updates",
+        "Email support",
+      ],
+    },
+    faqTitle: "Frequently asked",
+    faq: [
+      {
+        q: "Is the CLI really free?",
+        a: "Yes. Local doctor, doctor --target over SSH, the harden dry-run, init presets, the Markdown report, deploy/provision, and the GitHub Action are all free. Pro gates only the deliverables (HTML / PDF reports), the full-stack Pro templates, and the destructive remote auto-apply.",
+      },
+      {
+        q: "Is Pro a subscription?",
+        a: "No. Pro is a one-time 199 EUR purchase. Your license never expires and includes lifetime updates of the CLI. If the price changes later, existing licenses are unaffected.",
+      },
+      {
+        q: "Can I run Pro on multiple machines?",
+        a: "Yes. A Pro license activates one machine fingerprint at a time; you can deactivate and re-activate without limits.",
+      },
+      {
+        q: "Where are my secrets stored?",
+        a: "The license token lives at ~/.deployshuttle/license.json (mode 0600). The Cloudflare API token is read from an environment variable and never touched by disk. doctor scans run over SSH with your normal agent; we do not exfiltrate anything.",
+      },
+      {
+        q: "Refunds?",
+        a: "The license key is delivered immediately after payment. See the terms of sale for the refund policy.",
+        termsLink: true,
+      },
+    ],
+    termsLabel: "terms of sale",
+  },
+  fr: {
+    title: "Tarifs - DeployShuttle",
+    h1: "Scanner est gratuit. Les livrables se paient une fois.",
+    sub: "Le CLI est gratuit pour toujours. Pro est un achat unique de 199 EUR — sans abonnement — qui débloque les rapports client, les templates full-stack et l'auto-apply distant.",
+    payOnce: "achat unique",
+    oneTime: "une fois",
+    comingSoon: "Lien de paiement bientôt disponible",
+    free: {
+      name: "Free",
+      price: "0 EUR",
+      blurb: "Le CLI qui scanne, score et vous dit quoi corriger. Sans compte.",
+      cta: "Installer",
+      features: [
+        "doctor (local + --target via SSH)",
+        "Les 43 checks de production-readiness",
+        "harden --dry-run (chaque fix relu avant)",
+        "Rapports console + Markdown",
+        "init --preset (4 stacks)",
+        "deploy / provision / rollback / secrets",
+        "Intégration GitHub Action",
+        "linux-x64 + arm64, macOS x64 + arm64",
+      ],
+    },
+    pro: {
+      name: "Pro",
+      price: "199 EUR",
+      blurb: "Payez une fois, à vous pour toujours. Les livrables et les templates full-stack pour les freelances qui livrent à des clients.",
+      cta: "Obtenir Pro — 199 EUR",
+      features: [
+        "Tout le tier Free",
+        "init --pro (templates compose full-stack)",
+        "--with-db, --with-redis, --with-queue, --with-scheduler, --with-mailpit",
+        "Rapport HTML (résumé exécutif, risques acceptés)",
+        "Rapport PDF (livrable client)",
+        "harden --apply (chmod 600, ufw deny — allow-list uniquement)",
+        "Mises à jour à vie",
+        "Support par email",
+      ],
+    },
+    faqTitle: "Questions fréquentes",
+    faq: [
+      {
+        q: "Le CLI est-il vraiment gratuit ?",
+        a: "Oui. Le doctor local, doctor --target via SSH, le dry-run de harden, les presets init, le rapport Markdown, deploy/provision et la GitHub Action sont gratuits. Pro ne verrouille que les livrables (rapports HTML / PDF), les templates full-stack et l'auto-apply distant destructif.",
+      },
+      {
+        q: "Pro est-il un abonnement ?",
+        a: "Non. Pro est un achat unique de 199 EUR. Votre licence n'expire jamais et inclut les mises à jour du CLI à vie. Si le prix change plus tard, les licences existantes ne sont pas affectées.",
+      },
+      {
+        q: "Puis-je utiliser Pro sur plusieurs machines ?",
+        a: "Oui. Une licence Pro active une empreinte machine à la fois ; vous pouvez désactiver et réactiver sans limite.",
+      },
+      {
+        q: "Où sont stockés mes secrets ?",
+        a: "Le token de licence vit dans ~/.deployshuttle/license.json (mode 0600). Le token API Cloudflare est lu depuis une variable d'environnement et ne touche jamais le disque. Les scans doctor passent par SSH avec votre agent habituel ; rien n'est exfiltré.",
+      },
+      {
+        q: "Remboursements ?",
+        a: "La clé de licence est livrée immédiatement après paiement. Consultez les CGV pour la politique de remboursement.",
+        termsLink: true,
+      },
+    ],
+    termsLabel: "CGV",
+  },
+}[locale];
+
+const termsHref = localizePath("/terms", locale);
+---
+<Root title={copy.title}>
+  <section class="border-b border-border">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-16 sm:py-20 text-center">
+      <h1 class="display display-section text-balance">{copy.h1}</h1>
+      <p class="mt-5 mx-auto max-w-2xl text-muted-foreground">{copy.sub}</p>
+    </div>
+  </section>
+
+  <section class="border-b border-border">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12 grid gap-6 md:grid-cols-2">
+      <!-- Free -->
+      <div class="rounded-2xl border border-border p-8 flex flex-col">
+        <h2 class="text-xl font-semibold">{copy.free.name}</h2>
+        <div class="mt-3 flex items-baseline gap-1">
+          <span class="text-4xl font-bold tracking-tight">{copy.free.price}</span>
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground">{copy.free.blurb}</p>
+        <ul class="mt-6 space-y-2 text-sm">
+          {copy.free.features.map((f) => (
+            <li class="flex gap-2">
+              <svg class="h-4 w-4 mt-0.5 text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>{f}</span>
+            </li>
+          ))}
+        </ul>
+        <a href="/docs/install" class="mt-8 inline-flex h-11 items-center justify-center rounded-full border border-border bg-background px-5 text-sm font-medium hover:bg-muted transition-colors">
+          {copy.free.cta}
+        </a>
+      </div>
+
+      <!-- Pro -->
+      <div class="rounded-2xl border-2 border-primary/60 p-8 flex flex-col relative">
+        <div class="flex items-baseline gap-2">
+          <h2 class="text-xl font-semibold">{copy.pro.name}</h2>
+          <span class="text-xs text-primary rounded-full border border-primary/40 px-2 py-0.5">{copy.payOnce}</span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-1.5">
+          <span class="text-4xl font-bold tracking-tight">{copy.pro.price}</span>
+          <span class="text-sm text-muted-foreground">{copy.oneTime}</span>
+        </div>
+        <p class="mt-2 text-sm text-muted-foreground">{copy.pro.blurb}</p>
+        <ul class="mt-6 space-y-2 text-sm">
+          {copy.pro.features.map((f) => (
+            <li class="flex gap-2">
+              <svg class="h-4 w-4 mt-0.5 text-primary shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              <span>{f}</span>
+            </li>
+          ))}
+        </ul>
+        {stripePaymentLink ? (
+          <a href={stripePaymentLink} class="mt-8 inline-flex h-11 items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 active:translate-y-px transition">
+            {copy.pro.cta}
+          </a>
+        ) : (
+          <span class="mt-8 inline-flex h-11 items-center justify-center rounded-full border border-border bg-muted px-5 text-sm font-medium text-muted-foreground">
+            {copy.comingSoon}
+          </span>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16">
+      <h2 class="text-2xl font-bold tracking-tight">{copy.faqTitle}</h2>
+      <dl class="mt-8 space-y-6">
+        {copy.faq.map((item) => (
+          <div>
+            <dt class="font-medium">{item.q}</dt>
+            <dd class="mt-1 text-sm text-muted-foreground">
+              {item.termsLink ? (
+                <>
+                  {item.a.split(copy.termsLabel)[0]}
+                  <a href={termsHref} class="underline hover:text-foreground">{copy.termsLabel}</a>
+                  {item.a.split(copy.termsLabel)[1]}
+                </>
+              ) : (
+                item.a
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  </section>
+</Root>

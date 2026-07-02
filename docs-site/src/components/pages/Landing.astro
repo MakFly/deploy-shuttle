@@ -1,0 +1,354 @@
+---
+import Root from "@/layouts/Root.astro";
+import CopyBlock from "@/components/CopyBlock.astro";
+import type { Locale } from "@/i18n";
+import { localizePath } from "@/i18n";
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+
+const installCmd =
+  "curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh";
+
+const copy = {
+  en: {
+    eyebrow: "v2.1.0 — 43 checks shipped",
+    h1a: "Production-ready.",
+    h1b: "Before you deploy.",
+    sub: "One command audits your VPS. A deterministic score, every risk explained, a fix plan you can review — before your client finds out the firewall was off.",
+    ctaPrimary: "Get started",
+    ctaSecondary: "View on GitHub",
+    scanCaption: "A real scan output.",
+    darkH2: "One score. Zero surprises.",
+    darkSub: "doctor turns a server into a number you can defend — and a plan you can run.",
+    stats: [
+      { value: "43", label: "production-readiness checks" },
+      { value: "0–100", label: "deterministic score" },
+      { value: "30 s", label: "to your first scan" },
+    ],
+    features: [
+      {
+        title: "Every layer, one pass",
+        body: "System, SSH, Docker, firewall, secrets, reverse proxy, TLS, DNS, monitoring, backups, compose and Cloudflare. Every finding ships with a remediation.",
+        wide: true,
+      },
+      {
+        title: "A CI gate, not a console toy",
+        body: "--fail-below turns the score into a pipeline threshold. Critical finding? The deploy stops.",
+        wide: false,
+      },
+      {
+        title: "Safe by default",
+        body: "harden is dry-run first. Only allow-listed fixes are ever auto-applied; everything else is a command you review.",
+        wide: false,
+      },
+      {
+        title: "Stack presets",
+        body: "init --preset {nextjs, laravel, node-api, docker-swarm} writes a config that mutes stack-specific noise on day one.",
+        wide: true,
+      },
+      {
+        title: "GitHub Action ready",
+        body: "Drop MakFly/deploy-shuttle@v1 into a workflow, point at a server, gate the pipeline.",
+        wide: false,
+      },
+      {
+        title: "Runs everywhere",
+        body: "linux x64/arm64 (Hetzner CAX, Graviton), macOS x64/arm64. One install script.",
+        wide: false,
+      },
+    ],
+    howH2: "Audit. Harden. Deploy.",
+    steps: [
+      {
+        cmd: "shuttle doctor --target root@server",
+        title: "Audit",
+        body: "43 checks over SSH. A score, severities, and the why behind each finding.",
+      },
+      {
+        cmd: "shuttle harden --dry-run",
+        title: "Harden",
+        body: "Findings become a reviewable fix plan. Nothing touches the server until you say so.",
+      },
+      {
+        cmd: "shuttle deploy",
+        title: "Deploy",
+        body: "Zero-downtime deploys on the server you just made production-ready.",
+      },
+    ],
+    priceH2: "Free to scan. Pay once for the deliverables.",
+    priceFree: {
+      name: "Free",
+      price: "0 EUR",
+      body: "The full CLI: doctor, 43 checks, harden dry-run, Markdown reports, deploy.",
+      cta: "Install",
+    },
+    pricePro: {
+      name: "Pro",
+      price: "199 EUR",
+      cadence: "one-time",
+      body: "HTML & PDF client reports, full-stack templates, remote auto-apply. Yours forever.",
+      cta: "See pricing",
+    },
+    finalH2: "Run your first scan now.",
+    finalSub: "Install in one command. Scan a remote VPS over SSH. Decide what to fix.",
+    finalCta: "Install guide",
+    finalSecondary: "Browse the 43 checks",
+  },
+  fr: {
+    eyebrow: "v2.1.0 — 43 checks livrés",
+    h1a: "Prêt pour la prod.",
+    h1b: "Avant de déployer.",
+    sub: "Une commande audite votre VPS. Un score déterministe, chaque risque expliqué, un plan de correction à valider — avant que votre client découvre que le firewall était coupé.",
+    ctaPrimary: "Commencer",
+    ctaSecondary: "Voir sur GitHub",
+    scanCaption: "Une vraie sortie de scan.",
+    darkH2: "Un score. Zéro surprise.",
+    darkSub: "doctor transforme un serveur en un chiffre défendable — et en un plan exécutable.",
+    stats: [
+      { value: "43", label: "checks de production-readiness" },
+      { value: "0–100", label: "score déterministe" },
+      { value: "30 s", label: "avant votre premier scan" },
+    ],
+    features: [
+      {
+        title: "Toutes les couches, une passe",
+        body: "Système, SSH, Docker, firewall, secrets, reverse proxy, TLS, DNS, monitoring, backups, compose et Cloudflare. Chaque finding vient avec sa remédiation.",
+        wide: true,
+      },
+      {
+        title: "Une gate CI, pas un jouet console",
+        body: "--fail-below transforme le score en seuil de pipeline. Un finding critique ? Le déploiement s'arrête.",
+        wide: false,
+      },
+      {
+        title: "Sûr par défaut",
+        body: "harden est dry-run d'abord. Seuls des fixes allow-listés s'appliquent automatiquement ; le reste, vous le validez.",
+        wide: false,
+      },
+      {
+        title: "Presets par stack",
+        body: "init --preset {nextjs, laravel, node-api, docker-swarm} écrit une config qui coupe le bruit spécifique à votre stack dès le premier jour.",
+        wide: true,
+      },
+      {
+        title: "GitHub Action incluse",
+        body: "Ajoutez MakFly/deploy-shuttle@v1 à un workflow, pointez un serveur, gatez la pipeline.",
+        wide: false,
+      },
+      {
+        title: "Tourne partout",
+        body: "linux x64/arm64 (Hetzner CAX, Graviton), macOS x64/arm64. Un seul script d'installation.",
+        wide: false,
+      },
+    ],
+    howH2: "Auditer. Durcir. Déployer.",
+    steps: [
+      {
+        cmd: "shuttle doctor --target root@server",
+        title: "Auditer",
+        body: "43 checks via SSH. Un score, des sévérités, et le pourquoi de chaque finding.",
+      },
+      {
+        cmd: "shuttle harden --dry-run",
+        title: "Durcir",
+        body: "Les findings deviennent un plan de correction à relire. Rien ne touche le serveur sans votre accord.",
+      },
+      {
+        cmd: "shuttle deploy",
+        title: "Déployer",
+        body: "Déploiements zero-downtime sur le serveur que vous venez de sécuriser.",
+      },
+    ],
+    priceH2: "Scanner est gratuit. Les livrables se paient une fois.",
+    priceFree: {
+      name: "Free",
+      price: "0 EUR",
+      body: "Le CLI complet : doctor, 43 checks, harden dry-run, rapports Markdown, deploy.",
+      cta: "Installer",
+    },
+    pricePro: {
+      name: "Pro",
+      price: "199 EUR",
+      cadence: "une fois",
+      body: "Rapports client HTML & PDF, templates full-stack, auto-apply distant. À vous pour toujours.",
+      cta: "Voir les tarifs",
+    },
+    finalH2: "Lancez votre premier scan.",
+    finalSub: "Installation en une commande. Scan d'un VPS distant via SSH. À vous de décider quoi corriger.",
+    finalCta: "Guide d'installation",
+    finalSecondary: "Parcourir les 43 checks",
+  },
+}[locale];
+
+const pricingHref = localizePath("/pricing", locale);
+---
+<Root>
+  <!-- Hero -->
+  <section class="relative overflow-hidden">
+    <div aria-hidden="true" class="pointer-events-none absolute inset-0 -z-10">
+      <div class="absolute left-1/2 top-[-12rem] h-[38rem] w-[70rem] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,oklch(0.575_0.185_255_/_0.10),transparent)]"></div>
+    </div>
+    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pt-20 sm:pt-28 pb-16 text-center">
+      <a
+        href="https://github.com/MakFly/deploy-shuttle/releases"
+        target="_blank"
+        rel="noreferrer"
+        class="inline-flex items-center gap-2 rounded-full border border-border bg-muted/40 px-3.5 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+        {copy.eyebrow}
+      </a>
+      <h1 class="display display-hero mt-6">
+        {copy.h1a}<br />
+        <span class="text-muted-foreground">{copy.h1b}</span>
+      </h1>
+      <p class="mt-6 mx-auto max-w-2xl text-base sm:text-lg text-muted-foreground text-balance">
+        {copy.sub}
+      </p>
+      <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a
+          href="/docs/quickstart"
+          class="inline-flex h-11 min-w-44 items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground hover:opacity-90 active:translate-y-px transition"
+        >
+          {copy.ctaPrimary}
+        </a>
+        <a
+          href="https://github.com/MakFly/deploy-shuttle"
+          target="_blank"
+          rel="noreferrer"
+          class="inline-flex h-11 items-center justify-center text-sm font-medium text-primary hover:underline underline-offset-4"
+        >
+          {copy.ctaSecondary} <span aria-hidden="true" class="ml-1">→</span>
+        </a>
+      </div>
+      <div class="mt-10 mx-auto max-w-3xl text-left">
+        <CopyBlock code={installCmd} label="install" />
+      </div>
+    </div>
+  </section>
+
+  <!-- Product shot: real doctor output in a dark terminal -->
+  <section class="relative">
+    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 pb-8">
+      <div class="overflow-hidden rounded-2xl bg-[#0b0b0c] text-[#d6d6d3] ring-1 ring-black/20 shadow-2xl shadow-black/25">
+        <div class="flex items-center gap-2 border-b border-white/10 px-4 py-3">
+          <span class="h-3 w-3 rounded-full bg-[#ff5f57]"></span>
+          <span class="h-3 w-3 rounded-full bg-[#febc2e]"></span>
+          <span class="h-3 w-3 rounded-full bg-[#28c840]"></span>
+          <span class="ml-3 text-xs text-white/40 font-mono">shuttle doctor --target root@203.0.113.10</span>
+        </div>
+        <pre class="overflow-x-auto p-5 sm:p-6 text-xs sm:text-[13px] leading-relaxed font-mono"><code>DeployShuttle Doctor Report
+
+Target: root@203.0.113.10
+Score: <span class="text-[#ff6961] font-semibold">0/100 - Not Production Ready</span>
+
+<span class="text-[#ff6961]">Critical:</span>
+  [x] Public sensitive database listeners detected: 5432, 7700, 6379
+<span class="text-[#ffb340]">High:</span>
+  [x] 3 sensitive Docker port mapping(s) on 0.0.0.0
+  [x] UFW is missing or inactive
+  [x] No recent backup artifacts and no pg_dump cron entry detected
+<span class="text-[#ffd60a]">Medium:</span>
+  [x] 57 pending package update(s)
+  [x] sshd defaults to port 22
+
+<span class="text-[#6cb2ff]">Next:</span>
+  shuttle harden --target root@203.0.113.10 --dry-run
+  shuttle report --format html --output report.html</code></pre>
+      </div>
+      <p class="mt-3 text-center text-xs text-muted-foreground">{copy.scanCaption}</p>
+    </div>
+  </section>
+
+  <!-- Dark panel: score + bento features -->
+  <section class="mt-16">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="rounded-[2rem] bg-[#0b0b0c] px-6 sm:px-10 lg:px-14 py-16 sm:py-20 text-[#f5f4ef]">
+        <div class="max-w-3xl">
+          <h2 class="display display-section">{copy.darkH2}</h2>
+          <p class="mt-4 text-base sm:text-lg text-white/60">{copy.darkSub}</p>
+        </div>
+        <div class="mt-10 grid gap-6 sm:grid-cols-3">
+          {copy.stats.map((s) => (
+            <div class="rounded-2xl border border-white/10 bg-white/5 p-6">
+              <p class="text-4xl sm:text-5xl font-bold tracking-tight">{s.value}</p>
+              <p class="mt-2 text-sm text-white/55">{s.label}</p>
+            </div>
+          ))}
+        </div>
+        <div class="mt-6 grid gap-6 lg:grid-cols-3">
+          {copy.features.map((f) => (
+            <div class:list={["rounded-2xl border border-white/10 bg-white/5 p-6", f.wide && "lg:col-span-2"]}>
+              <h3 class="font-semibold text-[15px]">{f.title}</h3>
+              <p class="mt-2 text-sm leading-relaxed text-white/55">{f.body}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="mt-24">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <h2 class="display display-section text-center">{copy.howH2}</h2>
+      <div class="mt-12 grid gap-6 lg:grid-cols-3">
+        {copy.steps.map((s, i) => (
+          <div class="rounded-2xl border border-border p-6">
+            <p class="text-xs font-mono text-muted-foreground">0{i + 1}</p>
+            <h3 class="mt-2 text-lg font-semibold tracking-tight">{s.title}</h3>
+            <p class="mt-2 text-sm text-muted-foreground">{s.body}</p>
+            <pre class="mt-4 overflow-x-auto rounded-lg bg-muted px-3.5 py-2.5 text-xs font-mono text-foreground/80"><code>$ {s.cmd}</code></pre>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing teaser -->
+  <section class="mt-24">
+    <div class="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+      <h2 class="display display-section text-center text-balance">{copy.priceH2}</h2>
+      <div class="mt-12 grid gap-6 md:grid-cols-2">
+        <div class="rounded-2xl border border-border p-8 flex flex-col">
+          <p class="text-sm font-medium text-muted-foreground">{copy.priceFree.name}</p>
+          <p class="mt-2 text-4xl font-bold tracking-tight">{copy.priceFree.price}</p>
+          <p class="mt-3 text-sm text-muted-foreground">{copy.priceFree.body}</p>
+          <a href="/docs/install" class="mt-6 inline-flex h-10 items-center justify-center self-start rounded-full border border-border px-5 text-sm font-medium hover:bg-muted transition-colors">
+            {copy.priceFree.cta}
+          </a>
+        </div>
+        <div class="rounded-2xl border-2 border-primary/60 p-8 flex flex-col">
+          <p class="text-sm font-medium text-primary">{copy.pricePro.name}</p>
+          <p class="mt-2 text-4xl font-bold tracking-tight">
+            {copy.pricePro.price}
+            <span class="text-sm font-normal text-muted-foreground">{copy.pricePro.cadence}</span>
+          </p>
+          <p class="mt-3 text-sm text-muted-foreground">{copy.pricePro.body}</p>
+          <a href={pricingHref} class="mt-6 inline-flex h-10 items-center justify-center self-start rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">
+            {copy.pricePro.cta} <span aria-hidden="true" class="ml-1">→</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="mt-24">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-16 text-center">
+      <h2 class="display display-section">{copy.finalH2}</h2>
+      <p class="mt-4 text-muted-foreground">{copy.finalSub}</p>
+      <div class="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <a href="/docs/install" class="inline-flex h-11 min-w-44 items-center justify-center rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity">
+          {copy.finalCta}
+        </a>
+        <a href="/docs/checks" class="inline-flex h-11 items-center justify-center text-sm font-medium text-primary hover:underline underline-offset-4">
+          {copy.finalSecondary} <span aria-hidden="true" class="ml-1">→</span>
+        </a>
+      </div>
+    </div>
+  </section>
+</Root>

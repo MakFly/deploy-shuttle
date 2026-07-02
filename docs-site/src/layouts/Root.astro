@@ -3,45 +3,61 @@ import "@/styles/global.css";
 import TopNav from "@/components/TopNav.astro";
 import MobileSidebar from "@/components/MobileSidebar.astro";
 import Footer from "@/components/Footer.astro";
+import { getLocale, localizePath } from "@/i18n";
 
 interface Props {
   title?: string;
   description?: string;
   ogImage?: string;
 }
+const locale = getLocale(Astro.url.pathname);
 const {
-  title = "DeployShuttle - VPS production-readiness CLI",
-  description = "Audit, harden and deploy Docker apps on VPS. 43 checks, deterministic score, CI-ready.",
+  title = locale === "fr"
+    ? "DeployShuttle - Le CLI de production-readiness VPS"
+    : "DeployShuttle - VPS production-readiness CLI",
+  description = locale === "fr"
+    ? "Auditez, durcissez et déployez vos apps Docker sur VPS. 43 checks, score déterministe, prêt pour la CI."
+    : "Audit, harden and deploy Docker apps on VPS. 43 checks, deterministic score, CI-ready.",
   ogImage,
 } = Astro.props;
-const canonical = new URL(Astro.url.pathname, Astro.site ?? "https://deployshuttle.dev").toString();
+const site = Astro.site ?? "https://deployshuttle.dev";
+const canonical = new URL(Astro.url.pathname, site).toString();
+const altEn = new URL(localizePath(Astro.url.pathname, "en"), site).toString();
+const altFr = new URL(localizePath(Astro.url.pathname, "fr"), site).toString();
 ---
-<html lang="en" class="dark">
+<html lang={locale} class="scroll-smooth">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="en" href={altEn} />
+    <link rel="alternate" hreflang="fr" href={altFr} />
+    <link rel="alternate" hreflang="x-default" href={altEn} />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0b0c" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:type" content="website" />
+    <meta property="og:locale" content={locale === "fr" ? "fr_FR" : "en_US"} />
     {ogImage && <meta property="og:image" content={ogImage} />}
     <meta name="twitter:card" content="summary_large_image" />
     <script is:inline>
-      // No-FOUC theme bootstrap. Default = dark; respect saved preference.
+      // No-FOUC theme bootstrap. Default = light (Apple-like); respect
+      // a saved preference.
       try {
         const saved = localStorage.getItem("theme");
-        if (saved === "light") document.documentElement.classList.remove("dark");
-        else document.documentElement.classList.add("dark");
+        if (saved === "dark") document.documentElement.classList.add("dark");
+        else document.documentElement.classList.remove("dark");
       } catch (_) {
-        document.documentElement.classList.add("dark");
+        document.documentElement.classList.remove("dark");
       }
     </script>
   </head>
-  <body class="min-h-screen bg-background text-foreground antialiased">
+  <body class="min-h-dvh bg-background text-foreground antialiased">
     <TopNav />
     <MobileSidebar />
     <slot />

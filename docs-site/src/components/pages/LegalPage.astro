@@ -1,0 +1,91 @@
+---
+import Root from "@/layouts/Root.astro";
+import type { Locale } from "@/i18n";
+import { localizePath } from "@/i18n";
+
+interface Props {
+  locale: Locale;
+}
+const { locale } = Astro.props;
+
+// TODO(seller): fill in real values before going live. A French seller must
+// publish these (LCEN art. 6-III): identity, SIREN/SIRET, address, contact,
+// hosting provider.
+const legal = {
+  entity: "[LEGAL ENTITY NAME — e.g. auto-entrepreneur or company name]",
+  siren: "[SIREN/SIRET]",
+  address: "[REGISTERED ADDRESS]",
+  email: "[CONTACT EMAIL]",
+  director: "[PUBLICATION DIRECTOR]",
+  host: "[HOSTING PROVIDER — name, address, phone]",
+};
+
+const copy = {
+  en: {
+    title: "Legal Notice - DeployShuttle",
+    h1: "Legal Notice",
+    updated: "Mentions légales — last updated: 02-07-2026",
+    publisher: "Publisher",
+    hosting: "Hosting",
+    data: "Personal data",
+    dataP: `This site does not use tracking cookies. Purchases are processed by Stripe (payment data) and license emails are sent via Resend; in both cases only the data strictly needed to deliver and manage your license is processed (email address, license key, machine fingerprint hash). To exercise your GDPR rights, contact ${legal.email}.`,
+    sales: "Sales terms",
+    salesLink: "Terms of Sale",
+    director: "Publication director",
+    contact: "Contact",
+  },
+  fr: {
+    title: "Mentions légales - DeployShuttle",
+    h1: "Mentions légales",
+    updated: "Dernière mise à jour : 02-07-2026",
+    publisher: "Éditeur",
+    hosting: "Hébergement",
+    data: "Données personnelles",
+    dataP: `Ce site n'utilise pas de cookies de tracking. Les achats sont traités par Stripe (données de paiement) et les emails de licence sont envoyés via Resend ; dans les deux cas, seules les données strictement nécessaires à la livraison et à la gestion de votre licence sont traitées (adresse email, clé de licence, hash d'empreinte machine). Pour exercer vos droits RGPD, contactez ${legal.email}.`,
+    sales: "Conditions de vente",
+    salesLink: "CGV",
+    director: "Directeur de la publication",
+    contact: "Contact",
+  },
+}[locale];
+
+const termsHref = localizePath("/terms", locale);
+---
+<Root title={copy.title}>
+  <section>
+    <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 space-y-8">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">{copy.h1}</h1>
+        <p class="mt-2 text-sm text-muted-foreground">{copy.updated}</p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">{copy.publisher}</h2>
+        <p class="text-sm text-muted-foreground">
+          {legal.entity}<br />
+          SIREN/SIRET: {legal.siren}<br />
+          {legal.address}<br />
+          {copy.contact}: {legal.email}<br />
+          {copy.director}: {legal.director}
+        </p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">{copy.hosting}</h2>
+        <p class="text-sm text-muted-foreground">{legal.host}</p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">{copy.data}</h2>
+        <p class="text-sm text-muted-foreground">{copy.dataP}</p>
+      </div>
+
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">{copy.sales}</h2>
+        <p class="text-sm text-muted-foreground">
+          <a href={termsHref} class="underline hover:text-foreground">{copy.salesLink}</a>
+        </p>
+      </div>
+    </div>
+  </section>
+</Root>
