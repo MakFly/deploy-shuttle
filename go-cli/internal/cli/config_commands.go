@@ -239,16 +239,14 @@ func newInitCommand() *cobra.Command {
 
 			fmt.Println()
 
-			// --- Pro flag expansion ---
+			// --- Pro onboarding wizard ---
+			// Gate before asking questions; explicit --with-* flags act as
+			// answers, non-TTY stdin falls back to the full default set.
 			if pro {
-				if withDB == "" {
-					withDB = "postgres"
+				if err := license.Require("init --pro"); err != nil {
+					return err
 				}
-				withRedis = true
-				withQueue = true
-				withScheduler = true
-				withMailpit = true
-				withCI = true
+				runProWizard(cmd, &withDB, &withRedis, &withQueue, &withScheduler, &withMailpit, &withCI)
 			}
 
 			hasPro := withDB != "" || withRedis || withQueue || withScheduler || withMailpit
