@@ -5,11 +5,16 @@ import PrevNext from "@/components/PrevNext.astro";
 import TocAside from "@/components/TocAside.astro";
 
 interface Props {
-  title: string;
+  title?: string;
   description?: string;
+  frontmatter?: { title?: string; description?: string };
   headings?: { depth: number; slug: string; text: string }[];
 }
-const { title, description, headings = [] } = Astro.props;
+// MDX pages using `layout:` frontmatter deliver title/description inside
+// Astro.props.frontmatter, not as direct props.
+const { headings = [] } = Astro.props;
+const title = Astro.props.title ?? Astro.props.frontmatter?.title ?? "Docs";
+const description = Astro.props.description ?? Astro.props.frontmatter?.description;
 const fullTitle = `${title} - DeployShuttle docs`;
 const tocItems = headings.filter((h) => h.depth === 2 || h.depth === 3);
 ---

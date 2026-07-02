@@ -16,16 +16,21 @@ const isActive = (base: string) =>
 const otherLocale = locale === "en" ? "fr" : "en";
 const switchHref = localizePath(path, otherLocale);
 ---
-<header class="sticky top-0 z-40 w-full border-b border-border/60 bg-background/70 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
-  <div class="mx-auto flex h-12 max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
-    <Logo />
-    <nav class="hidden md:flex items-center gap-6 text-[13px]">
+<header class="sticky top-0 z-40 w-full px-3 sm:px-4 pt-2 sm:pt-3">
+  <div class="mx-auto flex h-12 max-w-3xl items-center rounded-full border border-border/70 bg-background/85 backdrop-blur-md shadow-lg shadow-black/[0.04] dark:shadow-black/20 pl-4 pr-1.5">
+    <!-- Left: wordmark -->
+    <div class="flex flex-1 items-center">
+      <Logo />
+    </div>
+
+    <!-- Center: nav links -->
+    <nav class="hidden md:flex items-center gap-7 text-[13px]">
       {nav.map((link) => (
         <a
           href={link.href}
           class:list={[
             "transition-colors hover:text-foreground",
-            isActive(link.base) ? "text-foreground" : "text-muted-foreground",
+            isActive(link.base) ? "text-foreground font-medium" : "text-muted-foreground",
           ]}
         >
           {link.title}
@@ -40,18 +45,20 @@ const switchHref = localizePath(path, otherLocale);
         {t.github}
       </a>
     </nav>
-    <div class="ml-auto flex items-center gap-2">
+
+    <!-- Right: locale, theme, CTA, mobile menu -->
+    <div class="flex flex-1 items-center justify-end gap-0.5">
       <a
         href={switchHref}
         aria-label={otherLocale === "fr" ? "Version française" : "English version"}
-        class="inline-flex h-8 items-center justify-center rounded-full border border-border bg-background px-3 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        class="inline-flex h-9 items-center justify-center rounded-full px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
       >
         {otherLocale.toUpperCase()}
       </a>
       <ThemeToggle />
       <a
         href={localizePath("/pricing", locale)}
-        class="hidden sm:inline-flex h-8 items-center justify-center rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground hover:opacity-90 transition-opacity"
+        class="hidden sm:inline-flex h-9 items-center justify-center rounded-full bg-primary px-4 ml-1 text-xs font-medium text-primary-foreground hover:opacity-90 active:translate-y-px transition"
       >
         {locale === "fr" ? "Obtenir Pro" : "Get Pro"}
       </a>
@@ -59,7 +66,7 @@ const switchHref = localizePath(path, otherLocale);
         type="button"
         data-mobile-toggle
         aria-label={t.openMenu}
-        class="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+        class="md:hidden inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
       >
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
