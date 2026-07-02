@@ -18,11 +18,10 @@ export const env = {
   licensePrivateKeyB64: required("LICENSE_PRIVATE_KEY_B64"),
   licensePublicKeyB64: required("LICENSE_PUBLIC_KEY_B64"),
 
-  // Stripe
+  // Stripe. Checkout happens via a Payment Link (one-time payment);
+  // the server only consumes webhooks, so no price ID is needed here.
   stripeSecretKey: required("STRIPE_SECRET_KEY"),
   stripeWebhookSecret: required("STRIPE_WEBHOOK_SECRET"),
-  stripeProPriceMonthly: optional("STRIPE_PRO_PRICE_MONTHLY"),
-  stripeProPriceYearly: optional("STRIPE_PRO_PRICE_YEARLY"),
 
   // Resend (optional in dev)
   resendApiKey: optional("RESEND_API_KEY"),

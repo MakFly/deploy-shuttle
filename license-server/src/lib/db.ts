@@ -14,8 +14,8 @@ export async function ensureSchema(): Promise<void> {
   await sql`
     CREATE TABLE IF NOT EXISTS licenses (
       key TEXT PRIMARY KEY,
-      stripe_customer_id TEXT NOT NULL,
-      stripe_subscription_id TEXT NOT NULL,
+      stripe_customer_id TEXT,
+      stripe_payment_intent_id TEXT NOT NULL,
       tier TEXT NOT NULL DEFAULT 'pro',
       status TEXT NOT NULL,
       seats INT NOT NULL DEFAULT 1,
@@ -46,8 +46,8 @@ export async function ensureSchema(): Promise<void> {
 
 export type LicenseRow = {
   key: string;
-  stripe_customer_id: string;
-  stripe_subscription_id: string;
+  stripe_customer_id: string | null;
+  stripe_payment_intent_id: string;
   tier: string;
   status: string;
   seats: number;
@@ -123,19 +123,19 @@ export async function deactivateActivation(
 
 export async function upsertLicense(row: {
   key: string;
-  stripeCustomerId: string;
-  stripeSubscriptionId: string;
+  stripeCustomerId: string | null;
+  stripePaymentIntentId: string;
   tier: "pro";
-  status: "active" | "past_due" | "canceled";
+  status: "active" | "canceled";
   seats: number;
   expiresAt: Date | null;
 }): Promise<void> {
   await sql`
-    INSERT INTO licenses (key, stripe_customer_id, stripe_subscription_id, tier, status, seats, expires_at)
-    VALUES (${row.key}, ${row.stripeCustomerId}, ${row.stripeSubscriptionId}, ${row.tier}, ${row.status}, ${row.seats}, ${row.expiresAt})
+    INSERT INTO licenses (key, stripe_customer_id, stripe_payment_intent_id, tier, status, seats, expires_at)
+    VALUES (${row.key}, ${row.stripeCustomerId}, ${row.stripePaymentIntentId}, ${row.tier}, ${row.status}, ${row.seats}, ${row.expiresAt})
     ON CONFLICT (key) DO UPDATE SET
       stripe_customer_id = EXCLUDED.stripe_customer_id,
-      stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+      stripe_payment_intent_id = EXCLUDED.stripe_payment_intent_id,
       tier = EXCLUDED.tier,
       status = EXCLUDED.status,
       seats = EXCLUDED.seats,
@@ -143,14 +143,13 @@ export async function upsertLicense(row: {
   `;
 }
 
-export async function setLicenseStatusBySubscription(
-  subscriptionId: string,
-  status: "active" | "past_due" | "canceled",
-  expiresAt: Date | null,
+export async function setLicenseStatusByPaymentIntent(
+  paymentIntentId: string,
+  status: "active" | "canceled",
 ): Promise<void> {
   await sql`
-    UPDATE licenses SET status = ${status}, expires_at = ${expiresAt}
-    WHERE stripe_subscription_id = ${subscriptionId}
+    UPDATE licenses SET status = ${status}
+    WHERE stripe_payment_intent_id = ${paymentIntentId}
   `;
 }
 

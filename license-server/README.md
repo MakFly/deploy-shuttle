@@ -1,9 +1,10 @@
 # DeployShuttle license server
 
-Stripe-backed license issuer for the DeployShuttle CLI Pro tier.
+Stripe-backed license issuer for the DeployShuttle CLI Pro tier
+(**one-time payment, perpetual license** — no subscription).
 
 ```
-Stripe Checkout ── webhook ──▶ license-server ── Postgres
+Stripe Payment Link ── webhook ──▶ license-server ── Postgres
                                        │
                                        ├─▶ /activate  (CLI → JWT 14 d)
                                        ├─▶ /deactivate (free machine slot)
@@ -15,7 +16,7 @@ Stripe Checkout ── webhook ──▶ license-server ── Postgres
 
 - **Bun** + **Hono** for the HTTP layer.
 - **Postgres** (Neon free tier works) via `postgres.js`.
-- **Stripe** (subscriptions, signed webhooks).
+- **Stripe** (one-time Checkout via Payment Link, signed webhooks).
 - **Resend** for transactional email (optional in dev).
 - **Ed25519** signing — verifying key embedded in the CLI binary.
 
@@ -41,15 +42,16 @@ bun run dev
 ## Stripe wiring
 
 1. Create a product `DeployShuttle Pro` in Stripe Dashboard.
-2. Add two prices: monthly and yearly. Copy the IDs into `.env`.
-3. Create a webhook endpoint pointing at `https://<host>/webhooks/stripe`.
-   Subscribe to `checkout.session.completed`,
-   `customer.subscription.updated`, `customer.subscription.deleted`.
+2. Add one **one-time** price: 199 EUR (TTC). No recurring price.
+3. Create a **Payment Link** for that price (card payments; enable
+   "collect customer email"). This is the Buy button URL for the
+   pricing page — no server-side checkout code needed.
+4. Create a webhook endpoint pointing at `https://<host>/webhooks/stripe`.
+   Subscribe to `checkout.session.completed` and `charge.refunded`.
    Copy the signing secret into `STRIPE_WEBHOOK_SECRET`.
-4. Wire the Checkout button on the landing page to redirect to a Stripe
-   Checkout Session that uses the monthly or yearly price ID.
-5. On `checkout.session.completed`, the server generates a license key,
-   stores it, and emails it to the customer (Resend).
+5. On `checkout.session.completed` (mode `payment`, paid), the server
+   generates a perpetual license key, stores it, and emails it to the
+   customer (Resend). On `charge.refunded`, the license is revoked.
 
 ## Deploy on Fly.io
 
@@ -61,8 +63,6 @@ fly secrets set \
   LICENSE_PUBLIC_KEY_B64="..." \
   STRIPE_SECRET_KEY="..." \
   STRIPE_WEBHOOK_SECRET="..." \
-  STRIPE_PRO_PRICE_MONTHLY="..." \
-  STRIPE_PRO_PRICE_YEARLY="..." \
   RESEND_API_KEY="..."
 fly deploy
 ```

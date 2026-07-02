@@ -1,5 +1,0 @@
-# Missing required fields
-domain: myapp.example.com
-deploy:
-  strategy: invalid-strategy
-  timeout: -5
