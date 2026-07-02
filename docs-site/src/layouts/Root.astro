@@ -9,6 +9,7 @@ interface Props {
   title?: string;
   description?: string;
   ogImage?: string;
+  noindex?: boolean;
 }
 const locale = getLocale(Astro.url.pathname);
 const {
@@ -19,6 +20,7 @@ const {
     ? "Auditez, durcissez et déployez vos apps Docker sur VPS. 43 checks, score déterministe, prêt pour la CI."
     : "Audit, harden and deploy Docker apps on VPS. 43 checks, deterministic score, CI-ready.",
   ogImage,
+  noindex = false,
 } = Astro.props;
 const site = Astro.site ?? "https://deployshuttle.dev";
 const canonical = new URL(Astro.url.pathname, site).toString();
@@ -32,6 +34,7 @@ const altFr = new URL(localizePath(Astro.url.pathname, "fr"), site).toString();
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex" />}
     <link rel="canonical" href={canonical} />
     <link rel="alternate" hreflang="en" href={altEn} />
     <link rel="alternate" hreflang="fr" href={altFr} />
