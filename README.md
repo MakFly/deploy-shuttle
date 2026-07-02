@@ -549,8 +549,6 @@ Run `shuttle <command> --help` for usage details.
 | **init** | Detects the stack, generates Dockerfile, compose, .env.example, and config. With `--pro`, assembles a multi-service compose from composable service blocks. |
 | **execx** | Unified shell abstraction -- `Local` for the current machine, `SSH` for remote targets. |
 
-Architecture and security details: [`plans/06-architecture-security.md`](plans/06-architecture-security.md)
-
 ---
 
 ## Supported Platforms

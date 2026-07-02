@@ -24,10 +24,10 @@ continuation after readiness checks, not as the only product promise.
 
 Current config lives in `shuttle.yml`. The readiness config is `.shuttle.yml`.
 
-The product plan lives in `plans/`. Use it as the source of truth for PRD, MVP scope,
-check catalog, command design, scoring, architecture, and launch direction. The previous
-TypeScript/Bun implementation was removed from the tree (2026-07-02); it remains
-available in git history only.
+The historical product plan (`plans/`) was removed from the tree (2026-07-02); it
+remains available in git history only, like the previous TypeScript/Bun implementation.
+Decided facts that survive it: single Pro tier at 199€ TTC one-time (no Team/Agency
+tier, no subscription), perpetual license, checkout via Stripe Payment Link.
 
 ## Commands
 
@@ -67,7 +67,7 @@ Always keep working context aligned with the real repository structure:
 - When adding a new top-level directory or changing major ownership boundaries, update
   this `CLAUDE.md` repo layout section in the same turn.
 - When product direction, roadmap, command design, or check catalog changes, update the
-  relevant file under `plans/`.
+  relevant doc under `docs/` (the former `plans/` directory is git history only).
 - When user-facing behavior changes, update the relevant docs once a docs surface exists,
   or note clearly why docs were not changed.
 - Do not document planned features as implemented. Use "planned", "MVP target", or
@@ -103,7 +103,7 @@ Current commands include:
 - `report`
 - `harden` (dry-run plan + safe apply, local or over SSH)
 
-Planned readiness commands from `plans/`:
+Planned readiness commands:
 
 - `harden` action coverage beyond `chmod 600 .env` (UFW baseline, Caddy admin, etc.)
 
@@ -129,9 +129,9 @@ tests, and docs exist.
 - **Readiness checks**: add doctor checks in `go-cli/internal/readiness/` and keep scoring deterministic.
 - **Pro templates**: `init --pro` runs an interactive onboarding wizard (DB engine, Redis, queue, scheduler, Mailpit, CI) in `internal/cli/init_pro_wizard.go`; explicit `--with-*` flags act as answers and skip their prompt, non-TTY/EOF stdin falls back to the full default set. Gated by `license.Require("init --pro")` before the questions. Service blocks in `templates/compose_services.go`, assembly in `templates/compose_pro.go`.
 - **Dev email**: the license-server delivers license emails to Mailpit when `MAILPIT_URL` is set (dev only — precedence over Resend, never set in prod).
-- **Monetization E2E**: `make e2e-license` runs the full purchase→email→activate→refund chain locally against `infra-postgres`/`infra-mailpit` using `stripe-mock/`; go-live steps live in `plans/11-go-live-checklist.md`.
+- **Monetization E2E**: `make e2e-license` runs the full purchase→email→activate→refund chain locally against `infra-postgres`/`infra-mailpit` using `stripe-mock/`; the go-live checklist is in git history (`plans/11-go-live-checklist.md`).
 - **Pricing**: 199€ TTC one-time, single Pro tier. No Agency tier.
-- **Compatibility**: the old TS CLI was removed (git history only); if Go behavior is intentionally partial, document that clearly in `README.md` or `plans/08-execution-tracker.md`.
+- **Compatibility**: the old TS CLI was removed (git history only); if Go behavior is intentionally partial, document that clearly in `README.md`.
 
 ## Style
 
@@ -151,7 +151,6 @@ tests, and docs exist.
 - `marketing/` — launch post drafts
 - `docs/` — check catalog reference
 - `scripts/` — release/build tooling
-- `plans/` — product pivot plans and PRD split into Markdown parts
 - `.shuttle/` — local Shuttle workspace/state placeholder
 - `Makefile` — dev shortcuts (docs site, tests, build, stripe-mock, e2e-license)
 

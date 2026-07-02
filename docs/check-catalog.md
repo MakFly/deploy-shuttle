@@ -131,8 +131,7 @@ missing or the token is rejected.
 
 ## Roadmap
 
-Planned additions tracked in [`plans/03-check-catalog.md`](../plans/03-check-catalog.md)
-and prioritized in [`plans/09-critique-and-deltas.md`](../plans/09-critique-and-deltas.md):
+Planned additions (formerly tracked in `plans/`, now git history only):
 `cloudflare.origin_exposed` (direct A records that leak the origin IP),
 `db.volume_not_persistent`, backup recency / restore drill / offsite checks,
 log rotation, uptime checks.
