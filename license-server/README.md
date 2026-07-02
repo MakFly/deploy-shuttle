@@ -152,3 +152,18 @@ Mailpit (UI on :8025) instead of Resend — dev only, never in production.
 
 The full chain (purchase → email → CLI activation → refund revocation) runs
 with `make e2e-license` from the repo root.
+
+## Real Stripe test-mode run
+
+`make e2e-stripe-test` replays the same chain against **real Stripe** (test
+mode): the script creates an idempotent test product/price/Payment Link via
+the Stripe CLI, starts `stripe listen` to forward signed webhooks to the local
+server, then waits for you to pay in the browser with the test card
+`4242 4242 4242 4242` (any future expiry, any CVC, your email). It asserts the
+key email in Mailpit (:8025), activates a gated CLI build, then refunds the
+test payment (`stripe refunds create`) and verifies the license is revoked.
+
+Prerequisites: `stripe login` done (test mode), infra-postgres + infra-mailpit
+running. No real Stripe API key touches the script — webhook verification is
+pure HMAC, so the server runs with `STRIPE_SECRET_KEY=sk_test_dummy` and the
+ephemeral `whsec_…` printed by `stripe listen`.

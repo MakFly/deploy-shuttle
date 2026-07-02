@@ -19,3 +19,4 @@ config.bat
 shuttle
 deploy-shuttle
 go-cli/deploy-shuttle
+.shuttle/stripe-test-link

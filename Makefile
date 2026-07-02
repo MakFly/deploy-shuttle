@@ -1,6 +1,6 @@
 # DeployShuttle — dev shortcuts. Run `make help` for the list.
 
-.PHONY: help site site-build site-preview test build stripe-mock e2e-license
+.PHONY: help site site-build site-preview test build stripe-mock e2e-license e2e-stripe-test
 
 help: ## List available targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -26,3 +26,6 @@ stripe-mock: ## Start the dev-only fake Stripe (http://localhost:4242/pay)
 
 e2e-license: ## Full purchase→email→activate→refund E2E against infra-postgres/mailpit
 	bash scripts/e2e-license.sh
+
+e2e-stripe-test: ## Same E2E against REAL Stripe test mode (stripe listen + Payment Link, human pays with the 4242 card)
+	bash scripts/e2e-stripe-test.sh

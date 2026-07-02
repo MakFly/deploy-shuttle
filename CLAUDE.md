@@ -129,7 +129,7 @@ tests, and docs exist.
 - **Readiness checks**: add doctor checks in `go-cli/internal/readiness/` and keep scoring deterministic.
 - **Pro templates**: `init --pro` runs an interactive onboarding wizard (DB engine, Redis, queue, scheduler, Mailpit, CI) in `internal/cli/init_pro_wizard.go`; explicit `--with-*` flags act as answers and skip their prompt, non-TTY/EOF stdin falls back to the full default set. Gated by `license.Require("init --pro")` before the questions. Service blocks in `templates/compose_services.go`, assembly in `templates/compose_pro.go`.
 - **Dev email**: the license-server delivers license emails to Mailpit when `MAILPIT_URL` is set (dev only — precedence over Resend, never set in prod).
-- **Monetization E2E**: `make e2e-license` runs the full purchase→email→activate→refund chain locally against `infra-postgres`/`infra-mailpit` using `stripe-mock/`; the go-live checklist is in git history (`plans/11-go-live-checklist.md`).
+- **Monetization E2E**: `make e2e-license` runs the full purchase→email→activate→refund chain locally against `infra-postgres`/`infra-mailpit` using `stripe-mock/`; `make e2e-stripe-test` runs the same chain against real Stripe test mode (`stripe listen` + Payment Link, human pays with the 4242 test card); the go-live checklist is in git history (`plans/11-go-live-checklist.md`).
 - **Pricing**: 199€ TTC one-time, single Pro tier. No Agency tier.
 - **Compatibility**: the old TS CLI was removed (git history only); if Go behavior is intentionally partial, document that clearly in `README.md`.
 
