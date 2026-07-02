@@ -1,7 +1,25 @@
 import { env } from "./env";
 
-// Minimal Resend client. No-ops when RESEND_API_KEY is missing (dev/test).
+// Minimal email sender. Dev precedence: MAILPIT_URL > Resend > console no-op.
 export async function sendLicenseKeyEmail(to: string, key: string): Promise<void> {
+  if (env.mailpitUrl) {
+    const res = await fetch(`${env.mailpitUrl}/api/v1/send`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        From: { Email: "noreply@deployshuttle.local", Name: "DeployShuttle" },
+        To: [{ Email: to }],
+        Subject: "Your DeployShuttle Pro license key",
+        HTML: licenseEmailHtml(key),
+        Text: licenseEmailText(key),
+      }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      throw new Error(`Mailpit send failed (${res.status}): ${detail}`);
+    }
+    return;
+  }
   if (!env.resendApiKey) {
     console.log(`[email:dev] would send license key ${key} to ${to}`);
     return;

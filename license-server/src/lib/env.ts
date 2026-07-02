@@ -27,6 +27,10 @@ export const env = {
   resendApiKey: optional("RESEND_API_KEY"),
   resendFrom: optional("RESEND_FROM", "DeployShuttle <noreply@deployshuttle.io>"),
 
+  // Mailpit (dev only). When set, license emails go to Mailpit's HTTP send
+  // API instead of Resend. Must stay unset in production.
+  mailpitUrl: optional("MAILPIT_URL"),
+
   // Token grace (offline window) and refresh lead.
   tokenGraceDays: Number(optional("TOKEN_GRACE_DAYS", "14")),
 };
