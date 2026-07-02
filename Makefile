@@ -25,4 +25,4 @@ stripe-mock: ## Start the dev-only fake Stripe (http://localhost:4242/pay)
 	bun run stripe-mock/server.ts
 
 e2e-license: ## Full purchase→email→activate→refund E2E against infra-postgres/mailpit
-	sh scripts/e2e-license.sh
+	bash scripts/e2e-license.sh
