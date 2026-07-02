@@ -19,9 +19,9 @@ WORK="$(mktemp -d)"
 
 PIDS=()
 cleanup() {
-  for pid in "${PIDS[@]:-}"; do kill "$pid" 2>/dev/null || true; done
-  # the stripe CLI forks a child that survives killing the parent
-  pkill -f "stripe listen --events" 2>/dev/null || true
+  # kill children first (the stripe CLI forks one that survives its parent),
+  # by parenthood — a pkill -f pattern could match unrelated shells.
+  for pid in "${PIDS[@]:-}"; do pkill -P "$pid" 2>/dev/null || true; kill "$pid" 2>/dev/null || true; done
   rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -96,12 +96,20 @@ PIDS+=($!)
 for _ in $(seq 1 30); do curl -sf "http://localhost:${LS_PORT}/healthz" >/dev/null && break; sleep 0.5; done
 curl -sf "http://localhost:${LS_PORT}/healthz" >/dev/null || fail "license-server did not come up (see $WORK/license-server.log)"
 
-# 6. Human step: pay with the Stripe test card.
-step "waiting for a real test-mode payment (max ${PAY_TIMEOUT}s)"
-echo
-echo "  ➤ Open:  $PAY_URL"
-echo "    Card 4242 4242 4242 4242 · any future expiry · any CVC · your email"
-echo
+# 6. The payment: human by default; AUTO_PAY=trigger fires a real Stripe
+# test-mode checkout via the CLI fixtures (payment page confirmed by Stripe —
+# same signed webhook path, no browser). The Payment Link custom-field VALUE
+# can only be exercised by a human checkout (fixtures don't fill fields in).
+if [ "${AUTO_PAY:-}" = "trigger" ]; then
+  step "autonomous payment via stripe trigger"
+  stripe trigger checkout.session.completed >/dev/null || fail "stripe trigger failed"
+else
+  step "waiting for a real test-mode payment (max ${PAY_TIMEOUT}s)"
+  echo
+  echo "  ➤ Open:  $PAY_URL"
+  echo "    Card 4242 4242 4242 4242 · any future expiry · any CVC · your email"
+  echo
+fi
 KEY=""
 for _ in $(seq 1 $((PAY_TIMEOUT / 5))); do
   KEY=$(docker exec infra-postgres psql -U test -d "$DB" -tAc \

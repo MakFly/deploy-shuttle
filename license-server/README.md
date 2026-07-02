@@ -178,3 +178,10 @@ Prerequisites: `stripe login` done (test mode), infra-postgres + infra-mailpit
 running. No real Stripe API key touches the script — webhook verification is
 pure HMAC, so the server runs with `STRIPE_SECRET_KEY=sk_test_dummy` and the
 ephemeral `whsec_…` printed by `stripe listen`.
+
+Fully autonomous variant (no browser): `AUTO_PAY=trigger make e2e-stripe-test`
+uses `stripe trigger checkout.session.completed` — Stripe's fixtures confirm a
+real test payment page, so the whole chain (signed webhook → key → email →
+activation → real refund → revocation) runs unattended. Only the Payment Link
+custom-field *value* (GitHub username) requires a human checkout. Override the
+payment wait with `PAY_TIMEOUT=<seconds>` (default 300).
