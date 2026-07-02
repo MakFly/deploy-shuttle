@@ -26,7 +26,8 @@ Current config lives in `shuttle.yml`. The readiness config is `.shuttle.yml`.
 
 The product plan lives in `plans/`. Use it as the source of truth for PRD, MVP scope,
 check catalog, command design, scoring, architecture, and launch direction. The previous
-TypeScript/Bun implementation lives in `legacy/ts-cli/` and is reference-only.
+TypeScript/Bun implementation was removed from the tree (2026-07-02); it remains
+available in git history only.
 
 ## Commands
 
@@ -111,15 +112,12 @@ tests, and docs exist.
 
 ### Core Layer (`go-cli/internal/`)
 - `config/` — YAML loader, defaults, env overlays, `server` to `servers` normalization
-- `readiness/` — `doctor`, check results, scoring, console/JSON reports (21 checks: system, SSH, Docker, firewall, secrets, reverse-proxy/database)
+- `readiness/` — `doctor`, check results, scoring, console/JSON reports (43 checks: system, SSH, Docker/compose, firewall, secrets, reverse-proxy/database, Cloudflare)
 - `harden/` — dry-run planner mapping doctor findings to proposed actions
 - `ssh/` — SSH command execution
 - `execx/` — local shell adapter
 - `runtime/` — remote path helpers under `/opt/shuttle/<app>/`
 - `secrets/` — local secret store for CLI parity
-
-### Legacy TS (`legacy/ts-cli/`)
-Reference implementation only. Do not add new product work there unless explicitly asked.
 
 ## Key Patterns
 
@@ -131,7 +129,7 @@ Reference implementation only. Do not add new product work there unless explicit
 - **Readiness checks**: add doctor checks in `go-cli/internal/readiness/` and keep scoring deterministic.
 - **Pro templates**: `init --pro` and `--with-*` flags generate multi-service compose (DB, Redis, workers). Gated by `license.Require("init --pro")`. Service blocks in `templates/compose_services.go`, assembly in `templates/compose_pro.go`.
 - **Pricing**: 199€ TTC one-time, single Pro tier. No Agency tier.
-- **Compatibility**: old TS behavior is reference material only; if Go behavior is intentionally partial, document that clearly in `README.md` or `plans/08-execution-tracker.md`.
+- **Compatibility**: the old TS CLI was removed (git history only); if Go behavior is intentionally partial, document that clearly in `README.md` or `plans/08-execution-tracker.md`.
 
 ## Style
 
@@ -143,10 +141,15 @@ Reference implementation only. Do not add new product work there unless explicit
 
 - `go-cli/` — active Go CLI
 - `go-cli/cmd/shuttle/` — main package
-- `go-cli/internal/` — internal CLI, config, readiness, SSH, templates, runtime, secrets packages
-- `legacy/ts-cli/` — archived TypeScript/Bun implementation
+- `go-cli/internal/` — internal CLI, config, readiness, SSH, templates, runtime, secrets, license packages
+- `docs-site/` — Astro landing + docs + pricing site (Bun)
+- `license-server/` — Stripe one-time checkout webhook + license issuer (Bun/Hono, Fly.io)
+- `report-pdf/` — React PDF renderer for `report --format pdf`
+- `marketing/` — launch post drafts
+- `docs/` — check catalog reference
 - `scripts/` — release/build tooling
 - `plans/` — product pivot plans and PRD split into Markdown parts
 - `.shuttle/` — local Shuttle workspace/state placeholder
+- `Makefile` — dev shortcuts (docs site, tests, build)
 
 When this layout changes, update this section immediately and rebuild the `ig` index.

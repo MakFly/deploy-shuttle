@@ -1,0 +1,22 @@
+# DeployShuttle — dev shortcuts. Run `make help` for the list.
+
+.PHONY: help site site-build site-preview test build
+
+help: ## List available targets
+	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+
+site: ## Start the docs site dev server (http://localhost:4321)
+	cd docs-site && bun install && bun run dev
+
+site-build: ## Production build of the docs site (set PUBLIC_STRIPE_PAYMENT_LINK to enable the buy button)
+	cd docs-site && bun install && bun run build
+
+site-preview: site-build ## Serve the production build locally
+	cd docs-site && bun run preview
+
+test: ## CI parity: gofmt + go vet + go test, then license-server tests
+	cd go-cli && test -z "$$(gofmt -l .)" && go vet ./... && go test ./...
+	cd license-server && bun install && bun run typecheck && bun test
+
+build: ## Build the shuttle binary (dist/)
+	sh scripts/build-go.sh
