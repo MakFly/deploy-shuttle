@@ -143,6 +143,17 @@ Postgres when `TEST_DATABASE_URL` is set (skipped otherwise):
 TEST_DATABASE_URL=postgres://test:test@localhost:5432/shuttle_license_test bun test
 ```
 
+## GitHub community perk (Spin-style)
+
+The Payment Link carries an optional **"GitHub username"** custom field
+(`key=github_username`). When the buyer fills it, `checkout.session.completed`
+stores the username on the license row and invites it to the private Pro repo
+(`GITHUB_PRO_REPO`, e.g. `MakFly/deployshuttle-pro`) via the GitHub API;
+`charge.refunded` removes the collaborator. The invite is a **perk, never the
+entitlement**: GitHub API failures are logged and the license is issued anyway.
+Requires `GITHUB_TOKEN` (collaborators write on the Pro repo); without it the
+server logs `[github:dev] would invite <user>` instead.
+
 ## Local dev (mock Stripe + Mailpit)
 
 No Stripe account needed: `stripe-mock/` (repo root) serves a fake Payment

@@ -9,6 +9,7 @@ const SECRET = "whsec_test";
 
 let app: { fetch: (req: Request) => Response | Promise<Response> };
 let sql: typeof import("../src/lib/db").sql;
+let githubCalls: { method: string; path: string }[] = [];
 
 function purchaseEvent(email: string, paymentIntent: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -91,12 +92,26 @@ describe.skipIf(!dbUrl)("POST /webhooks/stripe", () => {
     process.env.STRIPE_WEBHOOK_SECRET = SECRET;
     delete process.env.MAILPIT_URL;
     delete process.env.RESEND_API_KEY;
+    // Local GitHub API mock: records collaborator calls, 500s for "failuser".
+    const githubMock = Bun.serve({
+      port: 0,
+      fetch(req) {
+        const path = new URL(req.url).pathname;
+        githubCalls.push({ method: req.method, path });
+        if (path.endsWith("/failuser")) return new Response("boom", { status: 500 });
+        return new Response(null, { status: req.method === "PUT" ? 201 : 204 });
+      },
+    });
+    process.env.GITHUB_TOKEN = "ghp_test_dummy";
+    process.env.GITHUB_PRO_REPO = "mock/deployshuttle-pro";
+    process.env.GITHUB_API_URL = `http://localhost:${githubMock.port}`;
     app = (await import("../src/index")).default; // also runs ensureSchema()
     sql = (await import("../src/lib/db")).sql;
   });
 
   beforeEach(async () => {
     await sql`TRUNCATE webhook_events, activations, licenses`;
+    githubCalls = [];
   });
 
   test("rejects missing or invalid signature", async () => {
@@ -151,6 +166,72 @@ describe.skipIf(!dbUrl)("POST /webhooks/stripe", () => {
 
     const rows = await sql`SELECT status FROM licenses`;
     expect(rows[0]!.status).toBe("canceled");
+  });
+
+  test("github_username custom field stores + invites to the Pro repo", async () => {
+    const res = await postSigned(
+      purchaseEvent("gh@test.dev", "pi_gh_1", {
+        custom_fields: [
+          { key: "github_username", type: "text", optional: true, text: { value: "@octocat" } },
+        ],
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    const rows = await sql`SELECT github_username FROM licenses`;
+    expect(rows[0]!.github_username).toBe("octocat"); // "@" stripped
+    expect(githubCalls).toEqual([
+      { method: "PUT", path: "/repos/mock/deployshuttle-pro/collaborators/octocat" },
+    ]);
+  });
+
+  test("refund removes the buyer from the Pro repo", async () => {
+    await postSigned(
+      purchaseEvent("ghrefund@test.dev", "pi_gh_2", {
+        custom_fields: [
+          { key: "github_username", type: "text", optional: true, text: { value: "octocat" } },
+        ],
+      }),
+    );
+    githubCalls = [];
+    const res = await postSigned(refundEvent("pi_gh_2"));
+    expect(res.status).toBe(200);
+
+    const rows = await sql`SELECT status FROM licenses`;
+    expect(rows[0]!.status).toBe("canceled");
+    expect(githubCalls).toEqual([
+      { method: "DELETE", path: "/repos/mock/deployshuttle-pro/collaborators/octocat" },
+    ]);
+  });
+
+  test("invalid github username is ignored, license still issued", async () => {
+    const res = await postSigned(
+      purchaseEvent("bad@test.dev", "pi_gh_3", {
+        custom_fields: [
+          { key: "github_username", type: "text", optional: true, text: { value: "not a user!!" } },
+        ],
+      }),
+    );
+    expect(res.status).toBe(200);
+
+    const rows = await sql`SELECT * FROM licenses`;
+    expect(rows).toHaveLength(1);
+    expect(githubCalls).toEqual([]); // rejected before any API call
+  });
+
+  test("github API failure does not fail the purchase webhook", async () => {
+    const res = await postSigned(
+      purchaseEvent("fail@test.dev", "pi_gh_4", {
+        custom_fields: [
+          { key: "github_username", type: "text", optional: true, text: { value: "failuser" } },
+        ],
+      }),
+    );
+    expect(res.status).toBe(200); // invite failed (500) but license was issued
+
+    const rows = await sql`SELECT * FROM licenses`;
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.status).toBe("active");
   });
 
   test("unpaid session is acknowledged but creates no license", async () => {

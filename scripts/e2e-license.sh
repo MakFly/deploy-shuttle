@@ -63,9 +63,11 @@ for _ in $(seq 1 30); do
 done
 curl -sf "http://localhost:${LS_PORT}/healthz" >/dev/null || fail "license-server did not come up (see $WORK/license-server.log)"
 
-# 5. Purchase.
-step "purchase as ${EMAIL}"
-curl -sf -X POST "http://localhost:${MOCK_PORT}/pay" -d "email=${EMAIL}" -o /dev/null || fail "mock purchase rejected"
+# 5. Purchase (with the optional GitHub community perk field).
+GH_USER="e2e-octocat"
+step "purchase as ${EMAIL} (github: ${GH_USER})"
+curl -sf -X POST "http://localhost:${MOCK_PORT}/pay" \
+  -d "email=${EMAIL}" -d "github_username=${GH_USER}" -o /dev/null || fail "mock purchase rejected"
 
 # 6. License key from the Mailpit email (proves the email leg).
 step "license key from Mailpit"
@@ -80,6 +82,12 @@ KEY=$(curl -sf "http://localhost:8025/api/v1/message/${MSG_ID}" \
   | jq -r .Text | grep -oE 'DS-[A-Z0-9]{6}-[A-Z0-9]{6}-[A-Z0-9]{6}' | head -1)
 [ -n "$KEY" ] || fail "no DS-… key found in the email body"
 echo "   key: $KEY"
+
+# 6b. GitHub perk: username stored, invite attempted (dev no-op logged).
+STORED_GH=$(docker exec infra-postgres psql -U test -d "$DB" -tAc \
+  "SELECT github_username FROM licenses WHERE key='${KEY}';" | tr -d '[:space:]')
+[ "$STORED_GH" = "$GH_USER" ] || fail "github_username not stored (got '${STORED_GH}')"
+grep -q "would invite ${GH_USER}" "$WORK/license-server.log" || fail "github invite was never attempted"
 
 # 7. Gated CLI build (dev builds skip gates; ldflags arm them).
 step "build gated CLI"
@@ -112,6 +120,7 @@ curl -sf -X POST "http://localhost:${MOCK_PORT}/refund" -d "payment_intent=${PI}
 if "$BIN" license refresh >/dev/null 2>&1; then
   fail "license refresh succeeded AFTER refund (revocation broken)"
 fi
+grep -q "would remove ${GH_USER}" "$WORK/license-server.log" || fail "github removal was never attempted after refund"
 
 echo
 echo "E2E OK — key=${KEY}, email visible at http://localhost:8025 (to: ${EMAIL})"

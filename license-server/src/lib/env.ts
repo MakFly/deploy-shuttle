@@ -31,6 +31,13 @@ export const env = {
   // API instead of Resend. Must stay unset in production.
   mailpitUrl: optional("MAILPIT_URL"),
 
+  // GitHub Pro community perk (optional). When both are set, buyers who fill
+  // the "GitHub username" Payment Link custom field get invited to the
+  // private Pro repo; refunds remove them. No-op otherwise.
+  githubToken: optional("GITHUB_TOKEN"),
+  githubProRepo: optional("GITHUB_PRO_REPO"), // e.g. MakFly/deployshuttle-pro
+  githubApiUrl: optional("GITHUB_API_URL", "https://api.github.com"),
+
   // Token grace (offline window) and refresh lead.
   tokenGraceDays: Number(optional("TOKEN_GRACE_DAYS", "14")),
 };

@@ -12,7 +12,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DB=shuttle_license_stripetest
 LS_PORT=3999
 LOOKUP_KEY=shuttle_pro_test_199
-LINK_FILE="$ROOT/.shuttle/stripe-test-link"
+# v2: the link now carries the optional "GitHub username" custom field.
+LINK_FILE="$ROOT/.shuttle/stripe-test-link-v2"
 PAY_TIMEOUT=300   # seconds to wait for the human payment
 WORK="$(mktemp -d)"
 
@@ -54,7 +55,12 @@ PAY_URL=""
 [ -f "$LINK_FILE" ] && PAY_URL="$(cat "$LINK_FILE")"
 if [ -z "$PAY_URL" ]; then
   PAY_URL=$(stripe payment_links create \
-    -d "line_items[0][price]=${PRICE_ID}" -d "line_items[0][quantity]=1" | jq -r .url)
+    -d "line_items[0][price]=${PRICE_ID}" -d "line_items[0][quantity]=1" \
+    -d "custom_fields[0][key]=github_username" \
+    -d "custom_fields[0][type]=text" \
+    -d "custom_fields[0][optional]=true" \
+    -d "custom_fields[0][label][type]=custom" \
+    -d "custom_fields[0][label][custom]=GitHub username (community access)" | jq -r .url)
   [ -n "$PAY_URL" ] && [ "$PAY_URL" != "null" ] || fail "payment link creation failed"
   mkdir -p "$(dirname "$LINK_FILE")"
   printf '%s\n' "$PAY_URL" >"$LINK_FILE"
@@ -105,6 +111,13 @@ for _ in $(seq 1 $((PAY_TIMEOUT / 5))); do
 done
 [ -n "$KEY" ] || fail "no license appeared within ${PAY_TIMEOUT}s — was the payment completed?"
 echo "   key: $KEY"
+GH_STORED=$(docker exec infra-postgres psql -U test -d "$DB" -tAc \
+  "SELECT COALESCE(github_username,'') FROM licenses WHERE key='${KEY}';" | tr -d '[:space:]')
+if [ -n "$GH_STORED" ]; then
+  echo "   github: $GH_STORED (community perk)"
+  grep -q "would invite ${GH_STORED}" "$WORK/license-server.log" \
+    || fail "github username stored but invite never attempted"
+fi
 
 # 7. The key email must have reached Mailpit.
 step "license email in Mailpit"

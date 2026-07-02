@@ -24,6 +24,9 @@ export async function ensureSchema(): Promise<void> {
     );
   `;
   await sql`
+    ALTER TABLE licenses ADD COLUMN IF NOT EXISTS github_username TEXT;
+  `;
+  await sql`
     CREATE TABLE IF NOT EXISTS activations (
       id BIGSERIAL PRIMARY KEY,
       license_key TEXT NOT NULL REFERENCES licenses(key) ON DELETE CASCADE,
@@ -53,6 +56,7 @@ export type LicenseRow = {
   seats: number;
   expires_at: Date | null;
   created_at: Date;
+  github_username: string | null;
 };
 
 export async function findLicense(key: string): Promise<LicenseRow | null> {
@@ -129,18 +133,29 @@ export async function upsertLicense(row: {
   status: "active" | "canceled";
   seats: number;
   expiresAt: Date | null;
+  githubUsername?: string | null;
 }): Promise<void> {
   await sql`
-    INSERT INTO licenses (key, stripe_customer_id, stripe_payment_intent_id, tier, status, seats, expires_at)
-    VALUES (${row.key}, ${row.stripeCustomerId}, ${row.stripePaymentIntentId}, ${row.tier}, ${row.status}, ${row.seats}, ${row.expiresAt})
+    INSERT INTO licenses (key, stripe_customer_id, stripe_payment_intent_id, tier, status, seats, expires_at, github_username)
+    VALUES (${row.key}, ${row.stripeCustomerId}, ${row.stripePaymentIntentId}, ${row.tier}, ${row.status}, ${row.seats}, ${row.expiresAt}, ${row.githubUsername ?? null})
     ON CONFLICT (key) DO UPDATE SET
       stripe_customer_id = EXCLUDED.stripe_customer_id,
       stripe_payment_intent_id = EXCLUDED.stripe_payment_intent_id,
       tier = EXCLUDED.tier,
       status = EXCLUDED.status,
       seats = EXCLUDED.seats,
-      expires_at = EXCLUDED.expires_at
+      expires_at = EXCLUDED.expires_at,
+      github_username = EXCLUDED.github_username
   `;
+}
+
+export async function findLicenseByPaymentIntent(
+  paymentIntentId: string,
+): Promise<LicenseRow | null> {
+  const rows = await sql<LicenseRow[]>`
+    SELECT * FROM licenses WHERE stripe_payment_intent_id = ${paymentIntentId} LIMIT 1
+  `;
+  return rows[0] ?? null;
 }
 
 export async function setLicenseStatusByPaymentIntent(

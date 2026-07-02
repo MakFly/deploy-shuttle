@@ -46,7 +46,11 @@ async function sendEvent(event: Record<string, unknown>): Promise<Response> {
   });
 }
 
-function checkoutCompletedEvent(email: string, paymentIntent: string): Record<string, unknown> {
+function checkoutCompletedEvent(
+  email: string,
+  paymentIntent: string,
+  githubUsername: string,
+): Record<string, unknown> {
   return {
     id: `evt_mock_${rand()}`,
     object: "event",
@@ -65,6 +69,9 @@ function checkoutCompletedEvent(email: string, paymentIntent: string): Record<st
         customer_details: { email },
         amount_total: 19900,
         currency: "eur",
+        custom_fields: githubUsername
+          ? [{ key: "github_username", type: "text", optional: true, text: { value: githubUsername } }]
+          : [],
       },
     },
   };
@@ -113,6 +120,7 @@ function payPage(): string {
 <p>Fake Stripe Payment Link — DeployShuttle Pro, <strong>€199.00</strong> one-time.</p>
 <form class="pay" method="post" action="/pay">
   <input type="email" name="email" placeholder="you@example.com" required>
+  <input type="text" name="github_username" placeholder="GitHub username (optional, community access)">
   <button type="submit">Pay €199.00</button>
 </form>
 ${purchases.length ? `<table><tr><th>Email</th><th>payment_intent</th><th>At</th><th></th></tr>${rows}</table>` : ""}
@@ -132,8 +140,9 @@ const server = Bun.serve({
       const form = await req.formData();
       const email = String(form.get("email") ?? "").trim();
       if (!email) return new Response("missing email", { status: 400 });
+      const githubUsername = String(form.get("github_username") ?? "").trim();
       const paymentIntent = `pi_mock_${rand()}`;
-      const res = await sendEvent(checkoutCompletedEvent(email, paymentIntent));
+      const res = await sendEvent(checkoutCompletedEvent(email, paymentIntent, githubUsername));
       if (!res.ok) {
         const detail = await res.text().catch(() => "");
         return new Response(`webhook rejected (${res.status}): ${detail}`, { status: 502 });
