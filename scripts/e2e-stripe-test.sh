@@ -19,6 +19,8 @@ WORK="$(mktemp -d)"
 PIDS=()
 cleanup() {
   for pid in "${PIDS[@]:-}"; do kill "$pid" 2>/dev/null || true; done
+  # the stripe CLI forks a child that survives killing the parent
+  pkill -f "stripe listen --events" 2>/dev/null || true
   rm -rf "$WORK"
 }
 trap cleanup EXIT
