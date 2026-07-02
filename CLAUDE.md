@@ -127,7 +127,9 @@ tests, and docs exist.
 - **Secrets**: local secrets use a passphrase-protected envelope with Argon2id and XChaCha20-Poly1305 in `.shuttle/secrets.enc`; CI/non-interactive shells must set `SHUTTLE_SECRETS_PASSPHRASE`.
 - **Remote paths**: runtime helpers keep app state under `/opt/shuttle/<app>/`.
 - **Readiness checks**: add doctor checks in `go-cli/internal/readiness/` and keep scoring deterministic.
-- **Pro templates**: `init --pro` and `--with-*` flags generate multi-service compose (DB, Redis, workers). Gated by `license.Require("init --pro")`. Service blocks in `templates/compose_services.go`, assembly in `templates/compose_pro.go`.
+- **Pro templates**: `init --pro` runs an interactive onboarding wizard (DB engine, Redis, queue, scheduler, Mailpit, CI) in `internal/cli/init_pro_wizard.go`; explicit `--with-*` flags act as answers and skip their prompt, non-TTY/EOF stdin falls back to the full default set. Gated by `license.Require("init --pro")` before the questions. Service blocks in `templates/compose_services.go`, assembly in `templates/compose_pro.go`.
+- **Dev email**: the license-server delivers license emails to Mailpit when `MAILPIT_URL` is set (dev only — precedence over Resend, never set in prod).
+- **Monetization E2E**: `make e2e-license` runs the full purchase→email→activate→refund chain locally against `infra-postgres`/`infra-mailpit` using `stripe-mock/`; go-live steps live in `plans/11-go-live-checklist.md`.
 - **Pricing**: 199€ TTC one-time, single Pro tier. No Agency tier.
 - **Compatibility**: the old TS CLI was removed (git history only); if Go behavior is intentionally partial, document that clearly in `README.md` or `plans/08-execution-tracker.md`.
 
@@ -144,12 +146,13 @@ tests, and docs exist.
 - `go-cli/internal/` — internal CLI, config, readiness, SSH, templates, runtime, secrets, license packages
 - `docs-site/` — Astro landing + docs + pricing site (Bun)
 - `license-server/` — Stripe one-time checkout webhook + license issuer (Bun/Hono, Fly.io)
+- `stripe-mock/` — dev-only fake Stripe (checkout page + HMAC-signed webhooks); never deployed
 - `report-pdf/` — React PDF renderer for `report --format pdf`
 - `marketing/` — launch post drafts
 - `docs/` — check catalog reference
 - `scripts/` — release/build tooling
 - `plans/` — product pivot plans and PRD split into Markdown parts
 - `.shuttle/` — local Shuttle workspace/state placeholder
-- `Makefile` — dev shortcuts (docs site, tests, build)
+- `Makefile` — dev shortcuts (docs site, tests, build, stripe-mock, e2e-license)
 
 When this layout changes, update this section immediately and rebuild the `ig` index.

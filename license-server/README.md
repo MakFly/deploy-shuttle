@@ -136,4 +136,19 @@ bun test
 ```
 
 Covers Ed25519 sign/verify round trip, signature tampering rejection, and
-license key format/uniqueness.
+license key format/uniqueness. Webhook integration tests run against a real
+Postgres when `TEST_DATABASE_URL` is set (skipped otherwise):
+
+```bash
+TEST_DATABASE_URL=postgres://test:test@localhost:5432/shuttle_license_test bun test
+```
+
+## Local dev (mock Stripe + Mailpit)
+
+No Stripe account needed: `stripe-mock/` (repo root) serves a fake Payment
+Link page and sends HMAC-signed webhooks with a shared `STRIPE_WEBHOOK_SECRET`.
+Set `MAILPIT_URL=http://localhost:8025` to deliver license emails to the dev
+Mailpit (UI on :8025) instead of Resend — dev only, never in production.
+
+The full chain (purchase → email → CLI activation → refund revocation) runs
+with `make e2e-license` from the repo root.

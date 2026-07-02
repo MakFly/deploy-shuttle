@@ -1022,3 +1022,44 @@ subscriptions to a one-time Payment Link flow.
   docs-site build time.
 - Deploy docs-site on the production domain (client.go defaults to
   `https://license.deployshuttle.io` — the domain must be owned).
+
+## Current Slice - Monetization Chain E2E (mocked Stripe, iso Spin Pro)
+
+Date: 2026-07-02. Goal: make the whole purchase→activation→revocation funnel
+testable locally without a Stripe account, and close the remaining Spin-Pro
+UX gaps (interactive Pro onboarding, post-purchase page).
+
+- `license-server`: dev license emails can be delivered to Mailpit via its
+  HTTP send API (`MAILPIT_URL`, dev only — precedence over Resend); webhook
+  integration tests against a real throwaway Postgres
+  (`TEST_DATABASE_URL=… bun test`, skipped otherwise).
+- `stripe-mock/` (new top-level, dev-only, never deployed): fake Payment
+  Link page + HMAC-signed `checkout.session.completed` / `charge.refunded`
+  webhooks. The license-server code is unchanged — the mock shares
+  `STRIPE_WEBHOOK_SECRET` and signs with Stripe's real scheme.
+- `docs-site`: `/thank-you` + `/fr/thank-you` post-purchase page (noindex);
+  Stripe Payment Link confirmation will redirect there.
+- `go-cli`: `init --pro` is now an interactive onboarding wizard (DB engine,
+  Redis, queue, scheduler, Mailpit, CI). Explicit `--with-*` flags act as
+  answers; non-TTY/EOF stdin falls back to the historical auto-enable set,
+  so scripted usage is byte-identical. License gate runs before questions.
+- `scripts/e2e-license.sh` (`make e2e-license`): full A→Z run against
+  infra-postgres/infra-mailpit — purchase → key extracted from the Mailpit
+  email → gated CLI build (ldflags pubkey) → gate closed/open assertions →
+  refund → revoked refresh. Re-runnable; isolated ports (:3999/:4299),
+  throwaway DB, temp `SHUTTLE_HOME`.
+- `plans/11-go-live-checklist.md`: production mirror of the mocked chain
+  (Stripe live, Neon, Fly.io, Resend, GH secrets, DNS, live smoke test).
+  Documented, not executed.
+
+### Completion Checklist
+
+- [x] `make test` green (go + license-server, webhook tests skip without pg).
+- [x] Webhook integration tests pass against Postgres (10 pass).
+- [x] `make e2e-license` passes twice in a row (idempotent).
+- [x] `init --pro` wizard covered by tests (answers, EOF defaults, explicit flags).
+
+### Pending (operational, user-side)
+
+- Everything in `plans/11-go-live-checklist.md` (Stripe live, Neon, Fly,
+  Resend, GH secrets, DNS, live smoke test).

@@ -58,6 +58,10 @@ Checkout flow: Stripe Payment Link → license-server webhook
 emailed → `shuttle license activate <key>`. A `charge.refunded` webhook
 revokes the license.
 
+The full chain is testable locally without a Stripe account (`make
+e2e-license`, `stripe-mock/`); the production go-live steps live in
+`plans/11-go-live-checklist.md`.
+
 Earlier hypotheses (19 EUR one-shot report; Solo 9 / Pro 29 / Agency 79
 monthly) are superseded. The cloud tiers in section 1 remain future,
 post-traction options and must not appear on the pricing page.
