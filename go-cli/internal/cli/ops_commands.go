@@ -95,7 +95,7 @@ func newProvisionCommand() *cobra.Command {
 				}
 				for _, host := range group.Hosts {
 					fmt.Printf("Provisioning %s@%s (group: %s)\n", user, host, name)
-					provisionGroup := config.ServerGroup{Hosts: group.Hosts, User: "root", Port: group.Port}
+					provisionGroup := config.ServerGroup{Hosts: group.Hosts, User: "root", Port: group.Port, VPN: group.VPN}
 					client, err := connectSSH(provisionGroup, host)
 					if err != nil {
 						return err

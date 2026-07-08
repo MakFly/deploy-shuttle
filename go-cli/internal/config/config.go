@@ -32,12 +32,21 @@ type ServerShorthand struct {
 	Host string `yaml:"host" json:"host"`
 	User string `yaml:"user" json:"user"`
 	Port int    `yaml:"port,omitempty" json:"port,omitempty"`
+	VPN  VPN    `yaml:"vpn,omitempty" json:"vpn,omitempty"`
 }
 
 type ServerGroup struct {
 	Hosts []string `yaml:"hosts" json:"hosts"`
 	User  string   `yaml:"user" json:"user"`
 	Port  int      `yaml:"port,omitempty" json:"port,omitempty"`
+	VPN   VPN      `yaml:"vpn,omitempty" json:"vpn,omitempty"`
+}
+
+type VPN struct {
+	Required  bool   `yaml:"required,omitempty" json:"required,omitempty"`
+	Interface string `yaml:"interface,omitempty" json:"interface,omitempty"`
+	CheckHost string `yaml:"check_host,omitempty" json:"check_host,omitempty"`
+	CheckPort int    `yaml:"check_port,omitempty" json:"check_port,omitempty"`
 }
 
 type Build struct {
@@ -220,14 +229,17 @@ func loadFile(path string) (*Config, error) {
 func applyDefaults(cfg *Config) {
 	if cfg.Server != nil && len(cfg.Servers) == 0 {
 		cfg.Servers = map[string]ServerGroup{
-			"default": {Hosts: []string{cfg.Server.Host}, User: cfg.Server.User, Port: cfg.Server.Port},
+			"default": {Hosts: []string{cfg.Server.Host}, User: cfg.Server.User, Port: cfg.Server.Port, VPN: cfg.Server.VPN},
 		}
 	}
 	for name, group := range cfg.Servers {
 		if group.Port == 0 {
 			group.Port = 22
-			cfg.Servers[name] = group
 		}
+		if group.VPN.Required && group.VPN.CheckPort == 0 {
+			group.VPN.CheckPort = group.Port
+		}
+		cfg.Servers[name] = group
 	}
 	if cfg.Build.Dockerfile == "" {
 		cfg.Build.Dockerfile = "Dockerfile"

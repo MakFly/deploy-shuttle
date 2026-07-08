@@ -79,3 +79,20 @@ func TestDeployShuttleYMLUnknownPresetReturnsEmpty(t *testing.T) {
 		t.Fatal("unknown preset should return empty string")
 	}
 }
+
+func TestShuttleYMLIncludesWireGuardTemplate(t *testing.T) {
+	body := ShuttleYML("myapp", "myapp.example.com", "10.8.0.12", "deploy", 7022)
+	if !strings.Contains(body, "# vpn:") {
+		t.Fatal("shuttle.yml template should include a commented vpn block")
+	}
+	if !strings.Contains(body, "#   check_host: 10.8.0.12") {
+		t.Fatal("vpn template should use the configured host as check_host")
+	}
+	if !strings.Contains(body, "#   check_port: 7022") {
+		t.Fatal("vpn template should use the configured SSH port as check_port")
+	}
+	var parsed map[string]any
+	if err := yaml.Unmarshal([]byte(body), &parsed); err != nil {
+		t.Fatalf("shuttle.yml template did not parse: %v", err)
+	}
+}

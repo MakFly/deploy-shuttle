@@ -25,6 +25,9 @@ func newSSHCommand() *cobra.Command {
 					continue
 				}
 				for _, host := range group.Hosts {
+					if err := ensureVPNReachable(group, host); err != nil {
+						return err
+					}
 					target := host
 					if group.User != "" {
 						target = fmt.Sprintf("%s@%s", group.User, host)

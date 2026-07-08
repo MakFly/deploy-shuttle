@@ -156,6 +156,12 @@ server:
   host: %s
   user: %s
   port: %d
+  # Uncomment when SSH is only reachable through WireGuard.
+  # vpn:
+  #   required: true
+  #   interface: wg0
+  #   check_host: %s
+  #   check_port: %d
 
 deploy:
   strategy: swarm
@@ -163,7 +169,7 @@ deploy:
 services:
   web:
     port: 3000
-`, app, domain, host, user, port)
+`, app, domain, host, user, port, host, port)
 }
 
 func Caddyfile(cfg *config.Config, upstream string) string {
