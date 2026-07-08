@@ -59,6 +59,7 @@ type Build struct {
 
 type Deploy struct {
 	Strategy     string   `yaml:"strategy,omitempty" json:"strategy"`
+	Path         string   `yaml:"path,omitempty" json:"path,omitempty"`
 	Timeout      int      `yaml:"timeout,omitempty" json:"timeout"`
 	Retain       int      `yaml:"retain,omitempty" json:"retain"`
 	AutoRollback bool     `yaml:"auto_rollback,omitempty" json:"auto_rollback"`
@@ -153,6 +154,7 @@ type Notifications struct {
 type Caddy struct {
 	ConfDir       string            `yaml:"conf_dir,omitempty" json:"conf_dir,omitempty"`
 	ReloadCommand string            `yaml:"reload_command,omitempty" json:"reload_command,omitempty"`
+	Network       string            `yaml:"network,omitempty" json:"network,omitempty"`
 	TLSSnippet    string            `yaml:"tls_snippet,omitempty" json:"tls_snippet,omitempty"`
 	Routes        map[string]string `yaml:"routes,omitempty" json:"routes,omitempty"`
 	Email         string            `yaml:"email,omitempty" json:"email,omitempty"`
@@ -290,6 +292,9 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Caddy.ReloadCommand == "" {
 		cfg.Caddy.ReloadCommand = "docker service update --force caddy_caddy"
+	}
+	if cfg.Caddy.Network == "" {
+		cfg.Caddy.Network = "caddy_network"
 	}
 	if cfg.Dev.Ports.HTTP == 0 {
 		cfg.Dev.Ports.HTTP = 80

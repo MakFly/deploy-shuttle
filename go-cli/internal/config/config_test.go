@@ -91,3 +91,31 @@ servers:
 		t.Fatalf("expected explicit check port 2222, got %d", vpn.CheckPort)
 	}
 }
+
+func TestLoadDeployPathAndCaddyNetwork(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "shuttle.yml")
+	body := `app: myapp
+domain: myapp.example.com
+server:
+  host: 203.0.113.10
+  user: root
+deploy:
+  path: /opt/deploy/myapp
+caddy:
+  network: edge
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Deploy.Path != "/opt/deploy/myapp" {
+		t.Fatalf("expected deploy path override, got %q", cfg.Deploy.Path)
+	}
+	if cfg.Caddy.Network != "edge" {
+		t.Fatalf("expected caddy network edge, got %q", cfg.Caddy.Network)
+	}
+}

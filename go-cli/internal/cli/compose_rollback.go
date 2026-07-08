@@ -34,7 +34,7 @@ func rollbackCompose(cfg *config.Config, dryRun bool) error {
 }
 
 func rollbackComposeHost(cfg *config.Config, client *ssh.Client, host string, dryRun bool) error {
-	statePath := runtime.StatePath(cfg.App)
+	statePath := runtime.StatePath(cfg.App, cfg.Deploy.Path)
 	res := client.Run(fmt.Sprintf("cat %s 2>/dev/null", shell.Escape(statePath)))
 	if res.Code != 0 || strings.TrimSpace(res.Stdout) == "" {
 		return fmt.Errorf("no state.json found — nothing to rollback to")
@@ -52,7 +52,7 @@ func rollbackComposeHost(cfg *config.Config, client *ssh.Client, host string, dr
 	fmt.Printf("Current: %s (deployed %s)\n", state.Version, state.DeployedAt)
 	fmt.Printf("Rolling back to: %s (deployed %s)\n", state.Previous.Version, state.Previous.DeployedAt)
 
-	remoteDir := runtime.AppDir(cfg.App)
+	remoteDir := runtime.AppDir(cfg.App, cfg.Deploy.Path)
 
 	if dryRun {
 		fmt.Printf("[dry-run] Would run: cd %s && docker compose down && docker compose up -d\n", remoteDir)

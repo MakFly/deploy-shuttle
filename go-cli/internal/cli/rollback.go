@@ -41,8 +41,8 @@ func rollbackDeploy(cfg *config.Config, dryRun bool) error {
 }
 
 func rollbackHost(cfg *config.Config, client *ssh.Client, host string, dryRun bool) error {
-	appDir := runtime.AppDir(cfg.App)
-	statePath := runtime.StatePath(cfg.App)
+	appDir := runtime.AppDir(cfg.App, cfg.Deploy.Path)
+	statePath := runtime.StatePath(cfg.App, cfg.Deploy.Path)
 
 	// Step 1: Read state.json
 	fmt.Printf("→ Reading deployment state from %s...\n", host)

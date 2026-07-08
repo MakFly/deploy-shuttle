@@ -177,7 +177,7 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 		return err
 	}
 
-	appDir := runtime.AppDir(cfg.App)
+	appDir := runtime.AppDir(cfg.App, cfg.Deploy.Path)
 	fmt.Println()
 	output.Step("Deploying (swarm) to %s@%s:%d (%s)...", group.User, host, group.Port, appDir)
 
@@ -298,7 +298,7 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 	}
 
 	// Read current state to preserve previous info
-	currentState := readRemoteSwarmState(client, cfg.App)
+	currentState := readRemoteSwarmState(client, cfg)
 
 	// Save state.json
 	newState := swarmState{
@@ -319,7 +319,7 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 		return fmt.Errorf("marshal state: %w", err)
 	}
 
-	statePath := runtime.StatePath(cfg.App)
+	statePath := runtime.StatePath(cfg.App, cfg.Deploy.Path)
 	output.Step("Saving state to %s...", statePath)
 	res = client.UploadContent(string(stateJSON)+"\n", statePath, 0o644)
 	if res.Code != 0 {
@@ -405,8 +405,8 @@ func waitForSwarmConvergence(client *ssh.Client, stack string, timeoutSec int) e
 	}
 }
 
-func readRemoteSwarmState(client *ssh.Client, app string) swarmState {
-	statePath := runtime.StatePath(app)
+func readRemoteSwarmState(client *ssh.Client, cfg *config.Config) swarmState {
+	statePath := runtime.StatePath(cfg.App, cfg.Deploy.Path)
 	res := client.Run(fmt.Sprintf("cat %s 2>/dev/null", shell.Escape(statePath)))
 	if res.Code != 0 || strings.TrimSpace(res.Stdout) == "" {
 		return swarmState{}
@@ -432,11 +432,12 @@ func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices [
 		replicas = 1
 	}
 
+	caddyNetwork := cfg.Caddy.Network
 	stack := &swarmStackFile{
 		Version:  "3.8",
 		Services: map[string]swarmStackSvc{},
 		Networks: map[string]any{
-			"caddy_network": map[string]any{
+			caddyNetwork: map[string]any{
 				"external": true,
 			},
 			"default": map[string]any{
@@ -461,7 +462,7 @@ func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices [
 			Expose:      svc.Expose,
 			Command:     svc.Command,
 			Healthcheck: svc.Healthcheck,
-			Networks:    []string{"caddy_network", "default"},
+			Networks:    []string{caddyNetwork, "default"},
 			EnvFile:     []string{".env", ".env.secrets"},
 		}
 

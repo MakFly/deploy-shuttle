@@ -139,7 +139,7 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 		return err
 	}
 
-	remoteDir := runtime.AppDir(cfg.App)
+	remoteDir := runtime.AppDir(cfg.App, cfg.Deploy.Path)
 	fmt.Println()
 	output.Step("Deploying to %s@%s:%d (%s)...", group.User, host, group.Port, remoteDir)
 
@@ -235,7 +235,7 @@ func deployComposeToHost(cfg *config.Config, group config.ServerGroup, host stri
 
 	// Save state
 	version := detectVersion()
-	statePath := runtime.StatePath(cfg.App)
+	statePath := runtime.StatePath(cfg.App, cfg.Deploy.Path)
 	oldStateRes := client.Run(fmt.Sprintf("cat %s 2>/dev/null", shell.Escape(statePath)))
 	newState := composeState{
 		Version:    version,
@@ -304,6 +304,9 @@ func buildServiceImage(cf *composeFile, serviceName string, imageTag string, dry
 			dockerfile = v
 		} else {
 			dockerfile = "Dockerfile"
+		}
+		if v, ok := b["target"].(string); ok && v != "" {
+			buildArgs = append(buildArgs, "--target", v)
 		}
 		if args, ok := b["args"]; ok {
 			switch a := args.(type) {
@@ -457,13 +460,14 @@ func generateProdCompose(cf *composeFile, cfg *config.Config, buildServices []st
 		buildSet[s] = true
 	}
 
+	caddyNetwork := cfg.Caddy.Network
 	prod := &composeFile{
 		Services: map[string]composeService{},
 		Volumes:  map[string]any{},
 		Networks: map[string]any{
-			"caddy_network": map[string]any{
+			caddyNetwork: map[string]any{
 				"external": true,
-				"name":     "caddy_network",
+				"name":     caddyNetwork,
 			},
 		},
 	}
@@ -484,7 +488,7 @@ func generateProdCompose(cf *composeFile, cfg *config.Config, buildServices []st
 			Restart:     svc.Restart,
 			Command:     svc.Command,
 			Healthcheck: svc.Healthcheck,
-			Networks:    []string{"caddy_network"},
+			Networks:    []string{caddyNetwork},
 			EnvFile:     []string{".env", ".env.secrets"},
 		}
 

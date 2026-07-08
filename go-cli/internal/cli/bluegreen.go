@@ -173,7 +173,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 		return err
 	}
 
-	appDir := runtime.AppDir(cfg.App)
+	appDir := runtime.AppDir(cfg.App, cfg.Deploy.Path)
 	fmt.Println()
 	output.Step("Deploying (blue-green) to %s@%s:%d (%s)...", group.User, host, group.Port, appDir)
 
@@ -212,7 +212,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	}
 
 	// Read current state to determine active slot
-	currentState := readRemoteState(client, cfg.App)
+	currentState := readRemoteState(client, cfg)
 	activeSlot := currentState.Active
 	if activeSlot == "" {
 		activeSlot = "green" // no previous deploy, so "green" is current => deploy to "blue"
@@ -222,7 +222,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 	output.Step("Current active slot: %s, deploying to: %s", activeSlot, targetSlot)
 
 	// Create slot directory
-	slotDir := runtime.BlueGreenDir(cfg.App, targetSlot)
+	slotDir := runtime.BlueGreenDir(cfg.App, targetSlot, cfg.Deploy.Path)
 	res = client.Run(fmt.Sprintf("mkdir -p %s", shell.Escape(slotDir)))
 	if res.Code != 0 {
 		return fmt.Errorf("mkdir slot dir on %s: %s", host, res.Stderr)
@@ -341,7 +341,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 		output.Step("Draining old slot (%s) for %ds...", activeSlot, drainTimeout)
 		time.Sleep(time.Duration(drainTimeout) * time.Second)
 
-		oldSlotDir := runtime.BlueGreenDir(cfg.App, activeSlot)
+		oldSlotDir := runtime.BlueGreenDir(cfg.App, activeSlot, cfg.Deploy.Path)
 		oldProjectName := fmt.Sprintf("%s-%s", cfg.App, activeSlot)
 		output.Step("Stopping old slot (%s)...", activeSlot)
 		stopCmd := fmt.Sprintf("cd %s && docker compose -p %s down",
@@ -371,7 +371,7 @@ func deployBlueGreenToHost(cfg *config.Config, group config.ServerGroup, host st
 		return fmt.Errorf("marshal state: %w", err)
 	}
 
-	statePath := runtime.StatePath(cfg.App)
+	statePath := runtime.StatePath(cfg.App, cfg.Deploy.Path)
 	output.Step("Saving state to %s...", statePath)
 	res = client.UploadContent(string(stateJSON)+"\n", statePath, 0o644)
 	if res.Code != 0 {
@@ -392,8 +392,8 @@ func oppositeSlot(slot string) string {
 	return "blue"
 }
 
-func readRemoteState(client *ssh.Client, app string) blueGreenState {
-	statePath := runtime.StatePath(app)
+func readRemoteState(client *ssh.Client, cfg *config.Config) blueGreenState {
+	statePath := runtime.StatePath(cfg.App, cfg.Deploy.Path)
 	res := client.Run(fmt.Sprintf("cat %s 2>/dev/null", shell.Escape(statePath)))
 	if res.Code != 0 || strings.TrimSpace(res.Stdout) == "" {
 		return blueGreenState{}
@@ -459,6 +459,7 @@ func generateBlueGreenCompose(cf *composeFile, cfg *config.Config, buildServices
 		buildSet[s] = true
 	}
 
+	caddyNetwork := cfg.Caddy.Network
 	prod := &composeFile{
 		Services: map[string]composeService{},
 		Volumes:  map[string]any{},
@@ -466,9 +467,9 @@ func generateBlueGreenCompose(cf *composeFile, cfg *config.Config, buildServices
 			"default": map[string]any{
 				"name": fmt.Sprintf("%s-%s-net", cfg.App, slot),
 			},
-			"caddy_network": map[string]any{
+			caddyNetwork: map[string]any{
 				"external": true,
-				"name":     "caddy_network",
+				"name":     caddyNetwork,
 			},
 		},
 	}
@@ -491,7 +492,7 @@ func generateBlueGreenCompose(cf *composeFile, cfg *config.Config, buildServices
 			Restart:       svc.Restart,
 			Command:       svc.Command,
 			Healthcheck:   svc.Healthcheck,
-			Networks:      []string{"default", "caddy_network"},
+			Networks:      []string{"default", caddyNetwork},
 			EnvFile:       []string{"../.env", "../.env.secrets"},
 		}
 

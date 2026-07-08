@@ -183,7 +183,7 @@ func newProvisionCommand() *cobra.Command {
 					deployUserCommands := []string{
 						fmt.Sprintf("id -u %s >/dev/null 2>&1 || useradd -m -s /bin/bash %s", shell.Escape(user), shell.Escape(user)),
 						fmt.Sprintf("usermod -aG docker %s", shell.Escape(user)),
-						fmt.Sprintf("mkdir -p %s && chown -R %s:%s %s", shell.Escape(runtime.AppDir(cfg.App)), shell.Escape(user), shell.Escape(user), shell.Escape(runtime.AppDir(cfg.App))),
+						fmt.Sprintf("mkdir -p %s && chown -R %s:%s %s", shell.Escape(runtime.AppDir(cfg.App, cfg.Deploy.Path)), shell.Escape(user), shell.Escape(user), shell.Escape(runtime.AppDir(cfg.App, cfg.Deploy.Path))),
 					}
 					for _, command := range deployUserCommands {
 						res = client.Run(command)
@@ -268,7 +268,7 @@ func newStatusCommand() *cobra.Command {
 						return err
 					}
 					if cfg.Deploy.Strategy == "compose" {
-						remoteDir := runtime.AppDir(cfg.App)
+						remoteDir := runtime.AppDir(cfg.App, cfg.Deploy.Path)
 						res := client.Run(fmt.Sprintf("cd %s && docker compose ps", shell.Escape(remoteDir)))
 						fmt.Printf("%s\n%s\n", host, res.Stdout)
 					} else {
@@ -306,7 +306,7 @@ func newLogsCommand() *cobra.Command {
 						return err
 					}
 					if cfg.Deploy.Strategy == "compose" {
-						remoteDir := runtime.AppDir(cfg.App)
+						remoteDir := runtime.AppDir(cfg.App, cfg.Deploy.Path)
 						res := client.Run(fmt.Sprintf("cd %s && docker compose logs --tail %d %s", shell.Escape(remoteDir), lines, shell.Escape(service)))
 						fmt.Print(res.Stdout)
 						if res.Stderr != "" {
@@ -356,7 +356,7 @@ func newExecCommand() *cobra.Command {
 						return err
 					}
 					if cfg.Deploy.Strategy == "compose" {
-						remoteDir := runtime.AppDir(cfg.App)
+						remoteDir := runtime.AppDir(cfg.App, cfg.Deploy.Path)
 						res := client.Run(fmt.Sprintf("cd %s && docker compose exec %s %s", shell.Escape(remoteDir), shell.Escape(service), remote))
 						fmt.Print(res.Stdout)
 						if res.Code != 0 {
@@ -434,7 +434,7 @@ func newDestroyCommand() *cobra.Command {
 					if err != nil {
 						return err
 					}
-					res := client.Run(fmt.Sprintf("rm -rf %s", shell.Escape(runtime.AppDir(cfg.App))))
+					res := client.Run(fmt.Sprintf("rm -rf %s", shell.Escape(runtime.AppDir(cfg.App, cfg.Deploy.Path))))
 					if res.Code != 0 {
 						return fmt.Errorf(res.Stderr)
 					}
@@ -469,12 +469,12 @@ func lockRun(flags configFlags, action string) error {
 				return err
 			}
 			if action == "release" {
-				res := client.Run(fmt.Sprintf("rm -rf %s", shell.Escape(runtime.LockDir(cfg.App))))
+				res := client.Run(fmt.Sprintf("rm -rf %s", shell.Escape(runtime.LockDir(cfg.App, cfg.Deploy.Path))))
 				if res.Code != 0 {
 					return fmt.Errorf(res.Stderr)
 				}
 			} else {
-				res := client.Run(fmt.Sprintf("test -d %s && echo locked || echo unlocked", shell.Escape(runtime.LockDir(cfg.App))))
+				res := client.Run(fmt.Sprintf("test -d %s && echo locked || echo unlocked", shell.Escape(runtime.LockDir(cfg.App, cfg.Deploy.Path))))
 				fmt.Printf("%s: %s", host, res.Stdout)
 			}
 		}

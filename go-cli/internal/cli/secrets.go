@@ -126,7 +126,7 @@ func newSecretsCommand() *cobra.Command {
 					if err != nil {
 						return err
 					}
-					remoteDir := runtime.AppDir(cfg.App)
+					remoteDir := runtime.AppDir(cfg.App, cfg.Deploy.Path)
 					mkdir := client.Run("mkdir -p " + shell.Escape(remoteDir))
 					if mkdir.Code != 0 {
 						return fmt.Errorf("failed to create remote secrets directory on %s: %s", host, mkdir.Stderr)

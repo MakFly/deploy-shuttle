@@ -30,7 +30,7 @@ func rollbackSwarm(cfg *config.Config, dryRun bool) error {
 }
 
 func rollbackSwarmHost(cfg *config.Config, client *ssh.Client, host string, dryRun bool) error {
-	statePath := runtime.StatePath(cfg.App)
+	statePath := runtime.StatePath(cfg.App, cfg.Deploy.Path)
 
 	// Step 1: Read state.json
 	fmt.Printf("-> Reading deployment state from %s...\n", host)
