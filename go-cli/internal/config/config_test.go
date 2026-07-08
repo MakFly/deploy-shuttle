@@ -119,3 +119,33 @@ caddy:
 		t.Fatalf("expected caddy network edge, got %q", cfg.Caddy.Network)
 	}
 }
+
+func TestLoadCaddyBasicAuth(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "shuttle.yml")
+	body := `app: myapp
+domain: myapp.example.com
+server:
+  host: 203.0.113.10
+  user: root
+caddy:
+  basic_auth:
+    users:
+      - username: audit
+        hash: $2a$14$abcdef
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Caddy.BasicAuth.Users) != 1 {
+		t.Fatalf("expected one basic auth user, got %d", len(cfg.Caddy.BasicAuth.Users))
+	}
+	user := cfg.Caddy.BasicAuth.Users[0]
+	if user.Username != "audit" || user.Hash != "$2a$14$abcdef" {
+		t.Fatalf("unexpected basic auth user: %#v", user)
+	}
+}

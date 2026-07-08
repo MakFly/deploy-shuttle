@@ -158,6 +158,16 @@ type Caddy struct {
 	TLSSnippet    string            `yaml:"tls_snippet,omitempty" json:"tls_snippet,omitempty"`
 	Routes        map[string]string `yaml:"routes,omitempty" json:"routes,omitempty"`
 	Email         string            `yaml:"email,omitempty" json:"email,omitempty"`
+	BasicAuth     CaddyBasicAuth    `yaml:"basic_auth,omitempty" json:"basic_auth,omitempty"`
+}
+
+type CaddyBasicAuth struct {
+	Users []CaddyBasicAuthUser `yaml:"users,omitempty" json:"users,omitempty"`
+}
+
+type CaddyBasicAuthUser struct {
+	Username string `yaml:"username" json:"username"`
+	Hash     string `yaml:"hash" json:"hash"`
 }
 
 type Dev struct {
@@ -316,6 +326,14 @@ func validate(cfg *Config) error {
 	}
 	if cfg.Deploy.Strategy != "blue-green" && cfg.Deploy.Strategy != "rolling" && cfg.Deploy.Strategy != "swarm" && cfg.Deploy.Strategy != "compose" {
 		return fmt.Errorf("invalid deploy strategy %q", cfg.Deploy.Strategy)
+	}
+	for i, user := range cfg.Caddy.BasicAuth.Users {
+		if user.Username == "" {
+			return fmt.Errorf("caddy.basic_auth.users[%d].username is required", i)
+		}
+		if user.Hash == "" {
+			return fmt.Errorf("caddy.basic_auth.users[%d].hash is required", i)
+		}
 	}
 	return nil
 }

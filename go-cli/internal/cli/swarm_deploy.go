@@ -594,13 +594,8 @@ func generateSwarmCaddyConf(cfg *config.Config) string {
 		if cfg.Caddy.TLSSnippet != "" {
 			fmt.Fprintf(&b, "    import %s\n\n", cfg.Caddy.TLSSnippet)
 		}
-		b.WriteString("    header {\n")
-		b.WriteString("        X-Content-Type-Options \"nosniff\"\n")
-		b.WriteString("        X-Frame-Options \"DENY\"\n")
-		b.WriteString("        Referrer-Policy \"strict-origin-when-cross-origin\"\n")
-		b.WriteString("        Strict-Transport-Security \"max-age=31536000; includeSubDomains\"\n")
-		b.WriteString("        -Server\n")
-		b.WriteString("    }\n\n")
+		writeCaddySecurityHeaders(&b)
+		writeCaddyBasicAuth(&b, cfg)
 		fmt.Fprintf(&b, "    reverse_proxy %s {\n", swarmUpstream)
 		b.WriteString("        header_up Host {host}\n")
 		b.WriteString("        header_up X-Real-IP {remote}\n")
