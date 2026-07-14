@@ -493,14 +493,17 @@ func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices [
 				},
 			}
 
-			// Add default healthcheck if none present and this is the web service
-			if svc.Healthcheck == nil && webPort != "" {
-				stackSvc.Healthcheck = map[string]any{
-					"test":         []string{"CMD", "php", "-r", fmt.Sprintf(`exit(false === @file_get_contents("http://127.0.0.1:%s/", context: stream_context_create(["http" => ["timeout" => 3]])) ? 1 : 0);`, webPort)},
-					"interval":     "10s",
-					"timeout":      "5s",
-					"start_period": "30s",
-					"retries":      3,
+			// Healthcheck precedence: an explicit compose healthcheck wins;
+			// otherwise a shuttle.yml services.<name>.healthcheck; otherwise a
+			// generic default for the web service only. The default probes the
+			// exposed port over HTTP via wget/curl (no PHP assumption), so
+			// non-PHP stacks and custom-named services are no longer forced onto
+			// a broken check.
+			if stackSvc.Healthcheck == nil {
+				if hc := healthcheckFromConfig(cfg.Services[name], webPort); hc != nil {
+					stackSvc.Healthcheck = hc
+				} else if name == "web" && webPort != "" {
+					stackSvc.Healthcheck = defaultWebHealthcheck(webPort)
 				}
 			}
 		} else {
@@ -661,4 +664,70 @@ func detectWebPort(parsed *composeFile, cfg *config.Config) string {
 	}
 
 	return "3000"
+}
+
+// healthcheckFromConfig builds a Swarm healthcheck from a shuttle.yml
+// services.<name>.healthcheck block. Returns nil when nothing is configured, so
+// callers can fall back to a default. Supported: an explicit shell `command`, an
+// `http` probe on `path` (using the service port or the detected web port), or
+// `type: none` to disable the check.
+func healthcheckFromConfig(svc config.Service, defaultPort string) map[string]any {
+	hc := svc.Healthcheck
+	if hc.Type == "" && hc.Command == "" && hc.Path == "" {
+		return nil
+	}
+
+	var test []string
+	switch {
+	case strings.EqualFold(hc.Type, "none"):
+		return map[string]any{"test": []string{"NONE"}}
+	case hc.Command != "":
+		test = []string{"CMD-SHELL", hc.Command}
+	case hc.Path != "" || strings.EqualFold(hc.Type, "http"):
+		port := defaultPort
+		if svc.Port != 0 {
+			port = fmt.Sprintf("%d", svc.Port)
+		}
+		path := hc.Path
+		if path == "" {
+			path = "/"
+		}
+		test = []string{"CMD-SHELL", httpProbe(port, path)}
+	default:
+		return nil
+	}
+
+	out := map[string]any{"test": test, "start_period": "30s"}
+	if hc.Interval > 0 {
+		out["interval"] = fmt.Sprintf("%ds", hc.Interval)
+	}
+	if hc.Timeout > 0 {
+		out["timeout"] = fmt.Sprintf("%ds", hc.Timeout)
+	}
+	if hc.Retries > 0 {
+		out["retries"] = hc.Retries
+	}
+	return out
+}
+
+// defaultWebHealthcheck is the generic default for the `web` service: a plain
+// HTTP GET on the exposed port, trying wget then curl so it works on any base
+// image (no PHP assumption). Overridden by an explicit compose or shuttle.yml
+// healthcheck.
+func defaultWebHealthcheck(port string) map[string]any {
+	return map[string]any{
+		"test":         []string{"CMD-SHELL", httpProbe(port, "/")},
+		"interval":     "10s",
+		"timeout":      "5s",
+		"start_period": "30s",
+		"retries":      3,
+	}
+}
+
+// httpProbe returns a shell command that succeeds when an HTTP GET on the given
+// port/path returns, trying wget (busybox or GNU) then curl — the two clients
+// present on the vast majority of images.
+func httpProbe(port, path string) string {
+	url := fmt.Sprintf("http://127.0.0.1:%s%s", port, path)
+	return fmt.Sprintf("wget -q -O /dev/null %s 2>/dev/null || curl -fsS %s >/dev/null 2>&1", url, url)
 }
