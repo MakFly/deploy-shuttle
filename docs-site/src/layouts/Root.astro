@@ -26,6 +26,23 @@ const site = Astro.site ?? "https://deployshuttle.dev";
 const canonical = new URL(Astro.url.pathname, site).toString();
 const altEn = new URL(localizePath(Astro.url.pathname, "en"), site).toString();
 const altFr = new URL(localizePath(Astro.url.pathname, "fr"), site).toString();
+const hasFrenchAlternate = !Astro.url.pathname.replace(/^\/fr(?=\/|$)/, "").startsWith("/docs");
+const resolvedOgImage = new URL(ogImage ?? "/social-card.svg", site).toString();
+const structuredData = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "DeployShuttle",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Linux, macOS",
+  url: new URL(localizePath("/", locale), site).toString(),
+  description,
+  offers: {
+    "@type": "Offer",
+    price: "199",
+    priceCurrency: "EUR",
+    availability: "https://schema.org/InStock",
+  },
+}).replaceAll("<", "\\u003c");
 ---
 <html lang={locale} class="scroll-smooth">
   <head>
@@ -34,10 +51,12 @@ const altFr = new URL(localizePath(Astro.url.pathname, "fr"), site).toString();
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>{title}</title>
     <meta name="description" content={description} />
-    {noindex && <meta name="robots" content="noindex" />}
+    <meta name="robots" content={noindex ? "noindex, nofollow" : "index, follow"} />
+    <meta name="application-name" content="DeployShuttle" />
+    <meta name="author" content="DeployShuttle" />
     <link rel="canonical" href={canonical} />
     <link rel="alternate" hreflang="en" href={altEn} />
-    <link rel="alternate" hreflang="fr" href={altFr} />
+    {hasFrenchAlternate && <link rel="alternate" hreflang="fr" href={altFr} />}
     <link rel="alternate" hreflang="x-default" href={altEn} />
     <meta name="theme-color" media="(prefers-color-scheme: light)" content="#ffffff" />
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b0b0c" />
@@ -45,9 +64,15 @@ const altFr = new URL(localizePath(Astro.url.pathname, "fr"), site).toString();
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="DeployShuttle" />
     <meta property="og:locale" content={locale === "fr" ? "fr_FR" : "en_US"} />
-    {ogImage && <meta property="og:image" content={ogImage} />}
+    <meta property="og:image" content={resolvedOgImage} />
+    <meta property="og:image:alt" content={title} />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={resolvedOgImage} />
+    {!noindex && <script type="application/ld+json" set:html={structuredData} />}
     <script is:inline>
       // No-FOUC theme bootstrap. Default = light (Apple-like); respect
       // a saved preference.

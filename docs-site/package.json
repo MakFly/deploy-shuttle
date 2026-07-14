@@ -1,5 +1,6 @@
 {
   "name": "docs-site",
+  "description": "DeployShuttle marketing site and documentation for the VPS production-readiness CLI.",
   "type": "module",
   "version": "0.0.1",
   "private": true,

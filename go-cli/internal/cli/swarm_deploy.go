@@ -228,6 +228,27 @@ func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string
 			return fmt.Errorf("upload .env.secrets to %s: %s", host, res.Stderr)
 		}
 	}
+	for _, ref := range collectComposeEnvFiles(parsed) {
+		if ref == ".env" || ref == ".env.secrets" {
+			continue
+		}
+		if _, err := os.Stat(ref); err != nil {
+			continue
+		}
+		mode := os.FileMode(0o644)
+		if strings.Contains(ref, "secret") {
+			mode = 0o600
+		}
+		output.Step("Uploading %s...", ref)
+		content, err := os.ReadFile(ref)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", ref, err)
+		}
+		res = client.UploadContent(string(content), appDir+"/"+ref, mode)
+		if res.Code != 0 {
+			return fmt.Errorf("upload %s to %s: %s", ref, host, res.Stderr)
+		}
+	}
 
 	// Discover Docker Swarm secrets for this app
 	var swarmSecrets []string
@@ -463,7 +484,7 @@ func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices [
 			Command:     svc.Command,
 			Healthcheck: svc.Healthcheck,
 			Networks:    []string{caddyNetwork, "default"},
-			EnvFile:     []string{".env", ".env.secrets"},
+			EnvFile:     normalizeEnvFiles(svc.EnvFile),
 		}
 
 		if buildSet[name] {
@@ -580,6 +601,45 @@ func generateSwarmStackYAML(cf *composeFile, cfg *config.Config, buildServices [
 		cfg.App, time.Now().UTC().Format(time.RFC3339))
 
 	return header + string(out)
+}
+
+func collectComposeEnvFiles(cf *composeFile) []string {
+	seen := map[string]bool{}
+	var refs []string
+	for _, svc := range cf.Services {
+		for _, ref := range normalizeEnvFiles(svc.EnvFile) {
+			if ref == "" || seen[ref] {
+				continue
+			}
+			seen[ref] = true
+			refs = append(refs, ref)
+		}
+	}
+	return refs
+}
+
+func normalizeEnvFiles(value any) []string {
+	switch v := value.(type) {
+	case nil:
+		return nil
+	case string:
+		if strings.TrimSpace(v) == "" {
+			return nil
+		}
+		return []string{v}
+	case []string:
+		return v
+	case []any:
+		files := make([]string, 0, len(v))
+		for _, item := range v {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				files = append(files, s)
+			}
+		}
+		return files
+	default:
+		return nil
+	}
 }
 
 // generateSwarmCaddyConf generates a Caddy config for Swarm deployments.

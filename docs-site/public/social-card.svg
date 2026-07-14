@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title desc">
+  <title id="title">DeployShuttle</title>
+  <desc id="desc">VPS production-readiness CLI for Docker apps.</desc>
+  <rect width="1200" height="630" fill="#0b0b0c"/>
+  <rect x="72" y="72" width="1056" height="486" rx="28" fill="#111114" stroke="#2f3037"/>
+  <text x="112" y="170" fill="#8dd6ff" font-family="Inter, Arial, sans-serif" font-size="32" font-weight="700">DeployShuttle</text>
+  <text x="112" y="292" fill="#f7f7f5" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="800">Production-ready.</text>
+  <text x="112" y="382" fill="#b9b9b4" font-family="Inter, Arial, sans-serif" font-size="76" font-weight="800">Before you deploy.</text>
+  <text x="112" y="470" fill="#d6d6d3" font-family="Inter, Arial, sans-serif" font-size="30">Audit, harden and deploy Docker apps on VPS.</text>
+  <text x="112" y="520" fill="#7dd3fc" font-family="Inter, Arial, sans-serif" font-size="24">43 checks · deterministic score · CI-ready</text>
+</svg>
