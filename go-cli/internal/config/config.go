@@ -159,6 +159,14 @@ type Caddy struct {
 	Routes        map[string]string `yaml:"routes,omitempty" json:"routes,omitempty"`
 	Email         string            `yaml:"email,omitempty" json:"email,omitempty"`
 	BasicAuth     CaddyBasicAuth    `yaml:"basic_auth,omitempty" json:"basic_auth,omitempty"`
+	// IPAllowlist, when non-empty, restricts the site to these clients (matched on
+	// the Cloudflare Cf-Connecting-Ip header) instead of basic auth. Entries are
+	// regex fragments (e.g. "203\\.0\\.113\\.4" or "2a01:cb0c:[0-9a-f:]+") joined
+	// into a single alternation. Takes precedence over BasicAuth when set.
+	IPAllowlist []string `yaml:"ip_allowlist,omitempty" json:"ip_allowlist,omitempty"`
+	// HealthPath, when set (e.g. "/healthz"), is left open (no auth / no IP filter)
+	// so external monitors can probe it. Applies only in IPAllowlist mode.
+	HealthPath string `yaml:"health_path,omitempty" json:"health_path,omitempty"`
 }
 
 type CaddyBasicAuth struct {

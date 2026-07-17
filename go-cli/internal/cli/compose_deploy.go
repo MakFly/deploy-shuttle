@@ -597,11 +597,7 @@ func generateCaddyConf(cfg *config.Config) string {
 		}
 		fmt.Fprintf(&b, "    import %s\n\n", tlsSnippet)
 		writeCaddySecurityHeaders(&b)
-		writeCaddyBasicAuth(&b, cfg)
-		fmt.Fprintf(&b, "    reverse_proxy %s {\n", upstream)
-		b.WriteString("        header_up Host {host}\n")
-		b.WriteString("        header_up X-Real-IP {remote}\n")
-		b.WriteString("    }\n")
+		writeCaddyAccess(&b, cfg, upstream)
 		b.WriteString("}\n\n")
 	}
 

@@ -658,11 +658,7 @@ func generateSwarmCaddyConf(cfg *config.Config) string {
 			fmt.Fprintf(&b, "    import %s\n\n", cfg.Caddy.TLSSnippet)
 		}
 		writeCaddySecurityHeaders(&b)
-		writeCaddyBasicAuth(&b, cfg)
-		fmt.Fprintf(&b, "    reverse_proxy %s {\n", swarmUpstream)
-		b.WriteString("        header_up Host {host}\n")
-		b.WriteString("        header_up X-Real-IP {remote}\n")
-		b.WriteString("    }\n")
+		writeCaddyAccess(&b, cfg, swarmUpstream)
 		b.WriteString("}\n\n")
 	}
 

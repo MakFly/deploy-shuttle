@@ -210,11 +210,7 @@ func generateCaddyConfForSlot(cfg *config.Config, slot string) string {
 		}
 		fmt.Fprintf(&b, "    import %s\n\n", tlsSnippet)
 		writeCaddySecurityHeaders(&b)
-		writeCaddyBasicAuth(&b, cfg)
-		fmt.Fprintf(&b, "    reverse_proxy %s {\n", slotUpstream)
-		b.WriteString("        header_up Host {host}\n")
-		b.WriteString("        header_up X-Real-IP {remote}\n")
-		b.WriteString("    }\n")
+		writeCaddyAccess(&b, cfg, slotUpstream)
 		b.WriteString("}\n\n")
 	}
 
