@@ -120,6 +120,41 @@ caddy:
 	}
 }
 
+func TestLoadDeploymentSLOConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "shuttle.yml")
+	body := `app: myapp
+domain: myapp.example.com
+server:
+  host: 203.0.113.10
+  user: root
+deploy:
+  promotion_slo_seconds: 30
+  total_slo_seconds: 45
+  availability_url: https://myapp.example.com/health
+  availability_interval_ms: 200
+`
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Deploy.PromotionSLOSeconds != 30 {
+		t.Fatalf("expected 30 second promotion SLO, got %d", cfg.Deploy.PromotionSLOSeconds)
+	}
+	if cfg.Deploy.TotalSLOSeconds != 45 {
+		t.Fatalf("expected 45 second total SLO, got %d", cfg.Deploy.TotalSLOSeconds)
+	}
+	if cfg.Deploy.AvailabilityURL != "https://myapp.example.com/health" {
+		t.Fatalf("unexpected availability URL: %q", cfg.Deploy.AvailabilityURL)
+	}
+	if cfg.Deploy.AvailabilityIntervalMS != 200 {
+		t.Fatalf("expected 200ms interval, got %d", cfg.Deploy.AvailabilityIntervalMS)
+	}
+}
+
 func TestLoadCaddyBasicAuth(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "shuttle.yml")

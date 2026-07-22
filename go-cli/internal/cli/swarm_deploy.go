@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/MakFly/deploy-shuttle/go-cli/internal/config"
@@ -75,6 +76,7 @@ type swarmRestart struct {
 }
 
 func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
+	totalStartedAt := time.Now()
 	// Load .env for build-arg expansion
 	envFile := cfg.Deploy.EnvFile
 	if envFile == "" {
@@ -108,13 +110,8 @@ func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
 
 	// Step 1: Build images locally
 	if !skipBuild {
-		for _, svc := range buildServices {
-			imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, svc)
-			fmt.Println()
-			output.Step("Building %s...", svc)
-			if err := buildServiceImage(parsed, svc, imageTag, dryRun); err != nil {
-				return fmt.Errorf("build %s: %w", svc, err)
-			}
+		if err := buildSwarmServiceImages(parsed, buildServices, registryAddr, cfg.App, dryRun); err != nil {
+			return err
 		}
 	}
 
@@ -139,23 +136,51 @@ func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
 	if err := startRegistry(); err != nil {
 		return fmt.Errorf("start registry: %w", err)
 	}
-	defer stopRegistry(cfg.Deploy.PruneBuildCache != "off")
-
-	// Step 3: Push images to local registry
-	for _, svc := range buildServices {
-		imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, cfg.App, svc)
-		output.Step("Pushing %s to local registry...", svc)
-		if err := dockerPush(imageTag); err != nil {
-			return fmt.Errorf("push %s: %w", svc, err)
+	registryRunning := true
+	defer func() {
+		if registryRunning {
+			stopRegistry(cfg.Deploy.PruneBuildCache != "off")
 		}
+	}()
+
+	// Step 3: Push independent service images concurrently. The registry
+	// deduplicates shared blobs, while slow compression or disk writes no longer
+	// serialize the whole deployment.
+	pushStartedAt := time.Now()
+	if err := pushServiceImages(buildServices, registryAddr, cfg.App); err != nil {
+		return err
 	}
+	output.Detail("Timing push: %s", formatDeployDuration(time.Since(pushStartedAt)))
 
 	// Step 4: Deploy to each server
+	promotionStartedAt := time.Now()
+	availability := startAvailabilityProbe(cfg.Deploy.AvailabilityURL, cfg.Deploy.AvailabilityIntervalMS)
 	for _, group := range cfg.Servers {
 		for _, host := range group.Hosts {
 			if err := deploySwarmToHost(cfg, group, host, parsed, buildServices, registryAddr, version, webPort); err != nil {
+				availability.Stop()
 				return err
 			}
+		}
+	}
+	promotionDuration := time.Since(promotionStartedAt)
+	promotionSLOMissed := false
+	availabilityResult := availability.Stop()
+	if cfg.Deploy.AvailabilityURL != "" {
+		output.Detail("Availability: %d samples, %d failures", availabilityResult.Samples, availabilityResult.Failures)
+		if availabilityResult.Failures > 0 {
+			return fmt.Errorf("zero-downtime contract missed: %d/%d availability probes failed (first: %s)", availabilityResult.Failures, availabilityResult.Samples, availabilityResult.FirstFailure)
+		}
+		output.OK("Zero-downtime verified: %d/%d probes succeeded", availabilityResult.Samples, availabilityResult.Samples)
+	}
+	output.Detail("Timing promotion: %s", formatDeployDuration(promotionDuration))
+	if cfg.Deploy.PromotionSLOSeconds > 0 {
+		budget := time.Duration(cfg.Deploy.PromotionSLOSeconds) * time.Second
+		if promotionDuration > budget {
+			promotionSLOMissed = true
+			output.Attn("Promotion SLO missed: %s > %s", formatDeployDuration(promotionDuration), formatDeployDuration(budget))
+		} else {
+			output.OK("Promotion SLO met: %s <= %s", formatDeployDuration(promotionDuration), formatDeployDuration(budget))
 		}
 	}
 
@@ -165,10 +190,96 @@ func deploySwarm(cfg *config.Config, skipBuild bool, dryRun bool) error {
 
 	// Reclaim local disk: prune the Docker build cache used by this deploy.
 	pruneLocalBuildCache(cfg)
+	stopRegistry(cfg.Deploy.PruneBuildCache != "off")
+	registryRunning = false
 
 	fmt.Println()
+	totalDuration := time.Since(totalStartedAt)
+	output.Detail("Timing total: %s", formatDeployDuration(totalDuration))
+	if promotionSLOMissed {
+		return fmt.Errorf("promotion SLO missed: %s > %ds", formatDeployDuration(promotionDuration), cfg.Deploy.PromotionSLOSeconds)
+	}
+	if cfg.Deploy.TotalSLOSeconds > 0 {
+		budget := time.Duration(cfg.Deploy.TotalSLOSeconds) * time.Second
+		if totalDuration > budget {
+			return fmt.Errorf("total deploy SLO missed: %s > %s", formatDeployDuration(totalDuration), formatDeployDuration(budget))
+		}
+		output.OK("Total deploy SLO met: %s <= %s", formatDeployDuration(totalDuration), formatDeployDuration(budget))
+	}
 	output.OK("Swarm deploy complete (rolling updates)")
 	return nil
+}
+
+func buildSwarmServiceImages(parsed *composeFile, services []string, registryAddr string, app string, dryRun bool) error {
+	if len(services) == 1 {
+		service := services[0]
+		phaseStartedAt := time.Now()
+		imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, app, service)
+		fmt.Println()
+		output.Step("Building %s...", service)
+		if err := buildServiceImage(parsed, service, imageTag, dryRun); err != nil {
+			return fmt.Errorf("build %s: %w", service, err)
+		}
+		output.Detail("Timing build.%s: %s", service, formatDeployDuration(time.Since(phaseStartedAt)))
+		return nil
+	}
+
+	fmt.Println()
+	output.Step("Building %d services in parallel...", len(services))
+	var wg sync.WaitGroup
+	errs := make(chan error, len(services))
+
+	for _, service := range services {
+		service := service
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			phaseStartedAt := time.Now()
+			imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, app, service)
+			output.Step("Building %s...", service)
+			if err := buildServiceImage(parsed, service, imageTag, dryRun); err != nil {
+				errs <- fmt.Errorf("build %s: %w", service, err)
+				return
+			}
+			output.Detail("Timing build.%s: %s", service, formatDeployDuration(time.Since(phaseStartedAt)))
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+	if err, ok := <-errs; ok {
+		return err
+	}
+	return nil
+}
+
+func pushServiceImages(services []string, registryAddr string, app string) error {
+	var wg sync.WaitGroup
+	errs := make(chan error, len(services))
+
+	for _, service := range services {
+		service := service
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			imageTag := fmt.Sprintf("%s/%s-%s:latest", registryAddr, app, service)
+			output.Step("Pushing %s to local registry...", service)
+			if err := dockerPush(imageTag); err != nil {
+				errs <- fmt.Errorf("push %s: %w", service, err)
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+	if err, ok := <-errs; ok {
+		return err
+	}
+	return nil
+}
+
+func formatDeployDuration(duration time.Duration) string {
+	return duration.Round(10 * time.Millisecond).String()
 }
 
 func deploySwarmToHost(cfg *config.Config, group config.ServerGroup, host string, parsed *composeFile, buildServices []string, registryAddr string, version string, webPort string) error {

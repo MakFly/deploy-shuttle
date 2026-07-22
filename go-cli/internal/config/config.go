@@ -77,6 +77,17 @@ type Deploy struct {
 	// BuildCacheKeep is the max build-cache size kept when PruneBuildCache is
 	// "capped" (e.g. "5GB", "512MB"). Default "5GB".
 	BuildCacheKeep string `yaml:"build_cache_keep,omitempty" json:"build_cache_keep,omitempty"`
+	// PromotionSLOSeconds is the maximum expected duration for promoting images
+	// that have already been built and pushed to a healthy production stack.
+	// It is reported separately from source-to-image build time.
+	PromotionSLOSeconds int `yaml:"promotion_slo_seconds,omitempty" json:"promotion_slo_seconds,omitempty"`
+	// TotalSLOSeconds is the source-to-production command budget, including
+	// builds, transfers, promotion, cache maintenance, and registry shutdown.
+	TotalSLOSeconds int `yaml:"total_slo_seconds,omitempty" json:"total_slo_seconds,omitempty"`
+	// AvailabilityURL enables an external HTTP probe during promotion. Any
+	// non-2xx response or request error makes the zero-downtime contract fail.
+	AvailabilityURL        string `yaml:"availability_url,omitempty" json:"availability_url,omitempty"`
+	AvailabilityIntervalMS int    `yaml:"availability_interval_ms,omitempty" json:"availability_interval_ms,omitempty"`
 }
 
 type Hooks struct {

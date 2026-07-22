@@ -165,11 +165,15 @@ server:
 
 deploy:
   strategy: swarm
+  promotion_slo_seconds: 30
+  total_slo_seconds: 30
+  # availability_url: https://%s/health
+  # availability_interval_ms: 250
 
 services:
   web:
     port: 3000
-`, app, domain, host, user, port, host, port)
+`, app, domain, host, user, port, host, port, domain)
 }
 
 func Caddyfile(cfg *config.Config, upstream string) string {
