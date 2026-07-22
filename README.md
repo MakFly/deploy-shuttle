@@ -116,7 +116,7 @@ You can ship a Docker app to a **$5 VPS** in an afternoon -- but the gap between
 curl -fsSL https://raw.githubusercontent.com/MakFly/deploy-shuttle/main/scripts/install.sh | sh
 ```
 
-Downloads the latest binary for your OS and architecture into `~/.local/bin`.
+Downloads the latest binary for your OS and architecture into `~/.local/bin`. The installer also installs the versioned `dockerfile-optimizer` skill into both `~/.codex/skills` and `~/.claude/skills`; set `SHUTTLE_INSTALL_SKILLS=0` to opt out.
 
 Pre-built targets: `linux-x64`, `linux-arm64` (Hetzner CAX, AWS Graviton, Raspberry Pi 4/5), `darwin-x64`, `darwin-arm64`.
 
@@ -608,7 +608,7 @@ sh scripts/release.sh minor   # -> v2.1.0
 sh scripts/release.sh major   # -> v3.0.0
 ```
 
-The script validates tests, builds the binary with version injected via ldflags, installs to `~/.local/bin/shuttle`, and creates an annotated git tag. Push triggers the GitHub release workflow that cross-compiles for all platforms.
+The script validates tests, builds the binary with version injected via ldflags, installs to `~/.local/bin/shuttle`, and creates an annotated git tag. Push triggers the GitHub release workflow that cross-compiles for all platforms and publishes the checksummed `dockerfile-optimizer` skill archive used by the installer.
 
 ---
 

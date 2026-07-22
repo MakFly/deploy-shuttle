@@ -39,5 +39,6 @@ jobs:
             dist/shuttle-linux-arm64
             dist/shuttle-darwin-arm64
             dist/shuttle-darwin-x64
+            dist/dockerfile-optimizer.tar.gz
             dist/checksums.txt
           generate_release_notes: true

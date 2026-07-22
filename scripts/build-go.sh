@@ -41,4 +41,5 @@ build darwin arm64 shuttle-darwin-arm64
 build darwin amd64 shuttle-darwin-x64
 
 cd "$DIST"
-sha256sum shuttle-* > checksums.txt
+tar -czf dockerfile-optimizer.tar.gz -C "$ROOT/skills" dockerfile-optimizer
+sha256sum shuttle-* dockerfile-optimizer.tar.gz > checksums.txt
